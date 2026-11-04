@@ -35,7 +35,8 @@ Ce fichier n'en est que le résumé opérationnel.
 - Un repère est fixe et accumule des prises de vue datées. **Un repère peut contenir plusieurs photos**,
   y compris le même jour (rang `_01`, `_02`… en fin de nom).
 - **Un espace isolé par projet**, dans une seule application.
-- Codes de niveau : `SS` (ou `SS1`, `SS2`… si plusieurs sous-sols), `RDC`, `R+1`, `R+2`…, `TT` (toiture).
+- Codes de niveau : `SS` (ou `SS1`, `SS2`… si plusieurs sous-sols), `ES` (entresol), `RDC`, `R+1`, `R+2`…, `TT` (toiture).
+- Un carnet de plans multi-pages est découpé à l'import : une page = le plan d'un niveau.
 - Nom des plans : `{Projet}_{Niveau}.pdf` (sans indice ni lot ; l'indice est dans `_data/`).
 - Dossiers de niveau sous `01_PHOTOS/` préfixés d'un numéro d'ordre (`00_SS`, `01_RDC`, `02_R+1`…), pour
   le tri dans l'Explorateur ; partout ailleurs, le code seul. Voir CONCEPTION §A.6 bis.
@@ -70,6 +71,16 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
 - **Ne jamais committer** de plans clients, de photos réelles, de mots de passe, de jetons ni d'identifiants
   (tenant, client ID…). Les PDF de test réels restent hors du dépôt. Seuls des plans fictifs sont autorisés.
 - RGPD : l'appli ne doit pas inciter à photographier des personnes identifiables.
+
+## Code et commandes
+
+- `src/domaine/` : règles pures (codes de niveau, nommage, types) ; `src/stockage/` : interface `Stockage`
+  et ses implémentations ; `src/projet/` : logique d'un projet (`EspaceProjet`) ; `src/pdf/` : pdf.js et pdf-lib ;
+  `src/ui/` : écrans React.
+- Toute écriture dans le dossier projet passe par `EspaceProjet` et l'interface `Stockage`, jamais directement.
+- `npm test` : tests unitaires. `npm run build && npm run build:test && npm run test:e2e` : parcours complet
+  dans Chromium. `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
+- Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.
 
 ## Conventions de travail
 

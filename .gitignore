@@ -147,3 +147,13 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Constructions de l'application
+dist-test
+
+# Données réelles : ne jamais les mettre dans le dépôt (voir CLAUDE.md)
+*.jpg
+*.jpeg
+*.heic
+*.pdf
+plans-reels/
