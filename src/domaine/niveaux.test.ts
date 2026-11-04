@@ -18,8 +18,8 @@ describe('codes de niveau', () => {
   });
 
   it('numérote les dossiers pour l’Explorateur Windows', () => {
-    const noms = nomsDossiersNiveaux(['RDC', 'TT', 'SS', 'R+1']);
-    expect([...noms.values()]).toEqual(['00_SS', '01_RDC', '02_R+1', '03_TT']);
+    const noms = nomsDossiersNiveaux(['RDC', 'TT', 'SS1', 'R+1']);
+    expect([...noms.values()]).toEqual(['00_SS1', '01_RDC', '02_R+1', '03_TT']);
     // Le tri alphabétique des noms de dossier donne bien l'ordre du bâtiment.
     const beaucoup = [...nomsDossiersNiveaux(genererNiveaux(2, 11, true)).values()];
     expect([...beaucoup].sort()).toEqual(beaucoup);
@@ -30,10 +30,11 @@ describe('codes de niveau', () => {
     expect(normaliserCodeNiveau(' r+02 ')).toBe('R+2');
     expect(normaliserCodeNiveau('ss2')).toBe('SS2');
     expect(normaliserCodeNiveau('rdc')).toBe('RDC');
+    expect(normaliserCodeNiveau('ss')).toBe('SS1');
   });
 
-  it('refuse les mélanges et les doublons', () => {
-    expect(controlerNiveaux(['SS', 'SS2', 'RDC'])).toHaveLength(1);
+  it('refuse les codes non conformes et les doublons', () => {
+    expect(controlerNiveaux(['SS', 'RDC'])).toHaveLength(1); // sous-sol toujours numéroté
     expect(controlerNiveaux(['RDC', 'RDC'])).toHaveLength(1);
     expect(controlerNiveaux(['R1'])).toHaveLength(1);
     expect(controlerNiveaux(['SS2', 'SS1', 'RDC', 'R+1', 'TT'])).toEqual([]);
@@ -55,7 +56,7 @@ describe('codes de niveau', () => {
   });
 
   it('génère une liste type', () => {
-    expect(trierNiveaux(genererNiveaux(1, 2, true))).toEqual(['SS', 'RDC', 'R+1', 'R+2', 'TT']);
+    expect(trierNiveaux(genererNiveaux(1, 2, true))).toEqual(['SS1', 'RDC', 'R+1', 'R+2', 'TT']);
     expect(trierNiveaux(genererNiveaux(2, 0, false))).toEqual(['SS2', 'SS1', 'RDC']);
   });
 
@@ -69,7 +70,7 @@ describe('codes de niveau', () => {
     expect(devinerNiveau('ARCHI_PLAN_R+1_IndB.pdf')).toBe('R+1');
     expect(devinerNiveau('EXE-CVC-R02-ind-C.pdf')).toBe('R+2');
     expect(devinerNiveau('Plan RDC.pdf')).toBe('RDC');
-    expect(devinerNiveau('plan sous-sol.pdf')).toBe('SS');
+    expect(devinerNiveau('plan sous-sol.pdf')).toBe('SS1');
     expect(devinerNiveau('XX_SS2_A.pdf')).toBe('SS2');
     expect(devinerNiveau('Toiture terrasse.pdf')).toBe('TT');
     expect(devinerNiveau('PLAN_R+0.pdf')).toBe('RDC');

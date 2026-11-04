@@ -1,13 +1,13 @@
 /**
  * Codes de niveau (CONCEPTION §A.6 bis) :
- *   SS  (ou SS1, SS2… quand il y a plusieurs sous-sols ; SS1 est le plus proche du RDC)
+ *   SS1, SS2…  (sous-sols, toujours numérotés, même s'il n'y en a qu'un ; SS1 est le plus proche du RDC)
  *   ES  (entresol, entre les sous-sols et le RDC)
  *   RDC
  *   R+1, R+2, …
  *   TT  (toiture)
  */
 
-const MOTIF_CODE = /^(SS[1-9]\d?|SS|ES|RDC|R\+[1-9]\d?|TT)$/;
+const MOTIF_CODE = /^(SS[1-9]\d?|ES|RDC|R\+[1-9]\d?|TT)$/;
 
 /** Indique si le code respecte la convention. */
 export function estCodeNiveauValide(code: string): boolean {
@@ -21,6 +21,7 @@ export function normaliserCodeNiveau(saisie: string): string {
   if (etage) return `R+${etage[1]}`;
   const ss = /^SS0*([1-9]\d?)$/.exec(c);
   if (ss) return `SS${ss[1]}`;
+  if (c === 'SS' || c === 'SOUS-SOL' || c === 'SOUSSOL') return 'SS1';
   if (c === 'R+0' || c === 'R0') return 'RDC';
   if (c === 'ENTRESOL') return 'ES';
   if (c === 'TOIT' || c === 'TOITURE') return 'TT';
@@ -29,13 +30,12 @@ export function normaliserCodeNiveau(saisie: string): string {
 
 /**
  * Rang du niveau dans le bâtiment, du plus bas au plus haut.
- * SS2 < SS1 < SS < ES < RDC < R+1 < … < TT.
+ * SS2 < SS1 < ES < RDC < R+1 < … < TT.
  */
 export function rangNiveau(code: string): number {
   if (code === 'RDC') return 0;
   if (code === 'ES') return -0.5;
   if (code === 'TT') return 1000;
-  if (code === 'SS') return -1;
   const ss = /^SS(\d+)$/.exec(code);
   if (ss) return -Number(ss[1]);
   const etage = /^R\+(\d+)$/.exec(code);
@@ -60,20 +60,13 @@ export function controlerNiveaux(codes: readonly string[]): string[] {
     if (vus.has(code)) problemes.push(`Niveau en double : « ${code} ».`);
     vus.add(code);
   }
-  const ssSimple = codes.includes('SS');
-  const ssNumerotes = codes.some((c) => /^SS\d+$/.test(c));
-  if (ssSimple && ssNumerotes) {
-    problemes.push(
-      'Mélange de « SS » et de « SS1, SS2… » : quand il y a plusieurs sous-sols, ils doivent tous être numérotés.',
-    );
-  }
   return problemes;
 }
 
 /**
  * Noms des dossiers de niveau sous 01_PHOTOS/ : numéro d'ordre à 2 chiffres
  * devant le code, pour que l'Explorateur Windows les affiche dans l'ordre du bâtiment.
- * Exemple : SS, RDC, R+1 → { SS: "00_SS", RDC: "01_RDC", "R+1": "02_R+1" }.
+ * Exemple : SS1, RDC, R+1 → { SS1: "00_SS1", RDC: "01_RDC", "R+1": "02_R+1" }.
  */
 export function nomsDossiersNiveaux(codes: readonly string[]): Map<string, string> {
   const resultat = new Map<string, string>();
@@ -92,8 +85,7 @@ export function codeDepuisNomDossier(nom: string): string | null {
 /** Construit la liste type : n sous-sols, entresol éventuel, RDC, m étages, toiture éventuelle. */
 export function genererNiveaux(sousSols: number, etages: number, toiture: boolean, entresol = false): string[] {
   const codes: string[] = [];
-  if (sousSols === 1) codes.push('SS');
-  for (let i = sousSols; i >= 1 && sousSols > 1; i--) codes.push(`SS${i}`);
+  for (let i = sousSols; i >= 1; i--) codes.push(`SS${i}`);
   if (entresol) codes.push('ES');
   codes.push('RDC');
   for (let i = 1; i <= etages; i++) codes.push(`R+${i}`);
@@ -103,7 +95,6 @@ export function genererNiveaux(sousSols: number, etages: number, toiture: boolea
 
 /** Libellé en clair, pour l'affichage. */
 export function libelleNiveau(code: string): string {
-  if (code === 'SS') return 'Sous-sol';
   if (code === 'RDC') return 'Rez-de-chaussée';
   if (code === 'ES') return 'Entresol';
   if (code === 'TT') return 'Toiture';
@@ -132,7 +123,7 @@ export function devinerNiveau(nomFichier: string): string | null {
     [new RegExp(`${sep}SOUS[-_ ]?SOL[-_ ]?0*([1-9])${fin}`), (m) => `SS${m[1]}`],
     [new RegExp(`${sep}(?:RDC|R\\+?0+|REZ[-_ ]DE[-_ ]CHAUSSEE)${fin}`), () => 'RDC'],
     [new RegExp(`${sep}(?:ES|ENTRESOL)${fin}`), () => 'ES'],
-    [new RegExp(`${sep}(?:SS|SOUS[-_ ]?SOL)${fin}`), () => 'SS'],
+    [new RegExp(`${sep}(?:SS|SOUS[-_ ]?SOL)${fin}`), () => 'SS1'],
     [new RegExp(`${sep}(?:TT|TOITURE|TOIT|TERRASSE)${fin}`), () => 'TT'],
     [new RegExp(`${sep}ETAGE[-_ ]?0*([1-9]\\d?)${fin}`), (m) => `R+${m[1]}`],
   ];
@@ -156,7 +147,7 @@ export function devinerNiveauPage(texte: string): string | null {
     let code = m[1].replace(/ /g, '');
     if (/^REZ/.test(code)) code = 'RDC';
     const ss = /^SOUS-?SOL(\d?)$/.exec(code);
-    if (ss) code = ss[1] ? `SS${ss[1]}` : 'SS';
+    if (ss) code = ss[1] ? `SS${ss[1]}` : 'SS1';
     code = normaliserCodeNiveau(code);
     if (estCodeNiveauValide(code)) trouves.add(code);
   }

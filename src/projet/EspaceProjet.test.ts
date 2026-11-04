@@ -29,7 +29,7 @@ describe('EspaceProjet', () => {
     const cr = await e.ajouterNiveau('ss', 'BL');
     expect(cr).toContain('Dossier renommé : 01_R+1 → 02_R+1');
     const photos = (await s.lister('01_PHOTOS')).map((x) => x.nom).sort();
-    expect(photos).toEqual(['00_SS', '01_RDC', '02_R+1', '03_TT']);
+    expect(photos).toEqual(['00_SS1', '01_RDC', '02_R+1', '03_TT']);
     expect(await s.existe('01_PHOTOS/02_R+1/temoin.txt')).toBe(true);
     // Idempotent : une seconde application ne change rien.
     expect(await e.appliquerArborescence()).toEqual([]);

@@ -172,10 +172,10 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   await page.getByRole('button', { name: 'Importer 1 plan' }).click();
   await page.getByText(/Indice A archivé/).waitFor();
 
-  // Mélange SS / SS2 refusé, puis ajout de R+3 : TT doit être renuméroté.
-  await page.getByLabel('Ajouter un niveau').fill('ss2');
+  // « ss » devient SS1, déjà présent : refusé. Puis ajout de R+3 : TT doit être renuméroté.
+  await page.getByLabel('Ajouter un niveau').fill('ss');
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-  await page.getByText(/Mélange de « SS »/).waitFor();
+  await page.getByText('Niveau en double : « SS1 ».').waitFor();
   await page.getByLabel('Ajouter un niveau').fill('r3');
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
   await page.getByText('Dossier renommé : 04_TT → 05_TT').waitFor();
@@ -196,7 +196,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
     '00_PLANS/_ANCIENS/',
     '00_PLANS/_ANCIENS/T01_R+1_Ind-A.pdf',
     '01_PHOTOS/',
-    '01_PHOTOS/00_SS/',
+    '01_PHOTOS/00_SS1/',
     '01_PHOTOS/01_RDC/',
     '01_PHOTOS/02_R+1/',
     '01_PHOTOS/03_R+2/',
