@@ -35,14 +35,17 @@ Ce fichier n'en est que le résumé opérationnel.
 - Un repère est fixe et accumule des prises de vue datées. **Un repère peut contenir plusieurs photos**,
   y compris le même jour (rang `_01`, `_02`… en fin de nom).
 - **Un espace isolé par projet**, dans une seule application.
-- Codes de niveau : `SS` (sous-sol), `RDC`, `R+1`, `R+2`…, `TT` (toiture). Voir CONCEPTION §A.6 bis.
+- Codes de niveau : `SS` (ou `SS1`, `SS2`… si plusieurs sous-sols), `RDC`, `R+1`, `R+2`…, `TT` (toiture).
+- Nom des plans : `{Projet}_{Niveau}.pdf` (sans indice ni lot ; l'indice est dans `_data/`).
+- Dossiers de niveau sous `01_PHOTOS/` préfixés d'un numéro d'ordre (`00_SS`, `01_RDC`, `02_R+1`…), pour
+  le tri dans l'Explorateur ; partout ailleurs, le code seul. Voir CONCEPTION §A.6 bis.
 
 ## Arborescence sur le serveur partagé (CONCEPTION §A.6)
 
 ```
 2026-XXX_NomProjet/
-├── 00_PLANS/       XXX_R+1_Ind-B.pdf
-├── 01_PHOTOS/{Niveau}/{Niveau}.{N°local}_{NomLocal}/XXX_{Niveau}.{N°local}_P001_AAAA-MM-JJ_01.jpg
+├── 00_PLANS/       XXX_R+1.pdf
+├── 01_PHOTOS/{NN}_{Niveau}/{Niveau}.{N°local}_{NomLocal}/XXX_{Niveau}.{N°local}_P001_AAAA-MM-JJ_01.jpg
 ├── 02_EXPORTS/
 └── _data/
 ```

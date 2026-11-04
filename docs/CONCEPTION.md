@@ -37,7 +37,7 @@ Une application, à la fois **sur téléphone Android** et **sur PC Windows sans
 | Utilisateurs | **Une équipe dès le départ** (plusieurs personnes sur un même projet) |
 | Stockage actuel | **Serveur réseau partagé** (lecteur réseau). SharePoint est possible, la DSI sera sollicitée. |
 | Stockage définitif voulu | **Serveur réseau partagé uniquement. SharePoint seulement comme transit**, jamais comme stockage définitif. |
-| Format des plans | **PDF**. Codes de niveau définis le 04/11/2026 (voir A.6 bis) ; le reste du gabarit de nom est à définir. |
+| Format des plans | **PDF**. Nom des plans : `{Projet}_{Niveau}.pdf` (décidé le 04/11/2026, voir A.6 bis). |
 | Usage principal | **Relevé d'existant, audit et suivi de chantier** (suivi de chantier ajouté le 04/11/2026) |
 | Volume | **20 à 300 photos par visite** |
 | Organisation | **Un espace isolé par projet dans une seule application** (confirmé le 04/11/2026) |
@@ -87,9 +87,9 @@ Règles :
 ```
 2026-XXX_NomProjet/
 ├── 00_PLANS/
-│   └── XXX_R+1_Ind-B.pdf
+│   └── XXX_R+1.pdf
 ├── 01_PHOTOS/
-│   └── R+1/
+│   └── 02_R+1/       (numéro d'ordre du niveau devant le code : voir A.6 bis)
 │       ├── R+1.012_Local-TGBT/
 │       │   ├── XXX_R+1.012_P001_2026-10-30_01.jpg
 │       │   ├── XXX_R+1.012_P001_2027-03-15_01.jpg   (même repère, autre date)
@@ -110,10 +110,14 @@ Principe : une fois les noms triés par ordre alphabétique, les photos d'un mê
 | `R+1`, `R+2`, … | Étages courants |
 | `TT` | Toiture |
 
-Points [À VÉRIFIER] avec l'utilisateur :
-- **plusieurs sous-sols** : notation proposée `SS1`, `SS2`… ;
-- **ordre d'affichage** : l'appli trie les niveaux dans l'ordre du bâtiment (SS → RDC → R+1 → … → TT). En revanche l'Explorateur Windows trie les dossiers `01_PHOTOS/{Niveau}` par ordre alphabétique (`R+1`, `R+10`, `R+2`, `RDC`, `SS`, `TT`), donc pas dans l'ordre du bâtiment ;
-- le reste du gabarit de nom des plans (`{Projet}_{Niveau}_{Indice}` ?) reste à définir.
+Règles (validées le 04/11/2026) :
+- **Plusieurs sous-sols** : `SS1`, `SS2`… (`SS1` étant le plus proche du RDC). Un seul sous-sol : `SS`.
+- **Nom des plans** : `{Projet}_{Niveau}.pdf`, par exemple `XXX_R+1.pdf`. Ni indice ni lot dans le nom.
+- **Ordre dans l'Explorateur Windows** : les dossiers de niveau sous `01_PHOTOS/` portent un **numéro d'ordre à 2 chiffres** devant le code, attribué par l'appli dans l'ordre du bâtiment (du plus bas au plus haut), par exemple `00_SS2`, `01_SS1`, `02_RDC`, `03_R+1`… `NN_TT`. **Seuls ces dossiers** portent ce numéro. Les noms des plans, des dossiers de locaux et des photos gardent le code seul (`XXX_R+1.012_P001_…jpg`).
+
+Points [À VÉRIFIER] :
+- **Indices des plans** : le nom ne portant pas l'indice, l'indice est enregistré dans les données de l'appli (`_data/`). Proposition : à chaque nouvel indice, le PDF remplacé est déplacé dans `00_PLANS/_ANCIENS/` sous le nom `{Projet}_{Niveau}_{Indice}.pdf`, pour garder l'historique. À confirmer.
+- **Ajout d'un niveau en cours de projet** (par ex. un sous-sol découvert après coup) : la numérotation d'ordre devrait alors être décalée et les dossiers renommés. Proposition : l'appli le fait automatiquement, depuis le PC.
 
 ## A.7 Fonctions prévues
 
@@ -128,7 +132,7 @@ Points [À VÉRIFIER] avec l'utilisateur :
 **Plans et locaux**
 - Import PDF avec pdf.js, affichage par tuiles (zoom fluide, hors ligne).
 - **Détection automatique des locaux** depuis le texte vectoriel des PDF (étiquettes de pièces avec leur position) [À VÉRIFIER sur de vrais plans : impossible si le PDF est scanné ou si le texte est converti en traits].
-- Renommage des plans par gabarit paramétrable (par ex. `{Projet}_{Niveau}_{Indice}`), éventuellement depuis un tableau Excel.
+- Renommage des plans selon la convention `{Projet}_{Niveau}.pdf` (A.6 bis), éventuellement depuis un tableau Excel.
 - Changement d'indice : report des repères, avec recalage par 2 points si le cadrage a changé.
 
 **Suivi dans le temps**
@@ -160,7 +164,7 @@ Les lots 1 à 4 ne dépendent pas de la DSI.
 1. ~~**Comment les plans arrivent sur les téléphones**~~ **TRANCHÉ le 04/11/2026 : option A** (voir A.4-9). Rappel des options :
    - **A (recommandé)** : une copie de travail des plans et des repères reste dans SharePoint Transit pendant le projet. Chaque téléphone la télécharge seul. La copie est supprimée à la clôture du projet.
    - **B** : seules les photos transitent. Les plans sont chargés sur chaque téléphone par câble USB, à refaire à chaque nouvel indice.
-2. **Convention de nommage des plans** : codes de niveau définis le 04/11/2026 (A.6 bis). Reste à définir : le gabarit complet, la notation des sous-sols multiples, l'ordre de tri dans l'Explorateur.
+2. ~~**Convention de nommage des plans**~~ **TRANCHÉ le 04/11/2026** (A.6 bis) : `{Projet}_{Niveau}.pdf`, sous-sols `SS1`, `SS2`…, numéro d'ordre devant les dossiers de niveau. Restent [À VÉRIFIER] : l'archivage des anciens indices et l'ajout d'un niveau en cours de projet.
 3. **Plans PDF de test** : 2 ou 3 vrais plans (anonymisés) pour vérifier la détection des locaux. **Ne pas les mettre dans le dépôt Git si ce sont des plans clients.**
 4. **Écriture sur un lecteur réseau mappé** par la File System Access API : à tester dès le lot 1 [À VÉRIFIER].
 5. ~~**« Une appli par projet »**~~ **TRANCHÉ le 04/11/2026** : un espace isolé par projet dans une seule application.
