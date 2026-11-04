@@ -20,7 +20,7 @@ sans me le signaler explicitement. Réponds en français.
 
 ## A.1 Profil de l'utilisateur
 
-- Ingénieur électricité en bureau d'études fluides (BET), en France.
+- Ingénieur **CVC** en bureau d'études fluides (BET), en France.
 - Projets de bâtiment (ERP, tertiaire, logement), phases APS à EXE.
 - Préférences : réponses en français, vocabulaire technique précis, rigueur plutôt que fluidité, toute incertitude marquée **[À VÉRIFIER]**.
 - Il n'est pas développeur : il faut expliquer les étapes techniques (Git, installation, déploiement) pas à pas.
@@ -37,18 +37,18 @@ Une application, à la fois **sur téléphone Android** et **sur PC Windows sans
 | Utilisateurs | **Une équipe dès le départ** (plusieurs personnes sur un même projet) |
 | Stockage actuel | **Serveur réseau partagé** (lecteur réseau). SharePoint est possible, la DSI sera sollicitée. |
 | Stockage définitif voulu | **Serveur réseau partagé uniquement. SharePoint seulement comme transit**, jamais comme stockage définitif. |
-| Format des plans | **PDF**. La convention de nommage est à définir plus tard. |
-| Usage principal | **Relevé d'existant et audit** |
+| Format des plans | **PDF**. Codes de niveau définis le 04/11/2026 (voir A.6 bis) ; le reste du gabarit de nom est à définir. |
+| Usage principal | **Relevé d'existant, audit et suivi de chantier** (suivi de chantier ajouté le 04/11/2026) |
 | Volume | **20 à 300 photos par visite** |
-| Organisation | **Un espace par projet** (« une appli par projet », compris comme un espace isolé par projet [À VÉRIFIER avec l'utilisateur]) |
+| Organisation | **Un espace isolé par projet dans une seule application** (confirmé le 04/11/2026) |
 | Dépôt de code | **Un dépôt GitHub dédié**, à créer (voir la partie B) |
 | Filtres par lot (CFO, CVC…) | **Inutiles**. Priorité : beaucoup de photos, très faciles à prendre, à retrouver et à repérer. |
 | Besoins exprimés en plus | **Reprendre la même photo à plusieurs dates** et **rechercher par local** (locaux identifiés sur les plans) |
 
 ## A.4 Décisions d'architecture prises
 
-1. **Technologie : une seule base de code, une PWA** (Progressive Web App), en TypeScript avec React ou Svelte.
-   - Installée depuis Chrome sur Android et depuis Edge sur Windows : pas de droits admin, pas de store.
+1. **Technologie : une seule base de code, une PWA** (Progressive Web App), en TypeScript avec **React** (choix validé le 04/11/2026).
+   - Installée depuis Chrome sur Android et depuis **Chrome ou Edge** sur PC Windows : pas de droits admin, pas de store.
    - Hors ligne : Service Worker (cache de l'appli) et IndexedDB (données locales).
    - Côté PC, écriture dans les vrais dossiers Windows par la *File System Access API* (Edge/Chrome).
    - Solutions de repli si besoin : Capacitor (vraie appli Android) ou Tauri (exe Windows installable par l'utilisateur seul, sans droits admin).
@@ -71,7 +71,7 @@ Projet
  ├─ Plan (niveau, indice, PDF source, pages)
  │   └─ Local (numéro, nom, contour ou étiquette sur le plan)
  │        └─ Repère (x, y RELATIFS entre 0 et 1, n°, libellé, direction de prise de vue)
- │             └─ Prise de vue (date, auteur, fichier photo, commentaire, empreinte)
+ │             └─ Prise de vue (date, auteur, fichier photo, commentaire, empreinte) : PLUSIEURS par repère
  └─ Campagne / visite (date, équipe) : regroupe les prises de vue d'une journée
 ```
 
@@ -80,6 +80,7 @@ Règles :
 - **Identifiants UUID** générés sur l'appareil, pour créer des repères hors ligne sans collision. Le numéro lisible (`P012`) n'est qu'un libellé, réattribuable.
 - **Un petit fichier JSON par élément** (`_data/reperes/{uuid}.json`, `_data/photos/{uuid}.json`…) plutôt qu'un gros fichier unique, pour éviter les conflits d'écriture à plusieurs.
 - Le **repère est fixe** ; il accumule des **prises de vue datées**, ce qui permet le suivi dans le temps.
+- **Un repère peut contenir plusieurs photos**, y compris plusieurs le même jour : elles sont numérotées par un rang (`_01`, `_02`…) en fin de nom (voir A.6).
 
 ## A.6 Arborescence sur le serveur partagé
 
@@ -99,6 +100,20 @@ Règles :
 ```
 
 Principe : une fois les noms triés par ordre alphabétique, les photos d'un même repère se suivent dans l'ordre chronologique. Tout reste lisible sans l'appli.
+
+## A.6 bis Codes de niveau (décidé le 04/11/2026)
+
+| Code | Niveau |
+|---|---|
+| `SS` | Sous-sol |
+| `RDC` | Rez-de-chaussée |
+| `R+1`, `R+2`, … | Étages courants |
+| `TT` | Toiture |
+
+Points [À VÉRIFIER] avec l'utilisateur :
+- **plusieurs sous-sols** : notation proposée `SS1`, `SS2`… ;
+- **ordre d'affichage** : l'appli trie les niveaux dans l'ordre du bâtiment (SS → RDC → R+1 → … → TT). En revanche l'Explorateur Windows trie les dossiers `01_PHOTOS/{Niveau}` par ordre alphabétique (`R+1`, `R+10`, `R+2`, `RDC`, `SS`, `TT`), donc pas dans l'ordre du bâtiment ;
+- le reste du gabarit de nom des plans (`{Projet}_{Niveau}_{Indice}` ?) reste à définir.
 
 ## A.7 Fonctions prévues
 
@@ -145,10 +160,10 @@ Les lots 1 à 4 ne dépendent pas de la DSI.
 1. ~~**Comment les plans arrivent sur les téléphones**~~ **TRANCHÉ le 04/11/2026 : option A** (voir A.4-9). Rappel des options :
    - **A (recommandé)** : une copie de travail des plans et des repères reste dans SharePoint Transit pendant le projet. Chaque téléphone la télécharge seul. La copie est supprimée à la clôture du projet.
    - **B** : seules les photos transitent. Les plans sont chargés sur chaque téléphone par câble USB, à refaire à chaque nouvel indice.
-2. **Convention de nommage des plans** : à définir.
+2. **Convention de nommage des plans** : codes de niveau définis le 04/11/2026 (A.6 bis). Reste à définir : le gabarit complet, la notation des sous-sols multiples, l'ordre de tri dans l'Explorateur.
 3. **Plans PDF de test** : 2 ou 3 vrais plans (anonymisés) pour vérifier la détection des locaux. **Ne pas les mettre dans le dépôt Git si ce sont des plans clients.**
 4. **Écriture sur un lecteur réseau mappé** par la File System Access API : à tester dès le lot 1 [À VÉRIFIER].
-5. **« Une appli par projet »** : confirmer qu'il s'agit d'un espace isolé par projet dans une même appli, et non d'une appli construite pour chaque projet.
+5. ~~**« Une appli par projet »**~~ **TRANCHÉ le 04/11/2026** : un espace isolé par projet dans une seule application.
 6. **Note à la DSI** : une première version a été rédigée, mais elle décrit **l'ancienne architecture** (SharePoint comme stockage définitif, un site par projet). **Elle est à refaire** selon A.4 :
    - stockage définitif sur le serveur partagé ;
    - **une seule bibliothèque SharePoint de transit**, avec permission Sites.Selected limitée à elle ;

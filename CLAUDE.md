@@ -7,14 +7,14 @@ Ce fichier n'en est que le résumé opérationnel.
 
 - Répondre **en français**, avec un vocabulaire technique précis. Préférer la rigueur à la fluidité.
 - Marquer toute incertitude par **[À VÉRIFIER]**.
-- L'utilisateur est ingénieur électricité en BET fluides, **pas développeur** : expliquer pas à pas
+- L'utilisateur est ingénieur **CVC** en BET fluides, **pas développeur** : expliquer pas à pas
   les étapes techniques (Git, installation, test, déploiement) et ce que chaque commande fait.
 - Ne **jamais** remettre en cause une décision de `docs/CONCEPTION.md` §A.4 sans le signaler explicitement.
 
 ## Architecture (décisions figées, voir CONCEPTION §A.4)
 
-- **Une seule base de code : PWA** en TypeScript (React ou Svelte, choix à acter au lot 1).
-  Installée depuis Chrome (Android) et Edge (Windows), **sans droits administrateur ni store**.
+- **Une seule base de code : PWA** en TypeScript avec **React** (validé le 04/11/2026).
+  Installée depuis Chrome (Android) et Chrome ou Edge (PC Windows), **sans droits administrateur ni store**.
 - **Hors ligne obligatoire** : Service Worker (cache de l'appli) + IndexedDB (données locales).
   Demander `navigator.storage.persist()`.
 - **Stockage définitif = serveur réseau partagé uniquement**, écrit depuis le PC par la File System Access API.
@@ -32,7 +32,10 @@ Ce fichier n'en est que le résumé opérationnel.
 - Coordonnées des repères **relatives (0 à 1)** à la page du plan, jamais en pixels.
 - Identifiants **UUID générés sur l'appareil**. Le numéro lisible (`P012`) n'est qu'un libellé réattribuable.
 - **Un petit fichier JSON par élément** dans `_data/` (`_data/reperes/{uuid}.json`, `_data/photos/{uuid}.json`…).
-- Un repère est fixe et accumule des prises de vue datées.
+- Un repère est fixe et accumule des prises de vue datées. **Un repère peut contenir plusieurs photos**,
+  y compris le même jour (rang `_01`, `_02`… en fin de nom).
+- **Un espace isolé par projet**, dans une seule application.
+- Codes de niveau : `SS` (sous-sol), `RDC`, `R+1`, `R+2`…, `TT` (toiture). Voir CONCEPTION §A.6 bis.
 
 ## Arborescence sur le serveur partagé (CONCEPTION §A.6)
 
@@ -48,9 +51,10 @@ Les noms triés alphabétiquement doivent donner l'ordre chronologique par repè
 
 ## Priorités fonctionnelles
 
+- Usages : **relevé d'existant, audit et suivi de chantier**.
 - Terrain : **2 appuis maximum par photo**. Appui long sur le plan = nouveau repère + appareil photo.
 - Photos compressées vers 1 à 1,5 Mo, **métadonnées EXIF conservées**.
-- Recherche par local (« TGBT », « 012 »).
+- Recherche par local (« chaufferie », « TGBT », « 012 »).
 - Pas de filtres par lot technique (CFO, CVC…) : jugés inutiles.
 
 ## Plan de réalisation (CONCEPTION §A.8)
