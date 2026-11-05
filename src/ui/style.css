@@ -40,7 +40,7 @@ h1 { font-size: 1.4rem; margin: 0 0 8px; }
 h2 { font-size: 1.1rem; margin: 16px 0 8px; }
 .carte h2:first-child { margin-top: 0; }
 
-.entete { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+.entete { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 52px;
   padding: 8px 16px; background: var(--accent); color: var(--accent-texte); }
 .lien-titre { display: flex; align-items: center; gap: 8px; background: none; border: none;
   color: inherit; font-size: 1.05rem; font-weight: 600; padding: 4px 0; cursor: pointer; }
@@ -107,3 +107,77 @@ button.projet .discret { font-size: 0.85rem; }
 .fenetre canvas { display: block; margin-top: 8px; background: #fff; }
 .source-pdf { border: 1px solid var(--bord); border-radius: 8px; padding: 8px 12px; margin-top: 12px; }
 .ligne-ignoree td { color: var(--discret); }
+
+/* ---------------------------------------------------------------- recherche */
+.recherche { position: relative; margin-top: 12px; }
+.recherche input { width: 100%; }
+.resultats { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px;
+  list-style: none; background: var(--carte); border: 1px solid var(--bord); border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); max-height: 60vh; overflow-y: auto; }
+.resultats .aucun { padding: 10px; }
+.resultats button { width: 100%; display: flex; gap: 10px; align-items: baseline; text-align: left; border: none;
+  border-radius: 6px; min-height: 44px; }
+.resultats button:hover, .resultats button:focus { background: var(--info-fond); }
+.res-niveau { font-weight: 700; min-width: 3.2em; }
+.res-numero { min-width: 5.5em; color: var(--discret); }
+.res-nom { flex: 1; }
+
+/* ---------------------------------------------------------------- écran plan */
+.ecran-plan { position: fixed; inset: 52px 0 0 0; display: flex; flex-direction: column; background: var(--fond); z-index: 5; }
+.barre-plan { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px;
+  background: var(--carte); border-bottom: 1px solid var(--bord); }
+.barre-plan select { font: inherit; min-height: 44px; border-radius: 8px; border: 1px solid var(--bord);
+  background: var(--carte); color: var(--texte); padding: 0 8px; }
+.barre-recherche-plan { flex: 1 1 280px; }
+.barre-recherche-plan .recherche { margin-top: 0; }
+.ecran-plan > .message { margin: 8px 12px; }
+.corps-plan { flex: 1; display: flex; min-height: 0; }
+.zone-vue { flex: 1; position: relative; min-width: 0; }
+.panneau-plan { width: 340px; overflow-y: auto; padding: 12px 16px; background: var(--carte); border-left: 1px solid var(--bord); }
+.panneau-plan h2 { margin-top: 12px; }
+@media (max-width: 760px) {
+  .corps-plan { flex-direction: column; }
+  .zone-vue { flex: 1 1 55%; }
+  .panneau-plan { width: auto; flex: 0 1 45%; border-left: none; border-top: 1px solid var(--bord); }
+  .barre-plan .mono { display: none; }
+}
+
+.visionneuse { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none;
+  background: #d9dee5; cursor: grab; }
+.visionneuse:active { cursor: grabbing; }
+.visionneuse.placement { cursor: crosshair; }
+.vue-marqueurs { position: absolute; inset: 0; pointer-events: none; }
+.vue-etat { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--discret); }
+.vue-commandes { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.vue-commandes button { width: 44px; height: 44px; padding: 0; font-size: 1.3rem; box-shadow: 0 2px 6px rgb(0 0 0 / 0.2); }
+.vue-zoom { font-size: 0.75rem; background: var(--carte); padding: 2px 6px; border-radius: 6px; color: var(--discret); }
+.consigne { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: var(--accent);
+  color: var(--accent-texte); padding: 8px 12px; border-radius: 8px; display: flex; gap: 12px; align-items: center;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25); max-width: calc(100% - 24px); }
+.consigne button { color: var(--texte); }
+
+/* Marqueur : point d'ancrage à la position exacte, étiquette au-dessus. */
+.marqueur { position: absolute; left: 0; top: 0; pointer-events: auto; border: none; background: none; padding: 0;
+  min-height: 0; width: 0; height: 0; overflow: visible; cursor: pointer; }
+.marqueur-point { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+  background: #1f4e79; border: 2px solid #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3); }
+.marqueur-libelle { position: absolute; left: 0; bottom: 8px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: 4px; background: #1f4e79; color: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
+.marqueur-selection .marqueur-point, .marqueur-selection .marqueur-libelle { background: #e8743b; }
+.marqueur-selection { z-index: 2; }
+.marqueur-selection .marqueur-libelle { font-size: 14px; font-weight: 600; }
+.marqueur-candidat .marqueur-point { background: #1b6e3a; }
+.marqueur-candidat .marqueur-libelle { background: #fff; color: #1b6e3a; border: 2px dashed #1b6e3a; }
+.marqueur-candidat-ecarte .marqueur-point { background: #999; }
+.marqueur-candidat-ecarte .marqueur-libelle { background: #fff; color: #777; border: 2px dashed #aaa; text-decoration: line-through; }
+.marqueur-brouillon .marqueur-point, .marqueur-brouillon .marqueur-libelle { background: #e8743b; }
+
+.liste-locaux { list-style: none; margin: 0; padding: 0; }
+.liste-locaux li { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--bord); }
+.liste-locaux button { flex: 1; display: grid; grid-template-columns: 5.5em 1fr auto; gap: 8px; text-align: left;
+  border: none; background: none; min-height: 44px; padding: 6px 4px; border-radius: 0; }
+.liste-locaux button:hover { background: var(--info-fond); }
+.liste-candidats li.ecarte button { color: var(--discret); text-decoration: line-through; }
+.fiche-local label { margin-top: 8px; }
+.fiche-local input { width: 100%; }

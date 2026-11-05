@@ -80,3 +80,46 @@ describe('EspaceProjet', () => {
     expect((await s.lister('01_PHOTOS')).map((x) => x.nom).sort()).toEqual(['00_RDC', '01_TT']);
   });
 });
+
+describe('locaux', () => {
+  async function projetAvecPlan() {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, infos, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    return { s, e, planId: e.plans[0].id };
+  }
+
+  it('enregistre la détection sans doublons, puis relit les locaux', async () => {
+    const { s, e, planId } = await projetAvecPlan();
+    const detectes = [
+      { nom: 'TGBT', numero: 'LT1105', surface: 30.4, x: 0.3, y: 0.8, confiance: 'forte' as const, lignes: [] },
+      { nom: 'BUREAUX', numero: null, surface: null, x: 0.2, y: 0.5, confiance: 'moyenne' as const, lignes: [] },
+    ];
+    await e.enregistrerDetection(planId, detectes, 'BL');
+    const cr = await e.enregistrerDetection(planId, detectes, 'BL');
+    expect(cr[0]).toMatch(/^0 local/);
+    expect(e.locaux).toHaveLength(2);
+    expect((await s.lister('_data/locaux')).length).toBe(2);
+    const rouvert = await EspaceProjet.ouvrir(s);
+    expect(rouvert.locauxDuPlan(planId).map((l) => l.nom)).toEqual(['BUREAUX', 'TGBT']);
+  });
+
+  it('trouve le TGBT par la recherche', async () => {
+    const { e, planId } = await projetAvecPlan();
+    await e.creerLocal(planId, { nom: 'TGBT', numero: 'lt1105', surface: null, x: 0.5, y: 0.5 }, 'BL');
+    await e.creerLocal(planId, { nom: 'Chaufferie', numero: null, surface: 40, x: 0.6, y: 0.5 }, 'BL');
+    const r = e.rechercherLocaux('tgbt');
+    expect(r.map((x) => [x.local.numero, x.niveau.code])).toEqual([['LT1105', 'R+1']]);
+  });
+
+  it('refuse un numéro en double et un nom vide, modifie et supprime', async () => {
+    const { e, planId } = await projetAvecPlan();
+    const l = await e.creerLocal(planId, { nom: 'Bureau', numero: '101', surface: null, x: 0.1, y: 0.1 }, 'BL');
+    await expect(e.creerLocal(planId, { nom: 'Autre', numero: '101', surface: null, x: 0.2, y: 0.2 }, 'BL')).rejects.toThrow(/déjà utilisé/);
+    await expect(e.creerLocal(planId, { nom: ' ', numero: null, surface: null, x: 0.2, y: 0.2 }, 'BL')).rejects.toThrow(/obligatoire/);
+    await e.modifierLocal(l.id, { nom: 'Bureau direction', numero: '101', surface: 18, x: 0.12, y: 0.1 }, 'BL');
+    expect(e.locaux[0].nom).toBe('Bureau direction');
+    await e.supprimerLocal(l.id);
+    expect(e.locaux).toHaveLength(0);
+  });
+});

@@ -125,6 +125,16 @@ Règles issues du lot 1 (04/11/2026) :
 - **Carnets de plans** : un PDF contenant un niveau par page est découpé à l'import. Chaque page retenue devient le plan `{Projet}_{Niveau}.pdf` de son niveau, avec son contenu vectoriel. Le niveau de chaque page est reconnu d'après son titre (« PLAN DE NIVEAU - R+2 », « … - ENTRESOL », « … - TOIT »…), et l'utilisateur peut le corriger avant l'import. Le JSON du plan garde le nom du carnet d'origine et le numéro de page (`pageOrigine`).
 - **Équivalences reconnues** : `R+0` → `RDC`, `ENTRESOL` → `ES`, `TOIT` / `TOITURE` → `TT`, `R1` → `R+1`.
 
+## A.6 ter Locaux (lot 2, 05/11/2026)
+
+- Un local = un fichier `_data/locaux/{uuid}.json` : plan de rattachement (`planId`), numéro (facultatif), nom, surface (facultative), position de son étiquette (x, y relatifs 0 à 1), origine (`auto` : détecté puis validé ; `manuel` : placé à la main), auteur et date de création et de modification.
+- **Détection** : l'appli lit le texte vectoriel de la page et regroupe les lignes empilées et centrées de même hauteur. Elle retient les groupes qui contiennent un numéro (lettres puis chiffres, comme `SF202`, `LT1104.B`, ou chiffres seuls s'il y a une surface) ou une surface (`33,7 m²`). Un nom seul est retenu s'il désigne un type de local (bureau, sanit., local, circ., stockage, CTA, TGBT…), s'il est en majuscules et s'il se trouve dans la zone dessinée. Les propositions sont toujours **vérifiées par l'utilisateur** avant enregistrement, et une nouvelle détection ne recrée pas les locaux déjà présents.
+- Essai sur le carnet réel : 141 étiquettes complètes et 83 noms seuls sur 10 niveaux ; 47 locaux numérotés au SS1, dont le TGBT (LT1105). Quelques faux positifs restent à décocher (cartouche de la page toiture).
+- **Numéro unique** dans le projet ; nom obligatoire.
+- **Recherche** : par nom, numéro et code de niveau, sans tenir compte des accents ni de la casse (« tgbt », « 012 », « cta ss1 »). Le numéro exact passe en premier.
+- **Affichage des plans** : image de fond de la page entière, puis tuiles de 512 px calculées à la demande pour le zoom courant (jusqu'à 8 pixels par point PDF). Le zoom se fait à la molette, au pincement ou au double appui.
+- [À VÉRIFIER, à trancher avant le lot 3] **Locaux sans numéro** (par ex. « BUREAUX » en plateau) : le dossier photos prévu est `{Niveau}.{N°local}_{NomLocal}`. Il faut décider comment nommer le dossier d'un local sans numéro.
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
@@ -156,7 +166,7 @@ Règles issues du lot 1 (04/11/2026) :
 |---|---|---|
 | 0. Cadrage | Test de lecture des locaux sur de vrais PDF, maquettes des écrans, demande à la DSI | Spécification validée |
 | 1. Socle | Dépôt, PWA installable, création du projet, import des PDF, renommage, arborescence sur le serveur partagé | Projet créé sur le serveur (**réalisé le 04/11/2026**, validation sur le serveur réel à faire par l'utilisateur) |
-| 2. Plans et locaux | Affichage par tuiles, détection et correction des locaux, recherche | « Je tape TGBT, je trouve le local » |
+| 2. Plans et locaux | Affichage par tuiles, détection et correction des locaux, recherche | « Je tape TGBT, je trouve le local » (**réalisé le 05/11/2026**, vérifié sur un vrai carnet : le TGBT du SS1 est trouvé) |
 | 3. Terrain | Repères, photo en 2 appuis, panier à classer, hors ligne, compression | Visite de 300 photos en mode avion |
 | 4. Synchro zip | Export et import `.zip`, rangement, contrôle des doublons | **Première version utilisable de bout en bout** |
 | 5. SharePoint transit | MSAL, envoi depuis le téléphone, collecte par le PC puis purge | Deux personnes sur un même projet |
@@ -173,7 +183,7 @@ Les lots 1 à 4 ne dépendent pas de la DSI.
 2. ~~**Convention de nommage des plans**~~ **TRANCHÉ le 04/11/2026** (A.6 bis) : `{Projet}_{Niveau}.pdf`, sous-sols toujours numérotés `SS1`, `SS2`… (y compris un sous-sol unique), entresol `ES`, numéro d'ordre devant les dossiers de niveau. Archivage des anciens indices dans `00_PLANS/_ANCIENS/` et renumérotation automatique des dossiers de niveau.
 3. **Plans PDF de test** : 2 ou 3 vrais plans (anonymisés) pour vérifier la détection des locaux. **Ne pas les mettre dans le dépôt Git si ce sont des plans clients.**
    - 04/11/2026 : un premier carnet reçu (11 pages, A1, une page par niveau, texte vectoriel), utilisé hors dépôt. Les 10 niveaux ont été reconnus automatiquement. Les noms de locaux sont présents en texte (« BUREAUX », « COUR CENTRALE », « SANIT. F », « LOCAL VELOS »…), ce qui est favorable au lot 2. [À VÉRIFIER au lot 2 : présence de numéros de locaux, et lecture correcte des étiquettes sur plusieurs lignes.]
-4. **Écriture sur un lecteur réseau mappé** par la File System Access API : à tester dès le lot 1 [À VÉRIFIER]. L'écran « Tester l'écriture sur le serveur » de l'appli fait ce test (créer, écrire 1 Mo, relire, renommer un fichier et un dossier, supprimer).
+4. ~~**Écriture sur un lecteur réseau mappé**~~ **VALIDÉ le 05/11/2026** par l'utilisateur sur le serveur réel, avec l'écran « Tester l'écriture sur le serveur » : toutes les étapes réussies (écriture de 1 Mo en 0,5 s, renommage de dossier en 0,6 s).
 5. ~~**« Une appli par projet »**~~ **TRANCHÉ le 04/11/2026** : un espace isolé par projet dans une seule application.
 6. **Note à la DSI** : une première version a été rédigée, mais elle décrit **l'ancienne architecture** (SharePoint comme stockage définitif, un site par projet). **Elle est à refaire** selon A.4 :
    - stockage définitif sur le serveur partagé ;

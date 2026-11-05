@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { libelleNiveau } from '../domaine/niveaux';
-import type { Plan } from '../domaine/types';
 import type { EspaceProjet } from '../projet/EspaceProjet';
 import type { ProjetConnu } from '../stockage/registre';
-import { Apercu } from './Apercu';
+import { BarreRecherche } from './BarreRecherche';
+import { EcranPlan } from './plan/EcranPlan';
 import { dateLisible, Journal, Message, tailleLisible, texteErreur } from './commun';
 import { ImportPlans } from './ImportPlans';
 
@@ -19,7 +19,7 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
   const [journal, setJournal] = useState<string[]>(espace.avertissements.map((a) => `Attention : ${a}`));
   const [erreur, setErreur] = useState<string | null>(null);
   const [nouveauNiveau, setNouveauNiveau] = useState('');
-  const [apercu, setApercu] = useState<Plan | null>(null);
+  const [planOuvert, setPlanOuvert] = useState<{ planId: string; localId: string | null } | null>(null);
   const [occupe, setOccupe] = useState(false);
   const { projet } = espace;
 
@@ -35,6 +35,21 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
       setOccupe(false);
       setVersion((v) => v + 1);
     }
+  }
+
+  if (planOuvert && espace.planParId(planOuvert.planId)) {
+    return (
+      <EcranPlan
+        key={planOuvert.planId + (planOuvert.localId ?? '')}
+        espace={espace}
+        auteur={auteur}
+        planId={planOuvert.planId}
+        localId={planOuvert.localId}
+        surChangerPlan={(planId, localId) => setPlanOuvert({ planId, localId: localId ?? null })}
+        surFermer={() => setPlanOuvert(null)}
+        surJournal={(lignes) => setJournal((j) => [...lignes, ...j])}
+      />
+    );
   }
 
   return (
@@ -64,6 +79,7 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
           </div>
         </div>
         {erreur && <Message type="erreur">{erreur}</Message>}
+        <BarreRecherche espace={espace} surChoix={(r) => setPlanOuvert({ planId: r.plan.id, localId: r.local.id })} />
         <Journal lignes={journal} />
       </section>
 
@@ -77,6 +93,7 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
                 <th>Dossier photos</th>
                 <th>Plan courant</th>
                 <th>Indice</th>
+                <th>Locaux</th>
                 <th></th>
               </tr>
             </thead>
@@ -113,10 +130,11 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
                         </>
                       ) : null}
                     </td>
+                    <td>{plan ? espace.locauxDuPlan(plan.id).length : ''}</td>
                     <td className="actions-ligne">
                       {plan && (
-                        <button className="petit" onClick={() => setApercu(plan)}>
-                          Aperçu
+                        <button className="petit" onClick={() => setPlanOuvert({ planId: plan.id, localId: null })}>
+                          Ouvrir
                         </button>
                       )}
                       {!plan && (
@@ -170,7 +188,6 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
         executer={executer}
       />
 
-      {apercu && <Apercu espace={espace} plan={apercu} surFermer={() => setApercu(null)} />}
     </>
   );
 }

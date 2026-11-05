@@ -29,7 +29,12 @@ const serveur = await new Promise((ok) => {
 });
 
 const navigateur = await chromium.launch();
-const contexte = await navigateur.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
+// TELEPHONE=1 : écran de téléphone tactile (412 × 915).
+const contexte = await navigateur.newContext(
+  process.env.TELEPHONE
+    ? { viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+    : { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 },
+);
 await contexte.addInitScript(() => {
   window.showDirectoryPicker = async ({ id } = {}) =>
     (await navigator.storage.getDirectory()).getDirectoryHandle(`simule-${id ?? 'x'}`, { create: true });
@@ -37,7 +42,7 @@ await contexte.addInitScript(() => {
 const page = await contexte.newPage();
 const erreurs = [];
 page.on('pageerror', (e) => erreurs.push(String(e)));
-const capture = (nom) => captures && page.screenshot({ path: join(captures, `plans-reels-${nom}.png`), fullPage: true });
+const capture = (nom) => captures && page.screenshot({ path: join(captures, `plans-reels${process.env.TELEPHONE ? '-tel' : ''}-${nom}.png`), fullPage: !process.env.TELEPHONE });
 
 try {
   await page.goto(`http://localhost:${serveur.address().port}/`);
@@ -81,15 +86,30 @@ try {
   await page.getByText('Niveau ajouté : ES (Entresol)').waitFor();
   await capture('2-projet');
 
-  await page.locator('tr:has(strong:text-is("R+2"))').getByRole('button', { name: 'Aperçu' }).click();
-  await page.locator('.fenetre canvas[data-pret]').waitFor({ timeout: 60_000 });
-  console.log('Aperçu :', JSON.stringify(await page.evaluate(() => {
-    const c = document.querySelector('.fenetre canvas');
-    const r = c.getBoundingClientRect();
-    return { largeurPixels: c.width, hauteurPixels: c.height, largeurAffichee: Math.round(r.width), hauteurAffichee: Math.round(r.height) };
-  })));
-  await capture('3-apercu-R+2');
-  await page.getByRole('button', { name: 'Fermer' }).last().click();
+  // Lot 2 : ouverture du plan SS1, détection des locaux, enregistrement.
+  await page.locator('tr:has(strong:text-is("SS1"))').getByRole('button', { name: 'Ouvrir' }).click();
+  await page.locator('.visionneuse[data-fond-pret]').waitFor({ timeout: 60_000 });
+  await capture('3-plan-SS1');
+  const t1 = Date.now();
+  await page.getByRole('button', { name: 'Détecter les locaux' }).click();
+  await page.getByRole('heading', { name: 'Locaux détectés' }).waitFor({ timeout: 60_000 });
+  console.log(`Détection : ${((Date.now() - t1) / 1000).toFixed(1)} s ; ${await page.locator('.liste-candidats li').count()} propositions`);
+  await capture('4-detection-SS1');
+  await page.getByRole('button', { name: /^Enregistrer \d+ locaux$/ }).click();
+  await page.getByRole('heading', { name: /Locaux de ce plan/ }).waitFor();
+
+  // « Je tape TGBT, je trouve le local. »
+  await page.getByRole('button', { name: '← Projet' }).click();
+  await page.getByLabel('Rechercher un local').fill('tgbt');
+  await capture('5-recherche');
+  await page.locator('.resultats button').first().click();
+  await page.locator('.marqueur-selection').waitFor({ state: 'attached', timeout: 60_000 });
+  await page.locator('.visionneuse[data-fond-pret]').waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(2500); // rendu des tuiles nettes
+  const selection = await page.locator('.marqueur-selection').textContent();
+  console.log(`Recherche « tgbt » : marqueur sélectionné = ${selection} ; fiche = ${await page.locator('.fiche-local input').first().inputValue()}`);
+  assert.equal(selection, 'LT1105');
+  await capture('6-TGBT-zoome');
 
   const arbo = await page.evaluate(async () => {
     const lignes = [];

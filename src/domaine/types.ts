@@ -69,3 +69,26 @@ export interface Plan {
   importePar: string;
   historique: IndiceArchive[];
 }
+
+/**
+ * _data/locaux/{id}.json : un local identifié sur un plan.
+ * Sa position est celle de son étiquette, relative à la page du plan (0 à 1).
+ */
+export interface Local {
+  schema: number;
+  id: string;
+  planId: string;
+  /** Numéro du plan (« SF202 », « 012 ») ; null si le plan n'en donne pas. */
+  numero: string | null;
+  nom: string;
+  /** Surface en m², si elle figure sur le plan. */
+  surface: number | null;
+  x: number;
+  y: number;
+  /** « auto » : détecté sur le plan puis validé ; « manuel » : placé à la main. */
+  origine: 'auto' | 'manuel';
+  creeLe: string;
+  creePar: string;
+  modifieLe: string;
+  modifiePar: string;
+}
