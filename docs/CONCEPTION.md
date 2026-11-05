@@ -105,19 +105,25 @@ Principe : une fois les noms triés par ordre alphabétique, les photos d'un mê
 
 | Code | Niveau |
 |---|---|
-| `SS` | Sous-sol |
+| `SS1`, `SS2`, … | Sous-sols, **toujours numérotés**, même s'il n'y en a qu'un (`SS1` est le plus proche du RDC) |
+| `ES` | Entresol, entre les sous-sols et le RDC (ajouté et confirmé le 04/11/2026) |
 | `RDC` | Rez-de-chaussée |
 | `R+1`, `R+2`, … | Étages courants |
 | `TT` | Toiture |
 
 Règles (validées le 04/11/2026) :
-- **Plusieurs sous-sols** : `SS1`, `SS2`… (`SS1` étant le plus proche du RDC). Un seul sous-sol : `SS`.
+- **Sous-sols** : `SS1`, `SS2`… (`SS1` étant le plus proche du RDC). **Un seul sous-sol : `SS1`** (décidé le 04/11/2026 ; le code `SS` seul n'est plus utilisé, une saisie « SS » devient `SS1`).
 - **Nom des plans** : `{Projet}_{Niveau}.pdf`, par exemple `XXX_R+1.pdf`. Ni indice ni lot dans le nom.
-- **Ordre dans l'Explorateur Windows** : les dossiers de niveau sous `01_PHOTOS/` portent un **numéro d'ordre à 2 chiffres** devant le code, attribué par l'appli dans l'ordre du bâtiment (du plus bas au plus haut), par exemple `00_SS2`, `01_SS1`, `02_RDC`, `03_R+1`… `NN_TT`. **Seuls ces dossiers** portent ce numéro. Les noms des plans, des dossiers de locaux et des photos gardent le code seul (`XXX_R+1.012_P001_…jpg`).
+- **Ordre dans l'Explorateur Windows** : les dossiers de niveau sous `01_PHOTOS/` portent un **numéro d'ordre à 2 chiffres** devant le code, attribué par l'appli dans l'ordre du bâtiment (du plus bas au plus haut), par exemple `00_SS2`, `01_SS1`, `02_ES`, `03_RDC`, `04_R+1`… `NN_TT`. **Seuls ces dossiers** portent ce numéro. Les noms des plans, des dossiers de locaux et des photos gardent le code seul (`XXX_R+1.012_P001_…jpg`).
 
-Points [À VÉRIFIER] :
-- **Indices des plans** : le nom ne portant pas l'indice, l'indice est enregistré dans les données de l'appli (`_data/`). Proposition : à chaque nouvel indice, le PDF remplacé est déplacé dans `00_PLANS/_ANCIENS/` sous le nom `{Projet}_{Niveau}_{Indice}.pdf`, pour garder l'historique. À confirmer.
-- **Ajout d'un niveau en cours de projet** (par ex. un sous-sol découvert après coup) : la numérotation d'ordre devrait alors être décalée et les dossiers renommés. Proposition : l'appli le fait automatiquement, depuis le PC.
+Règles complémentaires (validées le 04/11/2026) :
+- **Indices des plans** : l'indice courant est enregistré dans les données de l'appli (`_data/plans/{uuid}.json`). À chaque nouvel indice, le PDF remplacé est déplacé dans `00_PLANS/_ANCIENS/` sous le nom `{Projet}_{Niveau}_Ind-{Indice}.pdf`.
+- **Ajout d'un niveau en cours de projet** : l'appli recalcule les numéros d'ordre et renomme automatiquement les dossiers de niveau.
+
+Règles issues du lot 1 (04/11/2026) :
+- **Un seul plan courant par niveau.** [À VÉRIFIER : grands bâtiments avec plusieurs feuilles (zones) par niveau.]
+- **Carnets de plans** : un PDF contenant un niveau par page est découpé à l'import. Chaque page retenue devient le plan `{Projet}_{Niveau}.pdf` de son niveau, avec son contenu vectoriel. Le niveau de chaque page est reconnu d'après son titre (« PLAN DE NIVEAU - R+2 », « … - ENTRESOL », « … - TOIT »…), et l'utilisateur peut le corriger avant l'import. Le JSON du plan garde le nom du carnet d'origine et le numéro de page (`pageOrigine`).
+- **Équivalences reconnues** : `R+0` → `RDC`, `ENTRESOL` → `ES`, `TOIT` / `TOITURE` → `TT`, `R1` → `R+1`.
 
 ## A.7 Fonctions prévues
 
@@ -149,7 +155,7 @@ Points [À VÉRIFIER] :
 | Lot | Contenu | Validation |
 |---|---|---|
 | 0. Cadrage | Test de lecture des locaux sur de vrais PDF, maquettes des écrans, demande à la DSI | Spécification validée |
-| 1. Socle | Dépôt, PWA installable, création du projet, import des PDF, renommage, arborescence sur le serveur partagé | Projet créé sur le serveur |
+| 1. Socle | Dépôt, PWA installable, création du projet, import des PDF, renommage, arborescence sur le serveur partagé | Projet créé sur le serveur (**réalisé le 04/11/2026**, validation sur le serveur réel à faire par l'utilisateur) |
 | 2. Plans et locaux | Affichage par tuiles, détection et correction des locaux, recherche | « Je tape TGBT, je trouve le local » |
 | 3. Terrain | Repères, photo en 2 appuis, panier à classer, hors ligne, compression | Visite de 300 photos en mode avion |
 | 4. Synchro zip | Export et import `.zip`, rangement, contrôle des doublons | **Première version utilisable de bout en bout** |
@@ -164,9 +170,10 @@ Les lots 1 à 4 ne dépendent pas de la DSI.
 1. ~~**Comment les plans arrivent sur les téléphones**~~ **TRANCHÉ le 04/11/2026 : option A** (voir A.4-9). Rappel des options :
    - **A (recommandé)** : une copie de travail des plans et des repères reste dans SharePoint Transit pendant le projet. Chaque téléphone la télécharge seul. La copie est supprimée à la clôture du projet.
    - **B** : seules les photos transitent. Les plans sont chargés sur chaque téléphone par câble USB, à refaire à chaque nouvel indice.
-2. ~~**Convention de nommage des plans**~~ **TRANCHÉ le 04/11/2026** (A.6 bis) : `{Projet}_{Niveau}.pdf`, sous-sols `SS1`, `SS2`…, numéro d'ordre devant les dossiers de niveau. Restent [À VÉRIFIER] : l'archivage des anciens indices et l'ajout d'un niveau en cours de projet.
+2. ~~**Convention de nommage des plans**~~ **TRANCHÉ le 04/11/2026** (A.6 bis) : `{Projet}_{Niveau}.pdf`, sous-sols toujours numérotés `SS1`, `SS2`… (y compris un sous-sol unique), entresol `ES`, numéro d'ordre devant les dossiers de niveau. Archivage des anciens indices dans `00_PLANS/_ANCIENS/` et renumérotation automatique des dossiers de niveau.
 3. **Plans PDF de test** : 2 ou 3 vrais plans (anonymisés) pour vérifier la détection des locaux. **Ne pas les mettre dans le dépôt Git si ce sont des plans clients.**
-4. **Écriture sur un lecteur réseau mappé** par la File System Access API : à tester dès le lot 1 [À VÉRIFIER].
+   - 04/11/2026 : un premier carnet reçu (11 pages, A1, une page par niveau, texte vectoriel), utilisé hors dépôt. Les 10 niveaux ont été reconnus automatiquement. Les noms de locaux sont présents en texte (« BUREAUX », « COUR CENTRALE », « SANIT. F », « LOCAL VELOS »…), ce qui est favorable au lot 2. [À VÉRIFIER au lot 2 : présence de numéros de locaux, et lecture correcte des étiquettes sur plusieurs lignes.]
+4. **Écriture sur un lecteur réseau mappé** par la File System Access API : à tester dès le lot 1 [À VÉRIFIER]. L'écran « Tester l'écriture sur le serveur » de l'appli fait ce test (créer, écrire 1 Mo, relire, renommer un fichier et un dossier, supprimer).
 5. ~~**« Une appli par projet »**~~ **TRANCHÉ le 04/11/2026** : un espace isolé par projet dans une seule application.
 6. **Note à la DSI** : une première version a été rédigée, mais elle décrit **l'ancienne architecture** (SharePoint comme stockage définitif, un site par projet). **Elle est à refaire** selon A.4 :
    - stockage définitif sur le serveur partagé ;
