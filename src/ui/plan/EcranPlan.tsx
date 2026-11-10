@@ -59,6 +59,16 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const [camera, setCamera] = useState<{ repereId: string | null } | null>(null);
   const [onglet, setOnglet] = useState<'terrain' | 'locaux' | 'panier'>('terrain');
   const [photoOuverte, setPhotoOuverte] = useState<{ photos: Photo[]; index: number } | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  /** Après un placement depuis le panier : retour au panier pour continuer le classement. */
+  function apresPlacement(nb: number, cible: string) {
+    setMode({ type: 'consultation' });
+    setSelection(null);
+    setRepereSel(null);
+    setOnglet('panier');
+    setInfo(`${nb > 1 ? `${nb} photos placées` : '1 photo placée'} sur ${cible}.`);
+  }
 
   // File d'enregistrement des photos : la compression (1 à 2 s par photo sur téléphone)
   // se fait en arrière-plan, pour pouvoir enchaîner les prises de vue sans attendre.
@@ -223,9 +233,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       void executer(async () => {
         const r = await espace.creerRepere(planId, x, y, auteur);
         await espace.classerPhotos(photoIds, r.id, auteur);
-        setMode({ type: 'consultation' });
-        setSelection(null);
-        setRepereSel(r.id);
+        apresPlacement(photoIds.length, `le nouveau repère ${r.numero}`);
       });
       return;
     }
@@ -266,15 +274,13 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         const photoIds = mode.photoIds;
         void executer(async () => {
           await espace.classerPhotos(photoIds, repereId, auteur);
-          setMode({ type: 'consultation' });
-          setRepereSel(repereId);
+          apresPlacement(photoIds.length, `le repère ${espace.reperes.find((x) => x.id === repereId)?.numero ?? ''}`);
         });
         return;
       }
       if (mode.type !== 'consultation') return;
-      setSelection(null);
-      setRepereSel(repereId);
-      if (appuiRepere === 'photo') ouvrirCamera(repereId);
+      if (appuiRepere === 'photo') photoSurMarqueur(id);
+      else ficheSurMarqueur(id);
       return;
     }
     // Appui sur l'étiquette d'un local.
@@ -283,9 +289,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       void executer(async () => {
         const r = await espace.repereEtiquette(id, auteur);
         await espace.classerPhotos(photoIds, r.id, auteur);
-        setMode({ type: 'consultation' });
-        setRepereSel(null);
-        setSelection(id);
+        const l = espace.locaux.find((x) => x.id === id);
+        apresPlacement(photoIds.length, `le local ${l ? `${l.numero ?? ''} ${l.nom}`.trim() : ''}`);
       });
       return;
     }
@@ -298,18 +303,28 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       });
       return;
     }
+    if (mode.type === 'ajout') setMode({ type: 'consultation' });
     if (mode.type === 'consultation' || mode.type === 'ajout') {
-      setMode({ type: 'consultation' });
-      setRepereSel(null);
-      setSelection(id);
+      // Réglage « Affichage » : appui = photo (par défaut) ou fiche ; l'appui long fait l'autre.
+      if (appuiRepere === 'photo' && mode.type === 'consultation') photoSurMarqueur(id);
+      else ficheSurMarqueur(id);
     }
   }
 
-  /** Appui long sur l'étiquette d'un local (ou sur un repère) : photo directe. */
+  /** Appui long sur une étiquette de local ou un repère : l'action inverse du simple appui. */
   function surAppuiLongMarqueur(id: string) {
     if (mode.type !== 'consultation') return;
+    if (appuiRepere === 'photo') ficheSurMarqueur(id);
+    else photoSurMarqueur(id);
+  }
+
+  /** Ouvre l'appareil photo sur un repère, ou sur l'étiquette d'un local. */
+  function photoSurMarqueur(id: string) {
     if (id.startsWith(PREFIXE_REPERE)) {
-      ouvrirCamera(id.slice(PREFIXE_REPERE.length));
+      const repereId = id.slice(PREFIXE_REPERE.length);
+      setSelection(null);
+      setRepereSel(repereId);
+      ouvrirCamera(repereId);
       return;
     }
     if (!espace.locaux.some((l) => l.id === id)) return;
@@ -319,6 +334,17 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       setSelection(id);
       ouvrirCamera(r.id);
     });
+  }
+
+  /** Ouvre la fiche d'un repère ou d'un local. */
+  function ficheSurMarqueur(id: string) {
+    if (id.startsWith(PREFIXE_REPERE)) {
+      setSelection(null);
+      setRepereSel(id.slice(PREFIXE_REPERE.length));
+      return;
+    }
+    setRepereSel(null);
+    setSelection(id);
   }
 
   function titreCamera(repereId: string | null) {
@@ -394,8 +420,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 Nom
               </button>
             </div>
-            <div className="bascule" role="group" aria-label="Appui sur un repère">
-              <span className="discret">Appui sur repère :</span>
+            <div className="bascule" role="group" aria-label="Appui sur un repère ou une étiquette">
+              <span className="discret">Appui sur repère ou étiquette :</span>
               {(['photo', 'fiche'] as const).map((v) => (
                 <button
                   key={v}
@@ -419,6 +445,14 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       </div>
 
       {erreur && <Message type="erreur">{erreur}</Message>}
+      {info && !erreur && (
+        <div className="message message-succes bandeau-info" role="status">
+          {info}
+          <button className="petit" onClick={() => setInfo(null)}>
+            OK
+          </button>
+        </div>
+      )}
 
       <div className="corps-plan">
         <div className="zone-vue">
@@ -572,6 +606,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 espace={espace}
                 planId={planId}
                 occupe={occupe}
+                appuiPhoto={appuiRepere === 'photo'}
                 surPhotoSansRepere={() => ouvrirCamera(null)}
                 surChoixRepere={(rep) => {
                   setRepereSel(rep.id);

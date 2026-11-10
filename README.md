@@ -14,7 +14,16 @@ Application, sur téléphone Android et PC Windows, qui sert à localiser des ph
 | 3. Terrain | Réalisé : repères, photo en 2 appuis avec l'appareil photo de l'appli, rafale, panier à classer, compression (EXIF conservé), hors ligne |
 | 4 à 7 | À faire |
 
-## Tester l'application sur un PC (sans rien installer)
+## Utiliser l'application
+
+Adresse : **https://baptistelaloggia.github.io/application-releve-photo/** (mise à jour automatique à chaque fusion dans `main`).
+
+- **Sur PC** : ouvrir l'adresse dans Chrome ou Edge, puis cliquer sur l'icône d'installation à droite de la barre d'adresse.
+- **Sur téléphone Android** : ouvrir l'adresse dans Chrome, puis menu ⋮ et « Ajouter à l'écran d'accueil » (ou « Installer l'application »).
+
+L'application installée fonctionne ensuite hors ligne. Les plans et les photos restent sur l'appareil ou sur le serveur : rien ne passe par GitHub.
+
+## Tester l'application sur un PC sans connexion (fichier unique)
 
 1. Récupérer le fichier `releve-photo-test.html` (version de test en un seul fichier).
 2. Clic droit sur le fichier, puis « Ouvrir avec », puis **Microsoft Edge** ou **Google Chrome**.
