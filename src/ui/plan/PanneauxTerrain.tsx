@@ -19,12 +19,15 @@ export function PanneauTerrain({
   espace,
   planId,
   occupe,
+  appuiPhoto,
   surPhotoSansRepere,
   surChoixRepere,
 }: {
   espace: EspaceProjet;
   planId: string;
   occupe: boolean;
+  /** Réglage « Affichage » : un appui sur un repère ou une étiquette ouvre l'appareil photo. */
+  appuiPhoto: boolean;
   surPhotoSansRepere: () => void;
   surChoixRepere: (r: Repere) => void;
 }) {
@@ -39,7 +42,8 @@ export function PanneauTerrain({
           <strong>Appui long</strong> sur le plan : nouveau repère, puis photo.
         </div>
         <div>
-          <strong>Appui</strong> sur un repère : photo.
+          <strong>Appui</strong> sur un repère ou l'étiquette d'un local : {appuiPhoto ? 'photo' : 'fiche'} ;{' '}
+          <strong>appui long</strong> : {appuiPhoto ? 'fiche' : 'photo'}.
         </div>
       </div>
       <div className="boutons">
@@ -214,18 +218,27 @@ export function PanneauPanier({
   const photos = espace.photosAClasser();
   const [choisies, setChoisies] = useState<Set<string>>(new Set());
   const selection = photos.filter((p) => choisies.has(p.id));
-  const basculer = (id: string) =>
+  // Dernière photo cochée ou décochée : avec la touche MAJ, toutes les photos entre les deux suivent.
+  const [dernier, setDernier] = useState<number | null>(null);
+  const basculer = (index: number, plage: boolean) => {
+    const id = photos[index].id;
+    const coche = !choisies.has(id);
     setChoisies((c) => {
       const n = new Set(c);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+      const [de, a] = plage && dernier !== null ? [Math.min(dernier, index), Math.max(dernier, index)] : [index, index];
+      for (let i = de; i <= a; i++) {
+        if (coche) n.add(photos[i].id);
+        else n.delete(photos[i].id);
+      }
       return n;
     });
+    setDernier(index);
+  };
   return (
     <>
       <p className="discret">
-        Photos prises sans repère, ou importées. Cochez une ou plusieurs photos, puis « Placer » : touchez ensuite
-        l'étiquette d'un local, un repère, ou le plan pour créer un repère.
+        Photos prises sans repère, ou importées. Cochez une ou plusieurs photos (sur PC, MAJ + clic coche toutes les photos
+        entre deux), puis « Placer » : touchez ensuite l'étiquette d'un local, un repère, ou le plan pour créer un repère.
       </p>
       <div className="boutons">
         <button onClick={surPhotoSansRepere} disabled={occupe}>
@@ -262,11 +275,17 @@ export function PanneauPanier({
           <ul className="liste-panier">
             {photos.map((p, i) => (
               <li key={p.id} className={choisies.has(p.id) ? 'choisie' : undefined}>
-                <input type="checkbox" checked={choisies.has(p.id)} onChange={() => basculer(p.id)} aria-label={`Choisir ${p.nomOrigine ?? 'la photo'}`} />
+                <input
+                  type="checkbox"
+                  checked={choisies.has(p.id)}
+                  readOnly
+                  onClick={(e) => basculer(i, e.shiftKey)}
+                  aria-label={`Choisir ${p.nomOrigine ?? 'la photo'}`}
+                />
                 <button className="vignette" onClick={() => surOuvrirPhoto(photos, i)}>
                   <Miniature espace={espace} photo={p} taille={72} />
                 </button>
-                <span className="discret" onClick={() => basculer(p.id)}>
+                <span className="discret" onClick={(e) => basculer(i, e.shiftKey)}>
                   {new Date(p.prisLe).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
                   {p.nomOrigine && <div className="petit-texte">{p.nomOrigine}</div>}
                 </span>

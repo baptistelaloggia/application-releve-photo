@@ -272,3 +272,4 @@ button.projet .discret { font-size: 0.85rem; }
 .barre-selection { position: sticky; top: 0; background: var(--carte); padding: 4px 0; z-index: 1; }
 .rattachement { background: var(--fond); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
 .puce { border-radius: 999px; }
+.ecran-plan > .bandeau-info { margin: 8px 12px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }

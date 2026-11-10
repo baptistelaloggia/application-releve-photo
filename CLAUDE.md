@@ -91,6 +91,9 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   dans Chromium (dont `terrain-lot3.mjs` : 300 photos en mode avion, fausse caméra ; `NB_PHOTOS` pour réduire).
   `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
 - Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.
+- **Le dépôt est public** (10/11/2026) : rien de confidentiel dans le code, les tests, les messages de commit ni la
+  documentation (aucun nom de client, de projet réel ou de collègue). L'appli est publiée sur GitHub Pages à chaque
+  fusion dans `main` (`.github/workflows/publication-pages.yml`).
 
 ## Conventions de travail
 

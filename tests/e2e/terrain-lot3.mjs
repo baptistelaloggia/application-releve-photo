@@ -164,8 +164,10 @@ try {
   await page.locator('.liste-panier input[type=checkbox]').check();
   await page.getByRole('button', { name: 'Placer la photo' }).click();
   await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P002' }).click();
-  await page.getByRole('heading', { name: 'Repère P002' }).waitFor();
-  assert.equal(await page.locator('.grille-photos .vignette').count(), 2);
+  // Retour automatique au panier, pour continuer le classement.
+  await page.getByText('1 photo placée sur le repère P002.').waitFor();
+  await page.getByRole('tab', { name: 'Panier (0)', selected: true }).waitFor();
+  assert.match(await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P002' }).textContent(), /P0022/);
 
   // 5. Import d'une grande photo de téléphone (4 000 × 3 000, prise en portrait, EXIF daté) :
   //    compression, redressement, EXIF conservé, date de prise de vue reprise de l'EXIF.
@@ -187,7 +189,6 @@ try {
   });
   const original = insererExif(new Uint8Array(grande), exifFictif('2026:10:30 14:05:09'));
   console.log(`Photo importée : ${(original.length / 1024 / 1024).toFixed(1)} Mo`);
-  await page.getByRole('button', { name: 'Fermer' }).first().click(); // ferme la fiche du repère
   await page.getByRole('tab', { name: 'Panier (0)' }).click();
   await page.getByText('Le panier est vide.').waitFor();
   await page.locator('input[type=file][accept="image/*"][multiple]').setInputFiles({
@@ -233,7 +234,8 @@ try {
   await page.getByRole('button', { name: 'Placer les 3 photos' }).click();
   await page.getByText('3 photos : touchez l’étiquette d’un local').waitFor();
   await page.locator('.marqueur-local .marqueur-libelle', { hasText: 'LT002' }).click();
-  await page.getByRole('heading', { name: 'Photos du local (3)' }).waitFor();
+  await page.getByText('3 photos placées sur le local LT002 LOCAL CTA.').waitFor();
+  await page.getByRole('tab', { name: 'Panier (0)', selected: true }).waitFor();
   await capture('4-photos-sur-etiquette');
   arbo = await arborescenceOpfs(page, `${dossierProjet}/01_PHOTOS`);
   assert.deepEqual(arbo.filter((l) => l.startsWith('01_R+1/R+1.LT002_LOCAL-CTA/') && l.endsWith('.jpg')), [
@@ -243,10 +245,25 @@ try {
   ]);
   // Le repère d'étiquette n'est pas dessiné : seul le compteur s'affiche sur l'étiquette du local.
   assert.equal(await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P003' }).count(), 0);
-  assert.match(await page.locator('.marqueur-selection .marqueur-libelle').textContent(), /LT0023/);
+  assert.match(await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT002' }).textContent(), /LT0023/);
+
+  // Sélection avec la touche MAJ : 1re et 3e photo cochées avec MAJ → les 3 sont choisies.
+  await page.locator('input[type=file][accept="image/*"][multiple]').setInputFiles([
+    { name: 'IMG_c.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
+    { name: 'IMG_d.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
+    { name: 'IMG_e.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
+  ]);
+  await page.getByRole('tab', { name: 'Panier (3)' }).waitFor({ timeout: 60_000 });
+  const cases = page.locator('.liste-panier input[type=checkbox]');
+  await cases.nth(0).click();
+  await cases.nth(2).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Placer les 3 photos' }).waitFor();
+  await page.getByRole('button', { name: 'Placer les 3 photos' }).click();
+  await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT002' }).click();
+  await page.getByRole('tab', { name: 'Panier (0)', selected: true }).waitFor();
+  assert.match(await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT002' }).textContent(), /LT0026/);
 
   // 7. Rattachement rapide : le repère P002 (BUREAUX) rattaché au local LT002, d'un appui sur son étiquette.
-  await page.getByRole('button', { name: 'Fermer' }).first().click();
   await page.getByRole('tab', { name: 'Terrain' }).click();
   await page.locator('.liste-locaux button', { hasText: 'P002' }).click();
   await page.getByRole('button', { name: 'Choisir le local sur le plan' }).click();
@@ -258,13 +275,17 @@ try {
   assert.ok(arbo.includes(`01_R+1/R+1.LT002_LOCAL-CTA/T03_R+1.LT002_P002_${jour}_02.jpg`), 'photos de P002 déplacées');
   assert.ok(!arbo.some((l) => l.startsWith('01_R+1/R+1.R1-01_BUREAUX')), 'dossier des bureaux vidé et supprimé');
 
-  // 8. Appui long sur l'étiquette du TGBT : photo du local, directement.
+  // 8. Réglage « Appui : photo » : un appui sur l'étiquette du TGBT ouvre l'appareil photo ;
+  //    l'appui long ouvre sa fiche.
   await page.getByRole('button', { name: 'Fermer' }).first().click();
   const b = await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT001' }).boundingBox();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.down();
   await page.waitForTimeout(700);
   await page.mouse.up();
+  await page.getByRole('heading', { name: 'Local R+1' }).waitFor();
+  await page.getByRole('button', { name: 'Fermer' }).first().click();
+  await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT001' }).click();
   await page.getByText('R+1 · LT001 TGBT · photo du local').waitFor();
   await declencher(1);
   await attendreEnregistrements();
@@ -275,7 +296,7 @@ try {
   const nb = arbo.filter((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/') && l.endsWith('.jpg')).length;
   assert.equal(nb, 3 + NB_PHOTOS + 1);
   const donnees = await arborescenceOpfs(page, `${dossierProjet}/_data/photos`);
-  assert.equal(donnees.length, 3 + NB_PHOTOS + 1 + 1 + 1 + 2 + 1);
+  assert.equal(donnees.length, 3 + NB_PHOTOS + 1 + 1 + 1 + 2 + 3 + 1);
   assert.deepEqual(erreurs, []);
   console.log('OK : terrain');
 } finally {
