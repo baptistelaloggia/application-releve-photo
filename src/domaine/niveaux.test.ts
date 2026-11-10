@@ -18,10 +18,10 @@ describe('codes de niveau', () => {
   });
 
   it('numérote les dossiers pour l’Explorateur Windows', () => {
-    const noms = nomsDossiersNiveaux(['RDC', 'TT', 'SS1', 'R+1']);
+    const noms = nomsDossiersNiveaux(trierNiveaux(['RDC', 'TT', 'SS1', 'R+1']));
     expect([...noms.values()]).toEqual(['00_SS1', '01_RDC', '02_R+1', '03_TT']);
     // Le tri alphabétique des noms de dossier donne bien l'ordre du bâtiment.
-    const beaucoup = [...nomsDossiersNiveaux(genererNiveaux(2, 11, true)).values()];
+    const beaucoup = [...nomsDossiersNiveaux(trierNiveaux(genererNiveaux(2, 11, true))).values()];
     expect([...beaucoup].sort()).toEqual(beaucoup);
   });
 
@@ -34,9 +34,10 @@ describe('codes de niveau', () => {
   });
 
   it('refuse les codes non conformes et les doublons', () => {
-    expect(controlerNiveaux(['SS', 'RDC'])).toHaveLength(1); // sous-sol toujours numéroté
+    expect(controlerNiveaux(['R_1'])).toHaveLength(1);
+    expect(controlerNiveaux(['R+4.MEZZ'])).toHaveLength(1); // « . » réservé aux noms de photos
     expect(controlerNiveaux(['RDC', 'RDC'])).toHaveLength(1);
-    expect(controlerNiveaux(['R1'])).toHaveLength(1);
+    expect(controlerNiveaux(['R+4-MEZZANINE'])).toEqual([]);
     expect(controlerNiveaux(['SS2', 'SS1', 'RDC', 'R+1', 'TT'])).toEqual([]);
   });
 
@@ -53,6 +54,14 @@ describe('codes de niveau', () => {
     expect(devinerNiveauPage('PLAN DE NIVEAU - ENTRESOL')).toBe('ES');
     expect(devinerNiveauPage('PLAN DE NIVEAU - SS1')).toBe('SS1');
     expect(devinerNiveauPage('CARNET DE PLANS DE NIVEAUX Phase Emetteur Lot Niveau Zone')).toBeNull();
+  });
+
+  it('accepte les niveaux intermédiaires à code libre', () => {
+    expect(normaliserCodeNiveau('R+4 mezzanine')).toBe('R+4-MEZZANINE');
+    expect(normaliserCodeNiveau('Mezzanine Hall')).toBe('MEZZANINE-HALL');
+    expect(normaliserCodeNiveau('ss')).toBe('SS1');
+    expect(trierNiveaux(['TT', 'R+4-MEZZANINE', 'R+5', 'R+4'])).toEqual(['R+4', 'R+4-MEZZANINE', 'R+5', 'TT']);
+    expect(trierNiveaux(['TT', 'COMBLES', 'R+5'])).toEqual(['R+5', 'COMBLES', 'TT']);
   });
 
   it('génère une liste type', () => {

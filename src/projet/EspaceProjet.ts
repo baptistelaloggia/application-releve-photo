@@ -1,6 +1,7 @@
 import {
   codeDepuisNomDossier,
   controlerNiveaux,
+  estCodeNiveauValide,
   libelleNiveau,
   nomsDossiersNiveaux,
   normaliserCodeNiveau,
@@ -15,12 +16,17 @@ import {
   normaliserCodeAffaire,
   normaliserIndice,
 } from '../domaine/nommage';
-import { VERSION_SCHEMA, type Niveau, type Plan, type Projet } from '../domaine/types';
+import { VERSION_SCHEMA, type Local, type Niveau, type Plan, type Projet } from '../domaine/types';
+import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
+import { rechercher } from '../domaine/recherche';
 import { ecrireJson, lireJson, type Stockage } from '../stockage/Stockage';
 
 const FICHIER_PROJET = `${DOSSIERS.donnees}/projet.json`;
 const DOSSIER_NIVEAUX = `${DOSSIERS.donnees}/niveaux`;
 const DOSSIER_PLANS = `${DOSSIERS.donnees}/plans`;
+const DOSSIER_LOCAUX = `${DOSSIERS.donnees}/locaux`;
+/** Écart entre deux niveaux dans le champ « ordre ». */
+const PAS_ORDRE = 10;
 
 export class ErreurPasUnProjet extends Error {
   constructor() {
@@ -57,6 +63,25 @@ export interface PrevisionImport {
   erreur: string | null;
 }
 
+/** Saisie d'un local (création ou modification). */
+export interface SaisieLocal {
+  nom: string;
+  numero: string | null;
+  surface: number | null;
+  x: number;
+  y: number;
+}
+
+/** Résultat de recherche : le local, son plan et son niveau. */
+export interface ResultatLocal {
+  local: Local;
+  plan: Plan;
+  niveau: Niveau;
+}
+
+/** Distance (relative à la page) en dessous de laquelle deux étiquettes de même nom sont un doublon. */
+const DISTANCE_DOUBLON = 0.01;
+
 const maintenant = () => new Date().toISOString();
 
 /** Contrôle les informations saisies pour un nouveau projet ; renvoie les problèmes. */
@@ -86,6 +111,7 @@ export class EspaceProjet {
     public projet: Projet,
     public niveaux: Niveau[],
     public plans: Plan[],
+    public locaux: Local[],
     /** Fichiers de données illisibles rencontrés à l'ouverture. */
     public avertissements: string[],
   ) {}
@@ -108,19 +134,20 @@ export class EspaceProjet {
       creeLe: maintenant(),
       creePar: auteur,
     };
-    const espace = new EspaceProjet(stockage, projet, [], [], []);
-    for (const code of infos.niveaux) {
+    const espace = new EspaceProjet(stockage, projet, [], [], [], []);
+    const codes = [...infos.niveaux].sort((a, b) => rangNiveau(a) - rangNiveau(b));
+    for (const [i, code] of codes.entries()) {
       const niveau: Niveau = {
         schema: VERSION_SCHEMA,
         id: crypto.randomUUID(),
         code,
+        ordre: i * PAS_ORDRE,
         creeLe: projet.creeLe,
         creePar: auteur,
       };
       await ecrireJson(stockage, `${DOSSIER_NIVEAUX}/${niveau.id}.json`, niveau);
       espace.niveaux.push(niveau);
     }
-    espace.trierNiveaux();
     await espace.appliquerArborescence();
     // projet.json en dernier : sa présence signifie « projet complet ».
     await ecrireJson(stockage, FICHIER_PROJET, projet);
@@ -131,7 +158,7 @@ export class EspaceProjet {
   static async ouvrir(stockage: Stockage): Promise<EspaceProjet> {
     if (!(await stockage.existe(FICHIER_PROJET))) throw new ErreurPasUnProjet();
     const projet = await lireJson<Projet>(stockage, FICHIER_PROJET);
-    const espace = new EspaceProjet(stockage, projet, [], [], []);
+    const espace = new EspaceProjet(stockage, projet, [], [], [], []);
     await espace.recharger();
     return espace;
   }
@@ -142,7 +169,10 @@ export class EspaceProjet {
     this.projet = await lireJson<Projet>(this.stockage, FICHIER_PROJET);
     this.niveaux = await this.lireTous<Niveau>(DOSSIER_NIVEAUX);
     this.plans = await this.lireTous<Plan>(DOSSIER_PLANS);
+    this.locaux = await this.lireTous<Local>(DOSSIER_LOCAUX);
     this.trierNiveaux();
+    // Projets créés avant l'ordre modifiable : on enregistre l'ordre du bâtiment.
+    if (this.niveaux.some((n) => n.ordre === undefined)) await this.renumeroter();
   }
 
   private async lireTous<T>(dossier: string): Promise<T[]> {
@@ -159,8 +189,25 @@ export class EspaceProjet {
     return resultat;
   }
 
+  /** Niveaux dans l'ordre enregistré ; à défaut, dans l'ordre du bâtiment. */
   private trierNiveaux() {
-    this.niveaux.sort((a, b) => rangNiveau(a.code) - rangNiveau(b.code));
+    this.niveaux.sort((a, b) =>
+      a.ordre !== undefined && b.ordre !== undefined ? a.ordre - b.ordre : rangNiveau(a.code) - rangNiveau(b.code),
+    );
+  }
+
+  /** Réécrit l'ordre 0, 10, 20… selon la position actuelle (seuls les niveaux modifiés sont réécrits). */
+  private async renumeroter() {
+    for (const [i, n] of this.niveaux.entries()) {
+      if (n.ordre === i * PAS_ORDRE) continue;
+      n.ordre = i * PAS_ORDRE;
+      await ecrireJson(this.stockage, `${DOSSIER_NIVEAUX}/${n.id}.json`, n);
+    }
+  }
+
+  /** Libellé affiché d'un niveau : celui saisi pour un niveau intermédiaire, sinon le libellé standard. */
+  libelle(n: Niveau): string {
+    return n.libelle ?? libelleNiveau(n.code);
   }
 
   // ---------------------------------------------------------------- arborescence
@@ -185,6 +232,7 @@ export class EspaceProjet {
       DOSSIERS.exports,
       DOSSIER_NIVEAUX,
       DOSSIER_PLANS,
+      DOSSIER_LOCAUX,
     ]) {
       if (!(await this.stockage.existe(d))) {
         await this.stockage.creerDossier(d);
@@ -234,17 +282,41 @@ export class EspaceProjet {
     const code = normaliserCodeNiveau(saisie);
     const problemes = controlerNiveaux([...this.niveaux.map((n) => n.code), code]);
     if (problemes.length) throw new Error(problemes.join('\n'));
+    const standard = estCodeNiveauValide(code);
     const niveau: Niveau = {
       schema: VERSION_SCHEMA,
       id: crypto.randomUUID(),
       code,
+      ...(standard ? {} : { libelle: saisie.trim().replace(/\s+/g, ' ') }),
       creeLe: maintenant(),
       creePar: auteur,
     };
+    // Position proposée : après le dernier niveau situé plus bas dans le bâtiment
+    // (« R+4-MEZZANINE » juste après R+4). L'utilisateur peut ensuite le déplacer.
+    const rang = rangNiveau(code);
+    let position = 0;
+    this.niveaux.forEach((n, i) => {
+      if (rangNiveau(n.code) <= rang) position = i + 1;
+    });
+    this.niveaux.splice(position, 0, niveau);
     await ecrireJson(this.stockage, `${DOSSIER_NIVEAUX}/${niveau.id}.json`, niveau);
-    this.niveaux.push(niveau);
-    this.trierNiveaux();
-    return [`Niveau ajouté : ${code} (${libelleNiveau(code)})`, ...(await this.appliquerArborescence())];
+    await this.renumeroter();
+    return [`Niveau ajouté : ${code} (${this.libelle(niveau)})`, ...(await this.appliquerArborescence())];
+  }
+
+  /** Déplace un niveau d'un cran vers le haut (+1) ou vers le bas (-1) et renumérote les dossiers. */
+  async deplacerNiveau(id: string, sens: 1 | -1): Promise<string[]> {
+    const i = this.niveaux.findIndex((n) => n.id === id);
+    if (i < 0) throw new Error('Niveau introuvable.');
+    const j = i + sens;
+    if (j < 0 || j >= this.niveaux.length) return [];
+    [this.niveaux[i], this.niveaux[j]] = [this.niveaux[j], this.niveaux[i]];
+    await this.renumeroter();
+    const n = this.niveaux[j];
+    return [
+      `Niveau ${n.code} déplacé vers le ${sens > 0 ? 'haut' : 'bas'}`,
+      ...(await this.appliquerArborescence()),
+    ];
   }
 
   /** Supprime un niveau, seulement s'il n'a ni plan ni photo. */
@@ -386,6 +458,145 @@ export class EspaceProjet {
 
   async lirePlan(plan: Plan): Promise<Blob> {
     return this.stockage.lireFichier(plan.fichier);
+  }
+
+  planParId(id: string): Plan | undefined {
+    return this.plans.find((p) => p.id === id);
+  }
+
+  niveauDuPlan(plan: Plan): Niveau {
+    const n = this.niveaux.find((x) => x.id === plan.niveauId);
+    if (!n) throw new Error(`Niveau introuvable pour le plan ${plan.fichier}`);
+    return n;
+  }
+
+  // ---------------------------------------------------------------- locaux
+
+  locauxDuPlan(planId: string): Local[] {
+    return this.locaux
+      .filter((l) => l.planId === planId)
+      .sort((a, b) => (a.numero ?? a.nom).localeCompare(b.numero ?? b.nom, 'fr', { numeric: true }));
+  }
+
+  /** Contrôle une saisie ; renvoie la saisie nettoyée ou lève une erreur explicite. */
+  private controlerLocal(saisie: SaisieLocal, idModifie?: string): SaisieLocal {
+    const nom = saisie.nom.trim().replace(/\s+/g, ' ');
+    const numero = saisie.numero?.trim().toUpperCase() || null;
+    if (!nom) throw new Error('Le nom du local est obligatoire.');
+    if (numero && !/^[A-Z0-9.+-]{1,12}$/.test(numero)) {
+      throw new Error('Le numéro ne doit contenir que des lettres, des chiffres, des points ou des tirets (12 caractères au plus).');
+    }
+    if (numero) {
+      const doublon = this.locaux.find((l) => l.numero === numero && l.id !== idModifie);
+      if (doublon) {
+        const plan = this.planParId(doublon.planId);
+        const niveau = plan ? this.niveauDuPlan(plan).code : '?';
+        throw new Error(`Le numéro ${numero} est déjà utilisé (${doublon.nom}, niveau ${niveau}).`);
+      }
+    }
+    if (saisie.surface !== null && !(saisie.surface > 0 && saisie.surface < 1_000_000)) {
+      throw new Error('Surface non valable.');
+    }
+    if (!(saisie.x >= 0 && saisie.x <= 1 && saisie.y >= 0 && saisie.y <= 1)) {
+      throw new Error('Position hors du plan.');
+    }
+    return { ...saisie, nom, numero };
+  }
+
+  private async ecrireLocal(local: Local) {
+    await ecrireJson(this.stockage, `${DOSSIER_LOCAUX}/${local.id}.json`, local);
+    this.locaux = [...this.locaux.filter((l) => l.id !== local.id), local];
+  }
+
+  /** Numéro automatique libre pour un nouveau local de ce plan (« R2-03 »). */
+  proposerNumero(planId: string): string {
+    const plan = this.planParId(planId);
+    if (!plan) throw new Error('Plan introuvable.');
+    return proposerNumeroLocal(
+      this.niveauDuPlan(plan).code,
+      this.locaux.flatMap((l) => (l.numero ? [l.numero] : [])),
+    );
+  }
+
+  async creerLocal(planId: string, saisie: SaisieLocal, auteur: string, origine: Local['origine'] = 'manuel'): Promise<Local> {
+    if (!this.planParId(planId)) throw new Error('Plan introuvable.');
+    const propre = this.controlerLocal(saisie);
+    const date = maintenant();
+    const local: Local = {
+      schema: VERSION_SCHEMA,
+      id: crypto.randomUUID(),
+      planId,
+      ...propre,
+      origine,
+      creeLe: date,
+      creePar: auteur,
+      modifieLe: date,
+      modifiePar: auteur,
+    };
+    await this.ecrireLocal(local);
+    return local;
+  }
+
+  async modifierLocal(id: string, saisie: SaisieLocal, auteur: string): Promise<Local> {
+    const existant = this.locaux.find((l) => l.id === id);
+    if (!existant) throw new Error('Local introuvable.');
+    const propre = this.controlerLocal(saisie, id);
+    const local: Local = { ...existant, ...propre, modifieLe: maintenant(), modifiePar: auteur };
+    await this.ecrireLocal(local);
+    return local;
+  }
+
+  async supprimerLocal(id: string): Promise<void> {
+    await this.stockage.supprimer(`${DOSSIER_LOCAUX}/${id}.json`);
+    this.locaux = this.locaux.filter((l) => l.id !== id);
+  }
+
+  /**
+   * Indique si un local détecté existe déjà sur ce plan : même numéro dans le projet,
+   * ou même nom à la même place. Sert à relancer la détection sans créer de doublons.
+   */
+  dejaPresent(planId: string, d: Pick<LocalDetecte, 'numero' | 'nom' | 'x' | 'y'>): Local | undefined {
+    const numero = d.numero?.toUpperCase();
+    return this.locaux.find(
+      (l) =>
+        (numero && l.numero === numero) ||
+        (l.planId === planId &&
+          l.nom.toUpperCase() === d.nom.trim().toUpperCase() &&
+          Math.hypot(l.x - d.x, l.y - d.y) < DISTANCE_DOUBLON),
+    );
+  }
+
+  /** Enregistre les locaux détectés retenus par l'utilisateur. Renvoie le compte rendu. */
+  async enregistrerDetection(planId: string, retenus: LocalDetecte[], auteur: string): Promise<string[]> {
+    let crees = 0;
+    const compteRendu: string[] = [];
+    for (const d of retenus) {
+      if (this.dejaPresent(planId, d)) {
+        compteRendu.push(`Déjà présent, ignoré : ${d.numero ?? ''} ${d.nom}`.replace('  ', ' '));
+        continue;
+      }
+      try {
+        await this.creerLocal(planId, { nom: d.nom, numero: d.numero, surface: d.surface, x: d.x, y: d.y }, auteur, 'auto');
+        crees++;
+      } catch (e) {
+        compteRendu.push(`Attention : ${d.nom} non enregistré (${e instanceof Error ? e.message : String(e)})`);
+      }
+    }
+    const plan = this.planParId(planId);
+    compteRendu.unshift(`${crees} ${crees > 1 ? 'locaux' : 'local'} enregistré${crees > 1 ? 's' : ''} sur le plan ${plan?.fichier.split('/').pop() ?? ''}`);
+    return compteRendu;
+  }
+
+  /** Recherche dans tous les locaux du projet, par nom, numéro et niveau. */
+  rechercherLocaux(requete: string, limite = 30): ResultatLocal[] {
+    const elements: Array<ResultatLocal & { nom: string; numero: string | null; codeNiveau: string }> = [];
+    for (const local of this.locaux) {
+      const plan = this.planParId(local.planId);
+      if (!plan) continue;
+      const niveau = this.niveauDuPlan(plan);
+      elements.push({ local, plan, niveau, nom: local.nom, numero: local.numero, codeNiveau: niveau.code });
+    }
+    return rechercher(requete, elements, limite).map(({ local, plan, niveau }) => ({ local, plan, niveau }));
   }
 }
 

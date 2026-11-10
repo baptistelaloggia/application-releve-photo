@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { genererNiveaux, libelleNiveau, nomsDossiersNiveaux } from '../domaine/niveaux';
+import { genererNiveaux, libelleNiveau, nomsDossiersNiveaux, trierNiveaux } from '../domaine/niveaux';
 import { nomDossierProjet, normaliserCodeAffaire } from '../domaine/nommage';
 import { controlerNouveauProjet, type EspaceProjet } from '../projet/EspaceProjet';
 import { creerProjet } from '../projet/ouverture';
@@ -31,7 +31,7 @@ export function NouveauProjet({ auteur, surAnnuler, surCree }: Props) {
   );
   const infos = { annee, codeAffaire: code, nom, niveaux };
   const problemes = controlerNouveauProjet(infos);
-  const dossiers = [...nomsDossiersNiveaux(niveaux).entries()];
+  const dossiers = [...nomsDossiersNiveaux(trierNiveaux(niveaux)).entries()];
 
   async function creer() {
     setErreur(null);

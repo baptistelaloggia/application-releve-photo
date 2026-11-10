@@ -10,7 +10,8 @@ Application, sur téléphone Android et PC Windows, qui sert à localiser des ph
 | Lot | État |
 |---|---|
 | 1. Socle | Réalisé : création de projet, niveaux, import et découpage des plans PDF, arborescence normalisée, test d'écriture sur le serveur |
-| 2 à 7 | À faire |
+| 2. Plans et locaux | Réalisé : affichage fluide des plans (zoom, tuiles), détection et correction des locaux, recherche |
+| 3 à 7 | À faire |
 
 ## Tester l'application sur un PC (sans rien installer)
 

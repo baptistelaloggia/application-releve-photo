@@ -40,20 +40,48 @@ export async function extrairePage(fichier: Blob, numeroPage: number): Promise<B
   return new Blob([(await cible.save()) as Uint8Array<ArrayBuffer>], { type: "application/pdf" });
 }
 
-/** Dessine une page du PDF dans un canevas, à la largeur demandée (aperçu). */
-export async function dessinerApercu(fichier: Blob, canevas: HTMLCanvasElement, largeur: number, page = 1): Promise<void> {
-  const tache = pdfjs.getDocument({ data: new Uint8Array(await fichier.arrayBuffer()) });
-  try {
-    const doc = await tache.promise;
-    const p = await doc.getPage(page);
-    const base = p.getViewport({ scale: 1 });
-    const ratio = window.devicePixelRatio || 1;
-    const vue = p.getViewport({ scale: (largeur / base.width) * ratio });
-    canevas.width = Math.floor(vue.width);
-    canevas.height = Math.floor(vue.height);
-    canevas.style.width = `${Math.floor(vue.width / ratio)}px`;
-    await p.render({ canvas: canevas, viewport: vue }).promise;
-  } finally {
-    await tache.destroy();
+// ------------------------------------------------------------------ documents ouverts
+
+type TachePdf = ReturnType<typeof pdfjs.getDocument>;
+export type PagePdf = Awaited<ReturnType<Awaited<TachePdf['promise']>['getPage']>>;
+
+interface Ouvert {
+  tache: Promise<TachePdf>;
+  page: Promise<PagePdf>;
+}
+const ouverts = new Map<string, Ouvert>();
+const MAX_OUVERTS = 3;
+
+/**
+ * Ouvre la 1re page d'un plan et la garde en mémoire (les 3 derniers plans ouverts),
+ * pour revenir vite sur un niveau déjà consulté.
+ * cle : identifiant stable du contenu (par ex. l'empreinte du plan).
+ */
+export function ouvrirPagePlan(cle: string, fichier: Blob): Promise<PagePdf> {
+  const deja = ouverts.get(cle);
+  if (deja) {
+    ouverts.delete(cle);
+    ouverts.set(cle, deja); // remis en dernier : le plus récemment utilisé
+    return deja.page;
   }
+  const tache = fichier.arrayBuffer().then((b) => pdfjs.getDocument({ data: new Uint8Array(b) }));
+  const page = tache.then(async (t) => (await t.promise).getPage(1));
+  const entree: Ouvert = { tache, page };
+  ouverts.set(cle, entree);
+  page.catch(() => ouverts.delete(cle));
+  while (ouverts.size > MAX_OUVERTS) {
+    const [ancienne, a] = ouverts.entries().next().value!;
+    ouverts.delete(ancienne);
+    void a.tache.then((t) => t.destroy()).catch(() => undefined);
+  }
+  return page;
+}
+
+/** Propose les locaux d'un plan à partir de son texte (voir domaine/locaux.ts). */
+export async function proposerLocaux(cle: string, fichier: Blob) {
+  const { detecterLocaux } = await import('../domaine/locaux');
+  const { lireTextesPlaces } = await import('./textesPlaces');
+  const page = await ouvrirPagePlan(cle, fichier);
+  const { textes, largeur, hauteur } = await lireTextesPlaces(page);
+  return { locaux: detecterLocaux(textes, largeur, hauteur), sansTexte: textes.every((t) => !t.texte.trim()) };
 }

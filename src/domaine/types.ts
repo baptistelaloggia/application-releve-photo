@@ -24,8 +24,12 @@ export interface Projet {
 export interface Niveau {
   schema: number;
   id: string;
-  /** SS, SS1, RDC, R+1, TT… */
+  /** SS1, ES, RDC, R+1, TT… ou code libre d'un niveau intermédiaire (R+4-MEZZANINE). */
   code: string;
+  /** Libellé saisi pour un niveau intermédiaire (« R+4 mezzanine »). */
+  libelle?: string;
+  /** Position dans le bâtiment, du bas vers le haut (0, 10, 20…). Modifiable par l'utilisateur. */
+  ordre?: number;
   creeLe: string;
   creePar: string;
 }
@@ -68,4 +72,27 @@ export interface Plan {
   importeLe: string;
   importePar: string;
   historique: IndiceArchive[];
+}
+
+/**
+ * _data/locaux/{id}.json : un local identifié sur un plan.
+ * Sa position est celle de son étiquette, relative à la page du plan (0 à 1).
+ */
+export interface Local {
+  schema: number;
+  id: string;
+  planId: string;
+  /** Numéro du plan (« SF202 », « 012 ») ; null si le plan n'en donne pas. */
+  numero: string | null;
+  nom: string;
+  /** Surface en m², si elle figure sur le plan. */
+  surface: number | null;
+  x: number;
+  y: number;
+  /** « auto » : détecté sur le plan puis validé ; « manuel » : placé à la main. */
+  origine: 'auto' | 'manuel';
+  creeLe: string;
+  creePar: string;
+  modifieLe: string;
+  modifiePar: string;
 }

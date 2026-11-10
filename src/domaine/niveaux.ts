@@ -5,17 +5,48 @@
  *   RDC
  *   R+1, R+2, …
  *   TT  (toiture)
+ * D'autres niveaux (intermédiaires) sont permis, avec un code libre : « R+4 mezzanine »
+ * devient « R+4-MEZZANINE ». L'ordre des niveaux d'un projet est enregistré et modifiable.
  */
 
 const MOTIF_CODE = /^(SS[1-9]\d?|ES|RDC|R\+[1-9]\d?|TT)$/;
+/**
+ * Code libre : lettres, chiffres, « + » et « - », 16 caractères au plus.
+ * Ni « _ » ni « . » : ils séparent les éléments des noms de dossiers et de photos.
+ */
+const MOTIF_CODE_LIBRE = /^[A-Z0-9][A-Z0-9+-]{0,15}$/;
 
-/** Indique si le code respecte la convention. */
+/** Indique si le code est un code standard de la convention (SS1, ES, RDC, R+n, TT). */
 export function estCodeNiveauValide(code: string): boolean {
   return MOTIF_CODE.test(code);
 }
 
-/** Met un code saisi au propre (majuscules, espaces retirés, « R1 » → « R+1 »). */
+/** Indique si le code est utilisable : standard, ou libre (niveau intermédiaire). */
+export function estCodeNiveauAutorise(code: string): boolean {
+  return MOTIF_CODE.test(code) || MOTIF_CODE_LIBRE.test(code);
+}
+
+/**
+ * Met un code saisi au propre : « r1 » → « R+1 », « entresol » → « ES »,
+ * « R+4 mezzanine » → « R+4-MEZZANINE ».
+ */
 export function normaliserCodeNiveau(saisie: string): string {
+  const standard = normaliserCodeStandard(saisie);
+  if (MOTIF_CODE.test(standard)) return standard;
+  return saisie
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim()
+    .replace(/[\s_.]+/g, '-')
+    .replace(/[^A-Z0-9+-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 16)
+    .replace(/-+$/, '');
+}
+
+function normaliserCodeStandard(saisie: string): string {
   const c = saisie.toUpperCase().replace(/\s+/g, '');
   const etage = /^R\+?0*([1-9]\d?)$/.exec(c);
   if (etage) return `R+${etage[1]}`;
@@ -40,7 +71,11 @@ export function rangNiveau(code: string): number {
   if (ss) return -Number(ss[1]);
   const etage = /^R\+(\d+)$/.exec(code);
   if (etage) return Number(etage[1]);
-  throw new Error(`Code de niveau non conforme : « ${code} »`);
+  // Niveau intermédiaire : juste au-dessus du niveau standard qui commence son code
+  // (« R+4-MEZZANINE » au-dessus de R+4), sinon sous la toiture.
+  const prefixe = /^(SS\d+|ES|RDC|R\+\d+|TT)-/.exec(code);
+  if (prefixe) return rangNiveau(prefixe[1]) + 0.5;
+  return 999;
 }
 
 /** Trie des codes dans l'ordre du bâtiment (du bas vers le haut). */
@@ -56,7 +91,11 @@ export function controlerNiveaux(codes: readonly string[]): string[] {
   const problemes: string[] = [];
   const vus = new Set<string>();
   for (const code of codes) {
-    if (!estCodeNiveauValide(code)) problemes.push(`Code de niveau non conforme : « ${code} ».`);
+    if (!estCodeNiveauAutorise(code)) {
+      problemes.push(
+        `Code de niveau non valable : « ${code} ». Utilisez des lettres, des chiffres, « + » ou « - » (16 caractères au plus).`,
+      );
+    }
     if (vus.has(code)) problemes.push(`Niveau en double : « ${code} ».`);
     vus.add(code);
   }
@@ -65,12 +104,13 @@ export function controlerNiveaux(codes: readonly string[]): string[] {
 
 /**
  * Noms des dossiers de niveau sous 01_PHOTOS/ : numéro d'ordre à 2 chiffres
- * devant le code, pour que l'Explorateur Windows les affiche dans l'ordre du bâtiment.
+ * devant le code, pour que l'Explorateur Windows les affiche dans l'ordre du projet.
+ * Les codes sont pris dans l'ordre donné (du bas vers le haut).
  * Exemple : SS1, RDC, R+1 → { SS1: "00_SS1", RDC: "01_RDC", "R+1": "02_R+1" }.
  */
-export function nomsDossiersNiveaux(codes: readonly string[]): Map<string, string> {
+export function nomsDossiersNiveaux(codesOrdonnes: readonly string[]): Map<string, string> {
   const resultat = new Map<string, string>();
-  trierNiveaux(codes).forEach((code, i) => {
+  codesOrdonnes.forEach((code, i) => {
     resultat.set(code, `${String(i).padStart(2, '0')}_${code}`);
   });
   return resultat;
@@ -79,7 +119,7 @@ export function nomsDossiersNiveaux(codes: readonly string[]): Map<string, strin
 /** Reconnaît un dossier de niveau (« 03_R+2 ») et renvoie son code, sinon null. */
 export function codeDepuisNomDossier(nom: string): string | null {
   const m = /^\d{2}_(.+)$/.exec(nom);
-  return m && estCodeNiveauValide(m[1]) ? m[1] : null;
+  return m && estCodeNiveauAutorise(m[1]) ? m[1] : null;
 }
 
 /** Construit la liste type : n sous-sols, entresol éventuel, RDC, m étages, toiture éventuelle. */
