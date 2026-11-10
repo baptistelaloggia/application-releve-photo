@@ -78,3 +78,13 @@ describe('détection des locaux', () => {
     expect(detecterLocaux(textes, L, H).map((l) => l.numero)).toEqual(['REST003', 'CI003']);
   });
 });
+
+import { proposerNumeroLocal } from './locaux';
+describe('numéro automatique', () => {
+  it('propose le premier numéro libre du niveau', () => {
+    expect(proposerNumeroLocal('R+2', [])).toBe('R2-01');
+    expect(proposerNumeroLocal('R+2', ['R2-01', 'r2-02', 'SF202'])).toBe('R2-03');
+    expect(proposerNumeroLocal('RDC', ['R2-01'])).toBe('RDC-01');
+    expect(proposerNumeroLocal('R+4-MEZZANINE', [])).toBe('R4-MEZ-01');
+  });
+});

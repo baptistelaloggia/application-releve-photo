@@ -36,7 +36,8 @@ Ce fichier n'en est que le résumé opérationnel.
   y compris le même jour (rang `_01`, `_02`… en fin de nom).
 - **Un espace isolé par projet**, dans une seule application.
 - Codes de niveau : `SS1`, `SS2`… (sous-sols toujours numérotés, même s'il n'y en a qu'un), `ES` (entresol),
-  `RDC`, `R+1`, `R+2`…, `TT` (toiture).
+  `RDC`, `R+1`, `R+2`…, `TT` (toiture), ou code libre d'un niveau intermédiaire (`R+4-MEZZANINE` : lettres,
+  chiffres, `+`, `-`, jamais `_` ni `.`). L'ordre des niveaux est enregistré (`ordre`) et modifiable.
 - Un carnet de plans multi-pages est découpé à l'import : une page = le plan d'un niveau.
 - Locaux : `_data/locaux/{uuid}.json`, rattachés à un plan, numéro unique dans le projet. Voir CONCEPTION §A.6 ter.
 - Nom des plans : `{Projet}_{Niveau}.pdf` (sans indice ni lot ; l'indice est dans `_data/`).

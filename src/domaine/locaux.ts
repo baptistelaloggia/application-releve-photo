@@ -188,3 +188,17 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
 function arrondir(v: number) {
   return Math.round(v * 100000) / 100000;
 }
+
+/**
+ * Numéro automatique d'un local, unique dans le projet : préfixe du niveau, puis
+ * rang à 2 chiffres (3 au-delà de 99). Exemples : R+2 → « R2-01 », RDC → « RDC-03 »,
+ * SS1 → « SS1-12 », R+4-MEZZANINE → « R4-MEZ-01 ».
+ */
+export function proposerNumeroLocal(codeNiveau: string, numerosExistants: Iterable<string>): string {
+  const prefixe = codeNiveau.replace(/\+/g, '').slice(0, 6).replace(/-+$/, '');
+  const pris = new Set([...numerosExistants].map((n) => n.toUpperCase()));
+  for (let rang = 1; ; rang++) {
+    const numero = `${prefixe}-${String(rang).padStart(2, '0')}`;
+    if (!pris.has(numero)) return numero;
+  }
+}

@@ -1,6 +1,7 @@
 import {
   codeDepuisNomDossier,
   controlerNiveaux,
+  estCodeNiveauValide,
   libelleNiveau,
   nomsDossiersNiveaux,
   normaliserCodeNiveau,
@@ -16,7 +17,7 @@ import {
   normaliserIndice,
 } from '../domaine/nommage';
 import { VERSION_SCHEMA, type Local, type Niveau, type Plan, type Projet } from '../domaine/types';
-import type { LocalDetecte } from '../domaine/locaux';
+import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
 import { ecrireJson, lireJson, type Stockage } from '../stockage/Stockage';
 
@@ -24,6 +25,8 @@ const FICHIER_PROJET = `${DOSSIERS.donnees}/projet.json`;
 const DOSSIER_NIVEAUX = `${DOSSIERS.donnees}/niveaux`;
 const DOSSIER_PLANS = `${DOSSIERS.donnees}/plans`;
 const DOSSIER_LOCAUX = `${DOSSIERS.donnees}/locaux`;
+/** Écart entre deux niveaux dans le champ « ordre ». */
+const PAS_ORDRE = 10;
 
 export class ErreurPasUnProjet extends Error {
   constructor() {
@@ -132,18 +135,19 @@ export class EspaceProjet {
       creePar: auteur,
     };
     const espace = new EspaceProjet(stockage, projet, [], [], [], []);
-    for (const code of infos.niveaux) {
+    const codes = [...infos.niveaux].sort((a, b) => rangNiveau(a) - rangNiveau(b));
+    for (const [i, code] of codes.entries()) {
       const niveau: Niveau = {
         schema: VERSION_SCHEMA,
         id: crypto.randomUUID(),
         code,
+        ordre: i * PAS_ORDRE,
         creeLe: projet.creeLe,
         creePar: auteur,
       };
       await ecrireJson(stockage, `${DOSSIER_NIVEAUX}/${niveau.id}.json`, niveau);
       espace.niveaux.push(niveau);
     }
-    espace.trierNiveaux();
     await espace.appliquerArborescence();
     // projet.json en dernier : sa présence signifie « projet complet ».
     await ecrireJson(stockage, FICHIER_PROJET, projet);
@@ -167,6 +171,8 @@ export class EspaceProjet {
     this.plans = await this.lireTous<Plan>(DOSSIER_PLANS);
     this.locaux = await this.lireTous<Local>(DOSSIER_LOCAUX);
     this.trierNiveaux();
+    // Projets créés avant l'ordre modifiable : on enregistre l'ordre du bâtiment.
+    if (this.niveaux.some((n) => n.ordre === undefined)) await this.renumeroter();
   }
 
   private async lireTous<T>(dossier: string): Promise<T[]> {
@@ -183,8 +189,25 @@ export class EspaceProjet {
     return resultat;
   }
 
+  /** Niveaux dans l'ordre enregistré ; à défaut, dans l'ordre du bâtiment. */
   private trierNiveaux() {
-    this.niveaux.sort((a, b) => rangNiveau(a.code) - rangNiveau(b.code));
+    this.niveaux.sort((a, b) =>
+      a.ordre !== undefined && b.ordre !== undefined ? a.ordre - b.ordre : rangNiveau(a.code) - rangNiveau(b.code),
+    );
+  }
+
+  /** Réécrit l'ordre 0, 10, 20… selon la position actuelle (seuls les niveaux modifiés sont réécrits). */
+  private async renumeroter() {
+    for (const [i, n] of this.niveaux.entries()) {
+      if (n.ordre === i * PAS_ORDRE) continue;
+      n.ordre = i * PAS_ORDRE;
+      await ecrireJson(this.stockage, `${DOSSIER_NIVEAUX}/${n.id}.json`, n);
+    }
+  }
+
+  /** Libellé affiché d'un niveau : celui saisi pour un niveau intermédiaire, sinon le libellé standard. */
+  libelle(n: Niveau): string {
+    return n.libelle ?? libelleNiveau(n.code);
   }
 
   // ---------------------------------------------------------------- arborescence
@@ -259,17 +282,41 @@ export class EspaceProjet {
     const code = normaliserCodeNiveau(saisie);
     const problemes = controlerNiveaux([...this.niveaux.map((n) => n.code), code]);
     if (problemes.length) throw new Error(problemes.join('\n'));
+    const standard = estCodeNiveauValide(code);
     const niveau: Niveau = {
       schema: VERSION_SCHEMA,
       id: crypto.randomUUID(),
       code,
+      ...(standard ? {} : { libelle: saisie.trim().replace(/\s+/g, ' ') }),
       creeLe: maintenant(),
       creePar: auteur,
     };
+    // Position proposée : après le dernier niveau situé plus bas dans le bâtiment
+    // (« R+4-MEZZANINE » juste après R+4). L'utilisateur peut ensuite le déplacer.
+    const rang = rangNiveau(code);
+    let position = 0;
+    this.niveaux.forEach((n, i) => {
+      if (rangNiveau(n.code) <= rang) position = i + 1;
+    });
+    this.niveaux.splice(position, 0, niveau);
     await ecrireJson(this.stockage, `${DOSSIER_NIVEAUX}/${niveau.id}.json`, niveau);
-    this.niveaux.push(niveau);
-    this.trierNiveaux();
-    return [`Niveau ajouté : ${code} (${libelleNiveau(code)})`, ...(await this.appliquerArborescence())];
+    await this.renumeroter();
+    return [`Niveau ajouté : ${code} (${this.libelle(niveau)})`, ...(await this.appliquerArborescence())];
+  }
+
+  /** Déplace un niveau d'un cran vers le haut (+1) ou vers le bas (-1) et renumérote les dossiers. */
+  async deplacerNiveau(id: string, sens: 1 | -1): Promise<string[]> {
+    const i = this.niveaux.findIndex((n) => n.id === id);
+    if (i < 0) throw new Error('Niveau introuvable.');
+    const j = i + sens;
+    if (j < 0 || j >= this.niveaux.length) return [];
+    [this.niveaux[i], this.niveaux[j]] = [this.niveaux[j], this.niveaux[i]];
+    await this.renumeroter();
+    const n = this.niveaux[j];
+    return [
+      `Niveau ${n.code} déplacé vers le ${sens > 0 ? 'haut' : 'bas'}`,
+      ...(await this.appliquerArborescence()),
+    ];
   }
 
   /** Supprime un niveau, seulement s'il n'a ni plan ni photo. */
@@ -459,6 +506,16 @@ export class EspaceProjet {
   private async ecrireLocal(local: Local) {
     await ecrireJson(this.stockage, `${DOSSIER_LOCAUX}/${local.id}.json`, local);
     this.locaux = [...this.locaux.filter((l) => l.id !== local.id), local];
+  }
+
+  /** Numéro automatique libre pour un nouveau local de ce plan (« R2-03 »). */
+  proposerNumero(planId: string): string {
+    const plan = this.planParId(planId);
+    if (!plan) throw new Error('Plan introuvable.');
+    return proposerNumeroLocal(
+      this.niveauDuPlan(plan).code,
+      this.locaux.flatMap((l) => (l.numero ? [l.numero] : [])),
+    );
   }
 
   async creerLocal(planId: string, saisie: SaisieLocal, auteur: string, origine: Local['origine'] = 'manuel'): Promise<Local> {

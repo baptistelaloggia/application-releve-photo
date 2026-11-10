@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { libelleNiveau } from '../domaine/niveaux';
+import { normaliserCodeNiveau } from '../domaine/niveaux';
 import type { EspaceProjet } from '../projet/EspaceProjet';
 import type { ProjetConnu } from '../stockage/registre';
 import { BarreRecherche } from './BarreRecherche';
 import { EcranPlan } from './plan/EcranPlan';
 import { dateLisible, Journal, Message, tailleLisible, texteErreur } from './commun';
 import { ImportPlans } from './ImportPlans';
+import { DetectionGlobale } from './DetectionGlobale';
 
 interface Props {
   espace: EspaceProjet;
@@ -19,6 +20,7 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
   const [journal, setJournal] = useState<string[]>(espace.avertissements.map((a) => `Attention : ${a}`));
   const [erreur, setErreur] = useState<string | null>(null);
   const [nouveauNiveau, setNouveauNiveau] = useState('');
+  const [detectionGlobale, setDetectionGlobale] = useState(false);
   const [planOuvert, setPlanOuvert] = useState<{ planId: string; localId: string | null } | null>(null);
   const [occupe, setOccupe] = useState(false);
   const { projet } = espace;
@@ -94,16 +96,18 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
                 <th>Plan courant</th>
                 <th>Indice</th>
                 <th>Locaux</th>
+                <th>Ordre</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {espace.niveaux.map((n) => {
+              {/* Du plus haut (en haut du tableau) au plus bas, comme sur une coupe du bâtiment. */}
+              {[...espace.niveaux].reverse().map((n, i, liste) => {
                 const plan = espace.planDuNiveau(n.id);
                 return (
                   <tr key={n.id}>
                     <td>
-                      <strong>{n.code}</strong> <span className="discret">{libelleNiveau(n.code)}</span>
+                      <strong>{n.code}</strong> <span className="discret">{espace.libelle(n)}</span>
                     </td>
                     <td className="mono">{espace.dossierNiveau(n.code).split('/')[1]}</td>
                     <td>
@@ -131,6 +135,26 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
                       ) : null}
                     </td>
                     <td>{plan ? espace.locauxDuPlan(plan.id).length : ''}</td>
+                    <td className="actions-ligne">
+                      <button
+                        className="petit"
+                        aria-label={`Monter le niveau ${n.code}`}
+                        title="Monter d'un niveau"
+                        disabled={occupe || i === 0}
+                        onClick={() => void executer(() => espace.deplacerNiveau(n.id, 1))}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        className="petit"
+                        aria-label={`Descendre le niveau ${n.code}`}
+                        title="Descendre d'un niveau"
+                        disabled={occupe || i === liste.length - 1}
+                        onClick={() => void executer(() => espace.deplacerNiveau(n.id, -1))}
+                      >
+                        ↓
+                      </button>
+                    </td>
                     <td className="actions-ligne">
                       {plan && (
                         <button className="petit" onClick={() => setPlanOuvert({ planId: plan.id, localId: null })}>
@@ -172,14 +196,42 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
             Ajouter un niveau
             <input
               value={nouveauNiveau}
-              placeholder="SS1, R+4, TT…"
-              maxLength={6}
+              placeholder="SS2, R+4, R+4 mezzanine…"
+              maxLength={40}
               onChange={(e) => setNouveauNiveau(e.target.value)}
             />
           </label>
           <button disabled={!nouveauNiveau.trim() || occupe}>Ajouter</button>
+          {nouveauNiveau.trim() && (
+            <span className="discret">
+              Code : <span className="mono">{normaliserCodeNiveau(nouveauNiveau) || '—'}</span>
+            </span>
+          )}
         </form>
+        <p className="discret">
+          Un niveau intermédiaire (mezzanine, combles…) prend un code libre ; il est placé au-dessus du niveau qui commence
+          son code, puis se déplace avec ↑ ↓. Les dossiers photos sont renumérotés automatiquement.
+        </p>
+        {espace.plans.length > 0 && !detectionGlobale && (
+          <div className="boutons">
+            <button onClick={() => setDetectionGlobale(true)} disabled={occupe}>
+              Détecter les locaux sur tous les plans…
+            </button>
+          </div>
+        )}
       </section>
+
+      {detectionGlobale && (
+        <DetectionGlobale
+          espace={espace}
+          auteur={auteur}
+          surJournal={(lignes) => setJournal((j) => [...lignes, ...j])}
+          surFin={() => {
+            setDetectionGlobale(false);
+            setVersion((v) => v + 1);
+          }}
+        />
+      )}
 
       <ImportPlans
         espace={espace}

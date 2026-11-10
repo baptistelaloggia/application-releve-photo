@@ -156,22 +156,24 @@ button.projet .discret { font-size: 0.85rem; }
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.25); max-width: calc(100% - 24px); }
 .consigne button { color: var(--texte); }
 
-/* Marqueur : point d'ancrage à la position exacte, étiquette au-dessus. */
+/* Marqueur : point d'ancrage (anneau creux, pour laisser lire le plan) à la position exacte,
+   tige verticale, étiquette au-dessus de l'étiquette du local dessinée sur le plan. */
 .marqueur { position: absolute; left: 0; top: 0; pointer-events: auto; border: none; background: none; padding: 0;
-  min-height: 0; width: 0; height: 0; overflow: visible; cursor: pointer; }
-.marqueur-point { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
-  background: #1f4e79; border: 2px solid #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3); }
-.marqueur-libelle { position: absolute; left: 0; bottom: 8px; transform: translateX(-50%); white-space: nowrap;
-  font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: 4px; background: #1f4e79; color: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
-.marqueur-selection .marqueur-point, .marqueur-selection .marqueur-libelle { background: #e8743b; }
-.marqueur-selection { z-index: 2; }
+  min-height: 0; width: 0; height: 0; overflow: visible; cursor: pointer; --couleur: #1f4e79; }
+.marqueur::before { content: ''; position: absolute; left: -1px; bottom: 4px; width: 2px;
+  height: calc(var(--decalage, 14px) - 4px); background: var(--couleur); opacity: 0.7; pointer-events: none; }
+.marqueur-point { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--couleur); background: transparent; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.8); }
+.marqueur-libelle { position: absolute; left: 0; bottom: var(--decalage, 14px); transform: translateX(-50%);
+  white-space: nowrap; font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: 4px;
+  background: var(--couleur); color: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
+.marqueur-selection { z-index: 2; --couleur: #e8743b; }
 .marqueur-selection .marqueur-libelle { font-size: 14px; font-weight: 600; }
-.marqueur-candidat .marqueur-point { background: #1b6e3a; }
+.marqueur-brouillon { --couleur: #e8743b; }
+.marqueur-candidat { --couleur: #1b6e3a; }
 .marqueur-candidat .marqueur-libelle { background: #fff; color: #1b6e3a; border: 2px dashed #1b6e3a; }
-.marqueur-candidat-ecarte .marqueur-point { background: #999; }
+.marqueur-candidat-ecarte { --couleur: #999; }
 .marqueur-candidat-ecarte .marqueur-libelle { background: #fff; color: #777; border: 2px dashed #aaa; text-decoration: line-through; }
-.marqueur-brouillon .marqueur-point, .marqueur-brouillon .marqueur-libelle { background: #e8743b; }
 
 .liste-locaux { list-style: none; margin: 0; padding: 0; }
 .liste-locaux li { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--bord); }
@@ -181,3 +183,17 @@ button.projet .discret { font-size: 0.85rem; }
 .liste-candidats li.ecarte button { color: var(--discret); text-decoration: line-through; }
 .fiche-local label { margin-top: 8px; }
 .fiche-local input { width: 100%; }
+.bascule { display: inline-flex; align-items: center; gap: 0; }
+.bascule .discret { margin-right: 6px; font-size: 0.9rem; }
+.bascule button { border-radius: 0; min-height: 40px; padding: 4px 12px; }
+.bascule button:first-of-type { border-radius: 8px 0 0 8px; }
+.bascule button:last-of-type { border-radius: 0 8px 8px 0; border-left: none; }
+.bascule button.actif { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); }
+.fiche-local label > button { align-self: flex-start; margin-top: 4px; }
+/* Locaux et propositions lus sur le plan : aucun repère graphique sur l'étiquette du plan
+   elle-même, seulement une courte tige sous l'étiquette de l'appli. */
+.marqueur-local .marqueur-point, .marqueur-selection .marqueur-point,
+.marqueur-candidat .marqueur-point, .marqueur-candidat-ecarte .marqueur-point { display: none; }
+.marqueur-local::before, .marqueur-selection::before,
+.marqueur-candidat::before, .marqueur-candidat-ecarte::before {
+  bottom: calc(var(--decalage, 14px) - 8px); height: 8px; }

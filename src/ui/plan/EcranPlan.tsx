@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { libelleNiveau, rangNiveau } from '../../domaine/niveaux';
 import type { LocalDetecte } from '../../domaine/locaux';
 import type { Local } from '../../domaine/types';
 import type { EspaceProjet, ResultatLocal, SaisieLocal } from '../../projet/EspaceProjet';
 import { proposerLocaux } from '../../pdf/pdf';
+import { ecrireReglage, lireReglage } from '../../stockage/registre';
 import { BarreRecherche } from '../BarreRecherche';
 import { Message, texteErreur } from '../commun';
 import { VisionneusePlan, type CommandesVisionneuse, type Marqueur } from './VisionneusePlan';
@@ -60,13 +60,26 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
 
   const locaux = espace.locauxDuPlan(planId);
   const localFocus = localId ? espace.locaux.find((l) => l.id === localId) : undefined;
+  // Niveaux ayant un plan, dans l'ordre du projet.
   const plansTries = useMemo(
-    () =>
-      espace.plans
-        .map((p) => ({ p, n: espace.niveauDuPlan(p) }))
-        .sort((a, b) => rangNiveau(a.n.code) - rangNiveau(b.n.code)),
-    [espace, espace.plans],
+    () => espace.niveaux.flatMap((n) => {
+      const p = espace.planDuNiveau(n.id);
+      return p ? [{ p, n }] : [];
+    }),
+    [espace, espace.plans, espace.niveaux],
   );
+
+  // Texte des étiquettes sur le plan : numéro du local (par défaut) ou nom. Mémorisé sur l'appareil.
+  const [etiquettes, setEtiquettes] = useState<'numero' | 'nom'>('numero');
+  useEffect(() => {
+    void lireReglage<'numero' | 'nom'>('etiquettes').then((v) => v && setEtiquettes(v));
+  }, []);
+  const choisirEtiquettes = (v: 'numero' | 'nom') => {
+    setEtiquettes(v);
+    void ecrireReglage('etiquettes', v);
+  };
+  const texteEtiquette = (l: { numero: string | null; nom: string }) =>
+    court(etiquettes === 'nom' ? l.nom : (l.numero ?? l.nom), etiquettes === 'nom' ? 22 : 16);
 
   async function executer(action: () => Promise<void>) {
     setErreur(null);
@@ -90,7 +103,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       id: l.id,
       x: l.x,
       y: l.y,
-      libelle: court(l.numero ?? l.nom),
+      libelle: texteEtiquette(l),
       titre: [l.numero, l.nom].filter(Boolean).join(' · '),
       style: l.id === selection ? 'selection' : 'local',
     });
@@ -102,7 +115,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         id: `candidat:${c.cle}`,
         x: c.x,
         y: c.y,
-        libelle: court(c.numero ?? c.nom),
+        libelle: texteEtiquette(c),
         titre: `${c.lignes.join(' / ')}${c.retenu ? '' : ' (écarté)'}`,
         style: c.retenu ? 'candidat' : 'candidat-ecarte',
       });
@@ -180,13 +193,22 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         >
           {plansTries.map(({ p, n }) => (
             <option key={p.id} value={p.id}>
-              {n.code} · {libelleNiveau(n.code)}
+              {n.code} · {espace.libelle(n)}
             </option>
           ))}
         </select>
         <span className="discret mono">
           {plan.fichier.split('/').pop()} · ind. {plan.indice}
         </span>
+        <div className="bascule" role="group" aria-label="Texte des étiquettes">
+          <span className="discret">Étiquettes :</span>
+          <button className={etiquettes === 'numero' ? 'actif' : undefined} aria-pressed={etiquettes === 'numero'} onClick={() => choisirEtiquettes('numero')}>
+            Numéro
+          </button>
+          <button className={etiquettes === 'nom' ? 'actif' : undefined} aria-pressed={etiquettes === 'nom'} onClick={() => choisirEtiquettes('nom')}>
+            Nom
+          </button>
+        </div>
         <div className="barre-recherche-plan">
           <BarreRecherche espace={espace} surChoix={choisirResultat} />
         </div>
@@ -249,7 +271,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
             <FicheLocal
               key="brouillon"
               titre="Nouveau local"
-              initial={{ nom: '', numero: null, surface: null, x: mode.x, y: mode.y }}
+              initial={{ nom: '', numero: espace.proposerNumero(planId), surface: null, x: mode.x, y: mode.y }}
+              numeroAutomatique
               occupe={occupe}
               surAnnuler={() => setMode({ type: 'consultation' })}
               surEnregistrer={(s) =>
@@ -266,6 +289,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               titre={`Local ${niveau.code}`}
               local={selectionne}
               initial={selectionne}
+              numeroPropose={selectionne.numero ? undefined : espace.proposerNumero(planId)}
               occupe={occupe}
               surAnnuler={() => setSelection(null)}
               surEnregistrer={(s) => executer(async () => void (await espace.modifierLocal(selectionne.id, s, auteur)))}
@@ -433,10 +457,16 @@ function FicheLocal({
   surAnnuler,
   surDeplacer,
   surSupprimer,
+  numeroAutomatique,
+  numeroPropose,
 }: {
   titre: string;
   local?: Local;
   initial: SaisieLocal;
+  /** Le numéro initial a été proposé automatiquement (nouveau local). */
+  numeroAutomatique?: boolean;
+  /** Numéro automatique proposé pour un local qui n'en a pas. */
+  numeroPropose?: string;
   occupe: boolean;
   surEnregistrer: (s: SaisieLocal) => void;
   surAnnuler: () => void;
@@ -466,12 +496,20 @@ function FicheLocal({
         <label>
           Numéro
           <input value={numero} maxLength={12} placeholder="facultatif" onChange={(e) => setNumero(e.target.value.toUpperCase())} />
+          {numeroPropose && !numero && (
+            <button type="button" className="petit" onClick={() => setNumero(numeroPropose)}>
+              Numéro automatique : {numeroPropose}
+            </button>
+          )}
         </label>
         <label>
           Surface (m²)
           <input value={surface} inputMode="decimal" placeholder="facultatif" onChange={(e) => setSurface(e.target.value)} />
         </label>
       </div>
+      {numeroAutomatique && numero === initial.numero && (
+        <p className="discret">Numéro attribué automatiquement : vous pouvez le modifier ou l'effacer.</p>
+      )}
       {!surfaceValide && <p className="texte-erreur">Surface non valable.</p>}
       {local && (
         <p className="discret">

@@ -120,6 +120,10 @@ Règles complémentaires (validées le 04/11/2026) :
 - **Indices des plans** : l'indice courant est enregistré dans les données de l'appli (`_data/plans/{uuid}.json`). À chaque nouvel indice, le PDF remplacé est déplacé dans `00_PLANS/_ANCIENS/` sous le nom `{Projet}_{Niveau}_Ind-{Indice}.pdf`.
 - **Ajout d'un niveau en cours de projet** : l'appli recalcule les numéros d'ordre et renomme automatiquement les dossiers de niveau.
 
+Niveaux intermédiaires et ordre (demandés le 10/11/2026) :
+- Un niveau peut avoir un **code libre** : lettres, chiffres, `+` et `-`, 16 caractères au plus. « R+4 mezzanine » donne le code `R+4-MEZZANINE` et le libellé « R+4 mezzanine ». Les caractères `_` et `.` sont interdits, car ils séparent les éléments des noms de dossiers et de photos.
+- **L'ordre des niveaux est enregistré** (champ `ordre` du JSON de chaque niveau) et modifiable avec les boutons ↑ ↓. Un nouveau niveau est placé au-dessus du niveau standard qui commence son code (`R+4-MEZZANINE` au-dessus de `R+4`), sinon sous la toiture. Les dossiers `01_PHOTOS/NN_…` sont renumérotés à chaque changement.
+
 Règles issues du lot 1 (04/11/2026) :
 - **Un seul plan courant par niveau.** [À VÉRIFIER : grands bâtiments avec plusieurs feuilles (zones) par niveau.]
 - **Carnets de plans** : un PDF contenant un niveau par page est découpé à l'import. Chaque page retenue devient le plan `{Projet}_{Niveau}.pdf` de son niveau, avec son contenu vectoriel. Le niveau de chaque page est reconnu d'après son titre (« PLAN DE NIVEAU - R+2 », « … - ENTRESOL », « … - TOIT »…), et l'utilisateur peut le corriger avant l'import. Le JSON du plan garde le nom du carnet d'origine et le numéro de page (`pageOrigine`).
@@ -131,6 +135,9 @@ Règles issues du lot 1 (04/11/2026) :
 - **Détection** : l'appli lit le texte vectoriel de la page et regroupe les lignes empilées et centrées de même hauteur. Elle retient les groupes qui contiennent un numéro (lettres puis chiffres, comme `SF202`, `LT1104.B`, ou chiffres seuls s'il y a une surface) ou une surface (`33,7 m²`). Un nom seul est retenu s'il désigne un type de local (bureau, sanit., local, circ., stockage, CTA, TGBT…), s'il est en majuscules et s'il se trouve dans la zone dessinée. Les propositions sont toujours **vérifiées par l'utilisateur** avant enregistrement, et une nouvelle détection ne recrée pas les locaux déjà présents.
 - Essai sur le carnet réel : 141 étiquettes complètes et 83 noms seuls sur 10 niveaux ; 47 locaux numérotés au SS1, dont le TGBT (LT1105). Quelques faux positifs restent à décocher (cartouche de la page toiture).
 - **Numéro unique** dans le projet ; nom obligatoire.
+- **Numéro automatique** (10/11/2026) : à la création d'un local, l'appli propose le premier numéro libre du niveau, sous la forme `{niveau sans +}-{rang}` (`R2-01`, `RDC-03`, `SS1-12`, `R4-MEZ-01`), modifiable ou effaçable. Un local sans numéro peut en recevoir un d'un clic.
+- **Étiquettes sur le plan** : placées au-dessus de l'étiquette du local dessinée sur le plan, pour la laisser lisible. Elles affichent au choix le numéro ou le nom (choix mémorisé sur l'appareil).
+- **Détection sur tous les plans** : un récapitulatif par niveau (locaux sûrs, noms seuls à vérifier, déjà présents) est présenté avant l'enregistrement.
 - **Recherche** : par nom, numéro et code de niveau, sans tenir compte des accents ni de la casse (« tgbt », « 012 », « cta ss1 »). Le numéro exact passe en premier.
 - **Affichage des plans** : image de fond de la page entière, puis tuiles de 512 px calculées à la demande pour le zoom courant (jusqu'à 8 pixels par point PDF). Le zoom se fait à la molette, au pincement ou au double appui.
 - [À VÉRIFIER, à trancher avant le lot 3] **Locaux sans numéro** (par ex. « BUREAUX » en plateau) : le dossier photos prévu est `{Niveau}.{N°local}_{NomLocal}`. Il faut décider comment nommer le dossier d'un local sans numéro.

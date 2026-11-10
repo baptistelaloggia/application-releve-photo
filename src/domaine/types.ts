@@ -24,8 +24,12 @@ export interface Projet {
 export interface Niveau {
   schema: number;
   id: string;
-  /** SS, SS1, RDC, R+1, TT… */
+  /** SS1, ES, RDC, R+1, TT… ou code libre d'un niveau intermédiaire (R+4-MEZZANINE). */
   code: string;
+  /** Libellé saisi pour un niveau intermédiaire (« R+4 mezzanine »). */
+  libelle?: string;
+  /** Position dans le bâtiment, du bas vers le haut (0, 10, 20…). Modifiable par l'utilisateur. */
+  ordre?: number;
   creeLe: string;
   creePar: string;
 }

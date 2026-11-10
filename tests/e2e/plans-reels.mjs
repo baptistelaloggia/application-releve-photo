@@ -110,6 +110,20 @@ try {
   console.log(`Recherche « tgbt » : marqueur sélectionné = ${selection} ; fiche = ${await page.locator('.fiche-local input').first().inputValue()}`);
   assert.equal(selection, 'LT1105');
   await capture('6-TGBT-zoome');
+  await page.getByRole('button', { name: 'Nom', exact: true }).click();
+  await page.locator('.visionneuse').hover();
+  await page.mouse.wheel(0, 500); // zoom arrière, pour voir plusieurs étiquettes
+  await page.waitForTimeout(1500);
+  await capture('7-etiquettes-nom');
+  await page.getByRole('button', { name: 'Numéro', exact: true }).click();
+
+  // Détection sur tous les plans (SS1 déjà fait : ses locaux sont « déjà présents »).
+  await page.getByRole('button', { name: '← Projet' }).click();
+  await page.getByRole('button', { name: 'Détecter les locaux sur tous les plans…' }).click();
+  await page.getByRole('button', { name: 'Lancer la détection' }).click();
+  await page.getByRole('button', { name: /^Enregistrer \d+ locaux$/ }).waitFor({ timeout: 60_000 });
+  console.log('Détection globale :', (await page.locator('section:has(h2:text("tous les plans")) tbody').innerText()).replace(/\s*\n\s*/g, ' | '));
+  await capture('8-detection-globale');
 
   const arbo = await page.evaluate(async () => {
     const lignes = [];

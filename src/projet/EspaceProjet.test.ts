@@ -81,6 +81,36 @@ describe('EspaceProjet', () => {
   });
 });
 
+describe('ordre des niveaux', () => {
+  it('insère un niveau intermédiaire au bon endroit, puis le déplace', async () => {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, { ...infos, niveaux: ['RDC', 'R+4', 'R+5', 'TT'] }, 'BL');
+    await e.ajouterNiveau('R+4 mezzanine', 'BL');
+    expect(e.niveaux.map((n) => n.code)).toEqual(['RDC', 'R+4', 'R+4-MEZZANINE', 'R+5', 'TT']);
+    expect(e.libelle(e.niveauParCode('R+4-MEZZANINE')!)).toBe('R+4 mezzanine');
+    expect((await s.lister('01_PHOTOS')).map((x) => x.nom).sort()).toEqual([
+      '00_RDC', '01_R+4', '02_R+4-MEZZANINE', '03_R+5', '04_TT',
+    ]);
+
+    await s.ecrireFichier('01_PHOTOS/03_R+5/temoin.txt', 'x');
+    const cr = await e.deplacerNiveau(e.niveauParCode('R+4-MEZZANINE')!.id, 1);
+    expect(cr).toContain('Dossier renommé : 03_R+5 → 02_R+5');
+    expect(await s.existe('01_PHOTOS/02_R+5/temoin.txt')).toBe(true);
+    expect(await s.existe('01_PHOTOS/03_R+4-MEZZANINE')).toBe(true);
+
+    // L'ordre est enregistré : il est retrouvé à la réouverture.
+    const rouvert = await EspaceProjet.ouvrir(s);
+    expect(rouvert.niveaux.map((n) => n.code)).toEqual(['RDC', 'R+4', 'R+5', 'R+4-MEZZANINE', 'TT']);
+    expect(await rouvert.appliquerArborescence()).toEqual([]);
+  });
+
+  it('ne déplace pas au-delà des extrémités', async () => {
+    const e = await EspaceProjet.creer(new StockageMemoire(), infos, 'BL');
+    expect(await e.deplacerNiveau(e.niveauParCode('RDC')!.id, -1)).toEqual([]);
+    expect(e.niveaux.map((n) => n.code)).toEqual(['RDC', 'R+1', 'TT']);
+  });
+});
+
 describe('locaux', () => {
   async function projetAvecPlan() {
     const s = new StockageMemoire();

@@ -19,6 +19,8 @@ const MAX_TUILES_EN_CACHE = 60;
 const MAX_FOND = 4096;
 /** Résolution maximale des tuiles, en pixels par point PDF. */
 const ECHELLE_MAX = 8;
+/** Demi-hauteur typique d'une étiquette de local sur un plan (3 à 4 lignes de texte), en points PDF. */
+const DEMI_HAUTEUR_ETIQUETTE = 16;
 
 export interface EvenementsMoteur {
   /** Appui court sur le plan (hors marqueur), en coordonnées relatives 0 à 1. */
@@ -166,6 +168,9 @@ export class MoteurVue {
   /** Met à jour l'affichage : transformation du plan et position des marqueurs. */
   appliquer() {
     this.monde.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.zoom})`;
+    // Hauteur de la tige des marqueurs : l'étiquette passe au-dessus de l'étiquette du local
+    // dessinée sur le plan (environ 16 points de haut au-dessus de son centre).
+    this.conteneur.style.setProperty('--decalage', `${Math.round(Math.max(14, DEMI_HAUTEUR_ETIQUETTE * this.zoom + 6))}px`);
     this.placerMarqueurs();
     this.evenements.surVue?.(this.zoom, this.zoomAjuste);
     window.clearTimeout(this.minuterieTuiles);

@@ -24,7 +24,7 @@ const ETIQUETTES_FICTIVES = [
   [600, 400, ['BUREAU', 'B101', '18 m²']],
   [400, 200, ['SANIT. H', 'SH101', '6 m²']],
 ];
-function pdfFictif(texte) {
+function pdfFictif(texte, etiquettesPlan = ETIQUETTES_FICTIVES) {
   const objets = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -32,7 +32,7 @@ function pdfFictif(texte) {
     null,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
-  const etiquettes = ETIQUETTES_FICTIVES.flatMap(([x, y, lignes]) =>
+  const etiquettes = etiquettesPlan.flatMap(([x, y, lignes]) =>
     lignes.map((l, i) => {
       const t = l.replace('²', '2');
       return `BT /F1 7 Tf ${x - t.length * 2} ${y - i * 7.5} Td (${t}) Tj ET`;
@@ -172,7 +172,14 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   // Import de deux plans : niveaux et indices devinés depuis les noms.
   await page.locator('input[type=file]').setInputFiles([
     { name: 'ARCHI_PLAN_R+1_Ind-A.pdf', mimeType: 'application/pdf', buffer: pdfFictif('Plan fictif R+1 ind A') },
-    { name: 'plan RDC.pdf', mimeType: 'application/pdf', buffer: pdfFictif('Plan fictif RDC') },
+    {
+      name: 'plan RDC.pdf',
+      mimeType: 'application/pdf',
+      buffer: pdfFictif('Plan fictif RDC', [
+        [300, 300, ['LOCAL VENTIL', 'LT010', '8 m²']],
+        [500, 300, ['ARCHIVES', 'AR001', '15 m²']],
+      ]),
+    },
   ]);
   await page.getByRole('button', { name: 'Importer 2 plans' }).waitFor();
   await capture('2-import');
@@ -195,6 +202,15 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
   await page.getByText('Dossier renommé : 04_TT → 05_TT').waitFor();
 
+  // Niveau intermédiaire à code libre, puis déplacement d'un cran vers le haut.
+  await page.getByLabel('Ajouter un niveau').fill('R+2 mezzanine');
+  await page.getByText('R+2-MEZZANINE', { exact: true }).waitFor(); // aperçu du code
+  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
+  await page.getByText('Niveau ajouté : R+2-MEZZANINE (R+2 mezzanine)').waitFor();
+  await page.getByRole('button', { name: 'Monter le niveau R+2-MEZZANINE' }).click();
+  await page.getByText('Niveau R+2-MEZZANINE déplacé vers le haut').waitFor();
+  await page.getByText('Dossier renommé : 05_R+3 → 04_R+3').waitFor();
+
   // Lot 2 : ouverture du plan R+1, détection des locaux, enregistrement.
   await page.locator('tr:has(strong:text-is("R+1"))').getByRole('button', { name: 'Ouvrir' }).click();
   await page.locator('.visionneuse[data-fond-pret]').waitFor();
@@ -210,6 +226,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   const boite = await page.locator('.visionneuse').boundingBox();
   await page.mouse.click(boite.x + boite.width * 0.5, boite.y + boite.height * 0.3);
   await page.getByLabel('Nom').fill('Local CTA');
+  assert.equal(await page.getByLabel('Numéro').inputValue(), 'R1-01'); // numéro automatique proposé
   await page.getByLabel('Numéro').fill('lt003');
   await page.getByRole('button', { name: 'Enregistrer' }).click();
   await page.locator('.marqueur-selection').filter({ hasText: 'LT003' }).waitFor({ state: 'attached' });
@@ -223,6 +240,17 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   assert.equal(await page.getByLabel('Nom').inputValue(), 'TGBT');
   await capture('4-tgbt');
   await page.getByRole('button', { name: '← Projet' }).click();
+
+  // Détection sur tous les plans : le RDC n'a pas encore de locaux, le R+1 les a déjà.
+  await page.getByRole('button', { name: 'Détecter les locaux sur tous les plans…' }).click();
+  await page.getByRole('button', { name: 'Lancer la détection' }).click();
+  await page.getByRole('button', { name: 'Enregistrer 2 locaux' }).waitFor();
+  await capture('5-detection-globale');
+  await page.getByRole('button', { name: 'Enregistrer 2 locaux' }).click();
+  await page.getByText(/2 locaux enregistrés sur le plan T01_RDC\.pdf/).waitFor();
+  await page.getByLabel('Rechercher un local').fill('archives');
+  await page.locator('.resultats button').filter({ hasText: 'AR001' }).waitFor();
+  await page.getByLabel('Rechercher un local').fill('');
 
   const arbo = await arborescence(page, telephone ? 'projets' : 'simule-parent-projets', dossierProjet);
   const sansDonnees = arbo.filter((l) => !/^_data\/(niveaux|plans|locaux)\/.+\.json$/.test(l));
@@ -238,7 +266,8 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
     '01_PHOTOS/02_R+1/',
     '01_PHOTOS/03_R+2/',
     '01_PHOTOS/04_R+3/',
-    '01_PHOTOS/05_TT/',
+    '01_PHOTOS/05_R+2-MEZZANINE/',
+    '01_PHOTOS/06_TT/',
     '02_EXPORTS/',
     '_data/',
     '_data/locaux/',
@@ -246,9 +275,9 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
     '_data/plans/',
     '_data/projet.json',
   ].sort());
-  assert.equal(arbo.filter((l) => l.startsWith('_data/niveaux/') && l.endsWith('.json')).length, 6);
+  assert.equal(arbo.filter((l) => l.startsWith('_data/niveaux/') && l.endsWith('.json')).length, 7);
   assert.equal(arbo.filter((l) => l.startsWith('_data/plans/') && l.endsWith('.json')).length, 2);
-  assert.equal(arbo.filter((l) => l.startsWith('_data/locaux/') && l.endsWith('.json')).length, 5);
+  assert.equal(arbo.filter((l) => l.startsWith('_data/locaux/') && l.endsWith('.json')).length, 7);
   console.log(arbo.join('\n'));
 
   // Après rechargement, le projet est dans la liste des récents et se rouvre.
@@ -258,7 +287,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
     await page.reload();
     await page.getByRole('button', { name: /Groupe scolaire fictif/ }).click();
     await page.getByRole('heading', { name: 'Groupe scolaire fictif' }).waitFor();
-    assert.equal(await page.locator('tbody tr').count(), 6);
+    assert.equal(await page.locator('tbody tr').count(), 7);
     await capture('5-rouvert');
   }
 
