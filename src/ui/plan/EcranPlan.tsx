@@ -5,7 +5,7 @@ import { dateLocale } from '../../domaine/nommage';
 import { compresserPhoto } from '../../photo/compression';
 import { CameraTerrain } from '../photo/CameraTerrain';
 import { VisionneusePhoto } from '../photo/VisionneusePhoto';
-import { FicheRepere, PanneauPanier, PanneauTerrain } from './PanneauxTerrain';
+import { FicheRepere, PanneauPanier, PanneauTerrain, PhotosDuLocal } from './PanneauxTerrain';
 import type { EspaceProjet, ResultatLocal, SaisieLocal } from '../../projet/EspaceProjet';
 import { proposerLocaux } from '../../pdf/pdf';
 import { ecrireReglage, lireReglage } from '../../stockage/registre';
@@ -37,7 +37,8 @@ type Mode =
   | { type: 'brouillon'; x: number; y: number }
   | { type: 'deplacement'; localId: string }
   | { type: 'deplacementRepere'; repereId: string }
-  | { type: 'classement'; photoId: string }
+  | { type: 'classement'; photoIds: string[] }
+  | { type: 'rattachement'; repereId: string }
   | { type: 'detection'; candidats: Candidat[]; sansTexte: boolean };
 
 const PREFIXE_REPERE = 'repere:';
@@ -164,11 +165,13 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       libelle: texteEtiquette(l),
       titre: [l.numero, l.nom].filter(Boolean).join(' · ') + (photographies.has(l.id) ? ' (photographié aujourd’hui)' : ''),
       style: l.id === selection ? 'selection' : photographies.has(l.id) ? 'local-visite' : 'local',
+      pastille: espace.photosDuLocal(l.id).length || undefined,
     });
   }
   if (mode.type !== 'detection') {
     for (const rep of espace.reperesDuPlan(planId)) {
       if (mode.type === 'deplacementRepere' && mode.repereId === rep.id) continue;
+      if (rep.surEtiquette) continue; // ses photos s'affichent sur l'étiquette du local
       marqueurs.push({
         id: PREFIXE_REPERE + rep.id,
         x: rep.x,
@@ -214,11 +217,12 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   }
 
   function surAppuiPlan(x: number, y: number) {
+    if (mode.type === 'rattachement') return; // on attend un appui sur un local
     if (mode.type === 'classement') {
-      const photoId = mode.photoId;
+      const photoIds = mode.photoIds;
       void executer(async () => {
         const r = await espace.creerRepere(planId, x, y, auteur);
-        await espace.classerPhoto(photoId, r.id, auteur);
+        await espace.classerPhotos(photoIds, r.id, auteur);
         setMode({ type: 'consultation' });
         setSelection(null);
         setRepereSel(r.id);
@@ -259,9 +263,9 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
     if (id.startsWith(PREFIXE_REPERE)) {
       const repereId = id.slice(PREFIXE_REPERE.length);
       if (mode.type === 'classement') {
-        const photoId = mode.photoId;
+        const photoIds = mode.photoIds;
         void executer(async () => {
-          await espace.classerPhoto(photoId, repereId, auteur);
+          await espace.classerPhotos(photoIds, repereId, auteur);
           setMode({ type: 'consultation' });
           setRepereSel(repereId);
         });
@@ -273,6 +277,27 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       if (appuiRepere === 'photo') ouvrirCamera(repereId);
       return;
     }
+    // Appui sur l'étiquette d'un local.
+    if (mode.type === 'classement') {
+      const photoIds = mode.photoIds;
+      void executer(async () => {
+        const r = await espace.repereEtiquette(id, auteur);
+        await espace.classerPhotos(photoIds, r.id, auteur);
+        setMode({ type: 'consultation' });
+        setRepereSel(null);
+        setSelection(id);
+      });
+      return;
+    }
+    if (mode.type === 'rattachement') {
+      const repereId = mode.repereId;
+      void executer(async () => {
+        await espace.modifierRepere(repereId, { localId: id }, auteur);
+        setMode({ type: 'consultation' });
+        setRepereSel(repereId);
+      });
+      return;
+    }
     if (mode.type === 'consultation' || mode.type === 'ajout') {
       setMode({ type: 'consultation' });
       setRepereSel(null);
@@ -280,10 +305,27 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
     }
   }
 
+  /** Appui long sur l'étiquette d'un local (ou sur un repère) : photo directe. */
+  function surAppuiLongMarqueur(id: string) {
+    if (mode.type !== 'consultation') return;
+    if (id.startsWith(PREFIXE_REPERE)) {
+      ouvrirCamera(id.slice(PREFIXE_REPERE.length));
+      return;
+    }
+    if (!espace.locaux.some((l) => l.id === id)) return;
+    void executer(async () => {
+      const r = await espace.repereEtiquette(id, auteur);
+      setRepereSel(null);
+      setSelection(id);
+      ouvrirCamera(r.id);
+    });
+  }
+
   function titreCamera(repereId: string | null) {
     const rep = repereId ? espace.reperes.find((x) => x.id === repereId) : undefined;
     if (!rep) return 'Photo sans repère → panier à classer';
     const local = rep.localId ? espace.locaux.find((l) => l.id === rep.localId) : undefined;
+    if (rep.surEtiquette && local) return [niveau.code, `${local.numero ?? ''} ${local.nom}`.trim(), 'photo du local'].join(' · ');
     return [rep.numero, niveau.code, local ? `${local.numero ?? ''} ${local.nom}`.trim() : 'hors local', rep.libelle]
       .filter(Boolean)
       .join(' · ');
@@ -320,7 +362,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const selectionne = selection ? espace.locaux.find((l) => l.id === selection) : undefined;
   const repereSelectionne = repereSel ? espace.reperes.find((x) => x.id === repereSel) : undefined;
   const nbPanier = espace.photosAClasser().length;
-  const modePlacement = ['ajout', 'brouillon', 'deplacement', 'deplacementRepere', 'classement'].includes(mode.type);
+  const modePlacement = ['ajout', 'brouillon', 'deplacement', 'deplacementRepere', 'classement', 'rattachement'].includes(mode.type);
 
   return (
     <div className="ecran-plan">
@@ -391,20 +433,23 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               modePlacement={modePlacement}
               surAppuiPlan={surAppuiPlan}
               surAppuiLongPlan={surAppuiLongPlan}
+              surAppuiLongMarqueur={surAppuiLongMarqueur}
               surAppuiMarqueur={surAppuiMarqueur}
             />
           ) : (
             <div className="vue-etat">Lecture du plan…</div>
           )}
-          {(mode.type === 'ajout' || mode.type === 'deplacement' || mode.type === 'deplacementRepere' || mode.type === 'classement') && (
+          {(mode.type === 'ajout' || mode.type === 'deplacement' || mode.type === 'deplacementRepere' || mode.type === 'classement' || mode.type === 'rattachement') && (
             <div className="consigne">
               {mode.type === 'ajout'
                 ? 'Touchez le plan à l’emplacement du local.'
                 : mode.type === 'classement'
-                  ? 'Touchez un repère, ou le plan pour créer un repère.'
-                  : mode.type === 'deplacementRepere'
-                    ? 'Touchez la nouvelle position du repère.'
-                    : 'Touchez la nouvelle position du local.'}
+                  ? `${mode.photoIds.length > 1 ? `${mode.photoIds.length} photos` : '1 photo'} : touchez l’étiquette d’un local, un repère, ou le plan pour créer un repère.`
+                  : mode.type === 'rattachement'
+                    ? 'Touchez l’étiquette du local auquel rattacher le repère.'
+                    : mode.type === 'deplacementRepere'
+                      ? 'Touchez la nouvelle position du repère.'
+                      : 'Touchez la nouvelle position du local.'}
               <button className="petit" onClick={() => setMode({ type: 'consultation' })}>
                 Annuler
               </button>
@@ -454,6 +499,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               surModifier={(maj) => executer(async () => void (await espace.modifierRepere(repereSelectionne.id, maj, auteur)))}
               surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
               surFermer={() => setRepereSel(null)}
+              surChoisirLocalSurPlan={() => setMode({ type: 'rattachement', repereId: repereSelectionne.id })}
             />
           ) : mode.type === 'brouillon' ? (
             <FicheLocal
@@ -483,14 +529,30 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               surEnregistrer={(s) => executer(async () => void (await espace.modifierLocal(selectionne.id, s, auteur)))}
               surDeplacer={() => setMode({ type: 'deplacement', localId: selectionne.id })}
               surSupprimer={() => {
-                if (!confirm(`Supprimer le local « ${selectionne.nom} » ?`)) return;
+                if (!confirm(`Supprimer le local « ${selectionne.nom} » ? Ses photos restent, sur des repères hors local.`)) return;
                 void executer(async () => {
-                  await espace.supprimerLocal(selectionne.id);
+                  await espace.supprimerLocal(selectionne.id, auteur);
                   setSelection(null);
                 });
               }}
             />
-          ) : (
+          ) : null}
+          {selectionne && mode.type !== 'detection' && mode.type !== 'brouillon' && !repereSelectionne && (
+            <PhotosDuLocal
+              key={`photos-${selectionne.id}`}
+              espace={espace}
+              localId={selectionne.id}
+              occupe={occupe}
+              surPhoto={() =>
+                void executer(async () => {
+                  const r = await espace.repereEtiquette(selectionne.id, auteur);
+                  ouvrirCamera(r.id);
+                })
+              }
+              surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
+            />
+          )}
+          {mode.type !== 'detection' && mode.type !== 'brouillon' && !repereSelectionne && !selectionne && (
             <>
             <div className="onglets" role="tablist">
               {(
@@ -524,7 +586,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 surImporter={(fichiers) => {
                   for (const f of fichiers) enregistrerPhoto(f, 'import', new Date(f.lastModified || Date.now()), null, f.name);
                 }}
-                surPlacer={(photo) => setMode({ type: 'classement', photoId: photo.id })}
+                surPlacer={(photos) => setMode({ type: 'classement', photoIds: photos.map((p) => p.id) })}
                 surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
               />
             ) : (

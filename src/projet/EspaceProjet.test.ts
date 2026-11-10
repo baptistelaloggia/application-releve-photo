@@ -260,3 +260,32 @@ describe('repères et photos', () => {
     expect([...e.locauxPhotographies('2026-10-31')]).toEqual([]);
   });
 });
+
+describe('photos sur l’étiquette du local', () => {
+  it('crée un seul repère d’étiquette par local, qui suit l’étiquette', async () => {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, { ...infos, codeAffaire: 'XXX' }, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    const planId = e.plans[0].id;
+    const l = await e.creerLocal(planId, { nom: 'CTA', numero: 'LT002', surface: null, x: 0.3, y: 0.3 }, 'BL');
+    const jpeg = new Blob(['j']);
+    const p1 = await e.ajouterPhoto({ repereId: null, jpeg, miniature: jpeg, largeur: 1, hauteur: 1, source: 'import' }, 'BL');
+    const p2 = await e.ajouterPhoto({ repereId: null, jpeg, miniature: jpeg, largeur: 1, hauteur: 1, source: 'import' }, 'BL');
+
+    const r = await e.repereEtiquette(l.id, 'BL');
+    expect(r.surEtiquette).toBe(true);
+    expect((await e.repereEtiquette(l.id, 'BL')).id).toBe(r.id);
+    await e.classerPhotos([p1.id, p2.id], r.id, 'BL');
+    expect(e.photosDuLocal(l.id).map((p) => p.rang)).toEqual([1, 2]);
+    expect(e.photosAClasser()).toHaveLength(0);
+
+    await e.modifierLocal(l.id, { ...l, x: 0.35, y: 0.4 }, 'BL');
+    expect(e.reperes.find((x) => x.id === r.id)).toMatchObject({ x: 0.35, y: 0.4 });
+    expect(e.locauxProches(planId, 0.34, 0.41, 3).map((x) => x.numero)).toEqual(['LT002']);
+
+    await e.supprimerLocal(l.id, 'BL');
+    const apres = e.reperes.find((x) => x.id === r.id)!;
+    expect(apres.surEtiquette).toBeUndefined();
+    expect(apres.localId).toBeNull();
+  });
+});

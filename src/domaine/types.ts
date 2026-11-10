@@ -112,6 +112,11 @@ export interface Repere {
   libelle: string;
   x: number;
   y: number;
+  /**
+   * Repère « d'étiquette » : celui du local lui-même, placé sur son étiquette.
+   * Il n'est pas dessiné comme un repère : ses photos s'affichent sur l'étiquette du local.
+   */
+  surEtiquette?: boolean;
   creeLe: string;
   creePar: string;
   modifieLe: string;

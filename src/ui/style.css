@@ -266,3 +266,9 @@ button.projet .discret { font-size: 0.85rem; }
   .panneau-plan { flex: 0 1 35%; padding: 8px 12px; }
   .options-plan-contenu { left: auto; right: -60px; }
 }
+.liste-panier li { grid-template-columns: 28px 72px 1fr; }
+.liste-panier li.choisie { background: var(--info-fond); border-radius: 8px; }
+.liste-panier input[type='checkbox'] { justify-self: center; }
+.barre-selection { position: sticky; top: 0; background: var(--carte); padding: 4px 0; z-index: 1; }
+.rattachement { background: var(--fond); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+.puce { border-radius: 999px; }

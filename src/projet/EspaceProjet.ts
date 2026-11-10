@@ -567,6 +567,12 @@ export class EspaceProjet {
     if (local.numero !== existant.numero || local.nom !== existant.nom) {
       await this.rangerPhotos(this.photos.filter((p) => this.repereDe(p)?.localId === id));
     }
+    // Le repère d'étiquette suit l'étiquette du local.
+    if (local.x !== existant.x || local.y !== existant.y) {
+      for (const r of this.reperes.filter((x) => x.localId === id && x.surEtiquette)) {
+        await this.ecrireRepere({ ...r, x: local.x, y: local.y, modifieLe: local.modifieLe, modifiePar: auteur });
+      }
+    }
     return local;
   }
 
@@ -589,7 +595,9 @@ export class EspaceProjet {
     await this.stockage.supprimer(`${DOSSIER_LOCAUX}/${id}.json`);
     this.locaux = this.locaux.filter((l) => l.id !== id);
     for (const r of this.reperes.filter((x) => x.localId === id)) {
-      await this.ecrireRepere({ ...r, localId: null, modifieLe: maintenant(), modifiePar: auteur });
+      // Le repère d'étiquette redevient un repère ordinaire, visible à sa place sur le plan.
+      const { surEtiquette: _surEtiquette, ...ordinaire } = r;
+      await this.ecrireRepere({ ...ordinaire, localId: null, modifieLe: maintenant(), modifiePar: auteur });
     }
     await this.rangerPhotos(this.photos.filter((p) => p.repereId && !this.repereDe(p)?.localId));
   }
@@ -671,7 +679,14 @@ export class EspaceProjet {
   }
 
   /** Crée un repère ; sans local précisé, il est rattaché au local le plus proche. */
-  async creerRepere(planId: string, x: number, y: number, auteur: string, localId?: string | null): Promise<Repere> {
+  async creerRepere(
+    planId: string,
+    x: number,
+    y: number,
+    auteur: string,
+    localId?: string | null,
+    options: { surEtiquette?: boolean } = {},
+  ): Promise<Repere> {
     if (!this.planParId(planId)) throw new Error('Plan introuvable.');
     if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) throw new Error('Position hors du plan.');
     const pris = new Set(this.reperes.map((r) => r.numero));
@@ -687,6 +702,7 @@ export class EspaceProjet {
       libelle: '',
       x,
       y,
+      ...(options.surEtiquette ? { surEtiquette: true } : {}),
       creeLe: date,
       creePar: auteur,
       modifieLe: date,
@@ -694,6 +710,30 @@ export class EspaceProjet {
     };
     await this.ecrireRepere(repere);
     return repere;
+  }
+
+  /** Repère d'étiquette d'un local : créé à la première photo prise ou placée sur l'étiquette du local. */
+  async repereEtiquette(localId: string, auteur: string): Promise<Repere> {
+    const local = this.locaux.find((l) => l.id === localId);
+    if (!local) throw new Error('Local introuvable.');
+    const existant = this.reperes.find((r) => r.localId === localId && r.surEtiquette);
+    return existant ?? this.creerRepere(local.planId, local.x, local.y, auteur, localId, { surEtiquette: true });
+  }
+
+  /** Photos d'un local (tous ses repères), de la plus ancienne à la plus récente. */
+  photosDuLocal(localId: string): Photo[] {
+    const ids = new Set(this.reperes.filter((r) => r.localId === localId).map((r) => r.id));
+    return this.photos.filter((p) => p.repereId && ids.has(p.repereId)).sort((a, b) => a.prisLe.localeCompare(b.prisLe));
+  }
+
+  /** Les n locaux les plus proches d'un point du plan, du plus proche au plus éloigné. */
+  locauxProches(planId: string, x: number, y: number, n = 3): Local[] {
+    return this.locaux
+      .filter((l) => l.planId === planId)
+      .map((l) => ({ l, d: Math.hypot(l.x - x, l.y - y) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, n)
+      .map((v) => v.l);
   }
 
   async modifierRepere(id: string, maj: Partial<Pick<Repere, 'libelle' | 'localId' | 'x' | 'y'>>, auteur: string): Promise<Repere> {
@@ -818,6 +858,11 @@ export class EspaceProjet {
     const modifiee: Photo = { ...photo, repereId, rang: repereId ? this.rangLibre(repereId, photo.date, photo.id) : 0 };
     await this.deplacerPhoto(photo, modifiee);
     return this.photos.find((p) => p.id === photoId)!;
+  }
+
+  /** Classe plusieurs photos d'un coup sur le même repère. */
+  async classerPhotos(photoIds: string[], repereId: string | null, auteur: string): Promise<void> {
+    for (const id of photoIds) await this.classerPhoto(id, repereId, auteur);
   }
 
   async commenterPhoto(photoId: string, commentaire: string): Promise<void> {

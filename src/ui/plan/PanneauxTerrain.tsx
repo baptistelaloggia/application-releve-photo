@@ -90,9 +90,12 @@ export function FicheRepere({
   surModifier,
   surOuvrirPhoto,
   surFermer,
+  surChoisirLocalSurPlan,
 }: {
   espace: EspaceProjet;
   repere: Repere;
+  /** Passe en mode « touchez le local sur le plan ». */
+  surChoisirLocalSurPlan: () => void;
   occupe: boolean;
   surPhoto: () => void;
   surDeplacer: () => void;
@@ -104,6 +107,8 @@ export function FicheRepere({
   const [libelle, setLibelle] = useState(repere.libelle);
   const photos = espace.photosDuRepere(repere.id);
   const locaux = espace.locauxDuPlan(repere.planId);
+  const proches = espace.locauxProches(repere.planId, repere.x, repere.y, 3).filter((l) => l.id !== repere.localId);
+  const localActuel = repere.localId ? espace.locaux.find((l) => l.id === repere.localId) : undefined;
   return (
     <div className="fiche-local">
       <div className="titre-projet">
@@ -117,8 +122,27 @@ export function FicheRepere({
           📷 Prendre une photo
         </button>
       </div>
+      <div className="rattachement">
+        <div>
+          Local : <strong>{localActuel ? `${localActuel.numero ?? ''} ${localActuel.nom}`.trim() : 'hors local'}</strong>
+        </div>
+        {proches.length > 0 && (
+          <div className="boutons">
+            {proches.map((l) => (
+              <button key={l.id} className="petit puce" disabled={occupe} onClick={() => surModifier({ localId: l.id })} title="Rattacher à ce local">
+                {l.numero ?? '—'} · {l.nom}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="boutons">
+          <button className="petit" disabled={occupe} onClick={surChoisirLocalSurPlan}>
+            Choisir le local sur le plan
+          </button>
+        </div>
+      </div>
       <label>
-        Local
+        Ou dans la liste
         <select
           value={repere.localId ?? ''}
           disabled={occupe}
@@ -184,15 +208,24 @@ export function PanneauPanier({
   occupe: boolean;
   surPhotoSansRepere: () => void;
   surImporter: (fichiers: File[]) => void;
-  surPlacer: (photo: Photo) => void;
+  surPlacer: (photos: Photo[]) => void;
   surOuvrirPhoto: (photos: Photo[], index: number) => void;
 }) {
   const photos = espace.photosAClasser();
+  const [choisies, setChoisies] = useState<Set<string>>(new Set());
+  const selection = photos.filter((p) => choisies.has(p.id));
+  const basculer = (id: string) =>
+    setChoisies((c) => {
+      const n = new Set(c);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   return (
     <>
       <p className="discret">
-        Photos prises sans repère, ou importées. Choisissez une photo, puis « Placer » : touchez ensuite un repère, ou le plan
-        pour en créer un.
+        Photos prises sans repère, ou importées. Cochez une ou plusieurs photos, puis « Placer » : touchez ensuite
+        l'étiquette d'un local, un repère, ou le plan pour créer un repère.
       </p>
       <div className="boutons">
         <button onClick={surPhotoSansRepere} disabled={occupe}>
@@ -214,23 +247,78 @@ export function PanneauPanier({
       {photos.length === 0 ? (
         <p className="discret">Le panier est vide.</p>
       ) : (
-        <ul className="liste-panier">
-          {photos.map((p, i) => (
-            <li key={p.id}>
-              <button className="vignette" onClick={() => surOuvrirPhoto(photos, i)}>
-                <Miniature espace={espace} photo={p} taille={72} />
-              </button>
-              <span className="discret">
-                {new Date(p.prisLe).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
-                {p.nomOrigine && <div className="petit-texte">{p.nomOrigine}</div>}
-              </span>
-              <button className="petit" onClick={() => surPlacer(p)} disabled={occupe}>
-                Placer
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="boutons barre-selection">
+            <button className="principal" disabled={occupe || selection.length === 0} onClick={() => surPlacer(selection)}>
+              Placer {selection.length > 1 ? `les ${selection.length} photos` : selection.length === 1 ? 'la photo' : ''}
+            </button>
+            <button
+              className="petit"
+              onClick={() => setChoisies(selection.length === photos.length ? new Set() : new Set(photos.map((p) => p.id)))}
+            >
+              {selection.length === photos.length ? 'Tout décocher' : `Tout cocher (${photos.length})`}
+            </button>
+          </div>
+          <ul className="liste-panier">
+            {photos.map((p, i) => (
+              <li key={p.id} className={choisies.has(p.id) ? 'choisie' : undefined}>
+                <input type="checkbox" checked={choisies.has(p.id)} onChange={() => basculer(p.id)} aria-label={`Choisir ${p.nomOrigine ?? 'la photo'}`} />
+                <button className="vignette" onClick={() => surOuvrirPhoto(photos, i)}>
+                  <Miniature espace={espace} photo={p} taille={72} />
+                </button>
+                <span className="discret" onClick={() => basculer(p.id)}>
+                  {new Date(p.prisLe).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
+                  {p.nomOrigine && <div className="petit-texte">{p.nomOrigine}</div>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </>
+  );
+}
+
+// ------------------------------------------------------------------ photos d'un local (sous sa fiche)
+
+export function PhotosDuLocal({
+  espace,
+  localId,
+  occupe,
+  surPhoto,
+  surOuvrirPhoto,
+}: {
+  espace: EspaceProjet;
+  localId: string;
+  occupe: boolean;
+  /** Photo sur l'étiquette du local. */
+  surPhoto: () => void;
+  surOuvrirPhoto: (photos: Photo[], index: number) => void;
+}) {
+  const photos = espace.photosDuLocal(localId);
+  return (
+    <div className="photos-local">
+      <div className="boutons">
+        <button className="principal" onClick={surPhoto} disabled={occupe}>
+          📷 Photo du local
+        </button>
+      </div>
+      <p className="discret petit-texte">Raccourci : appui long sur l'étiquette du local, sur le plan.</p>
+      <h2>
+        Photos du local <span className="discret">({photos.length})</span>
+      </h2>
+      {parJour(photos).map(([jour, liste]) => (
+        <div key={jour} className="groupe-photos">
+          <div className="discret">{dateLongue(jour)}</div>
+          <div className="grille-photos">
+            {liste.map((p) => (
+              <button key={p.id} className="vignette" onClick={() => surOuvrirPhoto(photos, photos.indexOf(p))}>
+                <Miniature espace={espace} photo={p} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
