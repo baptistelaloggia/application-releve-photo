@@ -3,7 +3,15 @@ import { ouvrirPagePlan } from '../../pdf/pdf';
 import { texteErreur } from '../commun';
 import { MoteurVue } from './MoteurVue';
 
-export type StyleMarqueur = 'local' | 'local-auto' | 'selection' | 'candidat' | 'candidat-ecarte' | 'brouillon';
+export type StyleMarqueur =
+  | 'local'
+  | 'local-visite'
+  | 'selection'
+  | 'candidat'
+  | 'candidat-ecarte'
+  | 'brouillon'
+  | 'repere'
+  | 'repere-selection';
 
 export interface Marqueur {
   id: string;
@@ -12,6 +20,8 @@ export interface Marqueur {
   libelle: string;
   titre?: string;
   style: StyleMarqueur;
+  /** Petit nombre affiché à côté de l'étiquette (nombre de photos d'un repère). */
+  pastille?: number;
 }
 
 export interface CommandesVisionneuse {
@@ -29,11 +39,14 @@ interface Props {
   /** Curseur en croix quand un appui place quelque chose. */
   modePlacement?: boolean;
   surAppuiPlan?: (x: number, y: number) => void;
+  surAppuiLongPlan?: (x: number, y: number) => void;
   surAppuiMarqueur?: (id: string) => void;
+  /** Appui long (0,5 s) sur un marqueur : par ex. photo directe sur l'étiquette d'un local. */
+  surAppuiLongMarqueur?: (id: string) => void;
 }
 
 export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function VisionneusePlan(
-  { cle, fichier, marqueurs, focus, modePlacement, surAppuiPlan, surAppuiMarqueur },
+  { cle, fichier, marqueurs, focus, modePlacement, surAppuiPlan, surAppuiLongPlan, surAppuiMarqueur, surAppuiLongMarqueur },
   ref,
 ) {
   const conteneur = useRef<HTMLDivElement>(null);
@@ -41,8 +54,15 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
   const moteur = useRef<MoteurVue | null>(null);
   const appuiPlan = useRef(surAppuiPlan);
   appuiPlan.current = surAppuiPlan;
+  const appuiLong = useRef(surAppuiLongPlan);
+  appuiLong.current = surAppuiLongPlan;
   const [etat, setEtat] = useState<'chargement' | 'pret' | string>('chargement');
   const [zoom, setZoom] = useState(100);
+  // Appui long sur un marqueur : minuterie, et clic qui suit ignoré.
+  const appuiLongMarqueur = useRef<{ minuterie: number; declenche: boolean; x: number; y: number } | null>(null);
+  const annulerAppuiLong = () => {
+    if (appuiLongMarqueur.current) window.clearTimeout(appuiLongMarqueur.current.minuterie);
+  };
 
   useImperativeHandle(ref, () => ({
     centrerSur: (x, y, f) => moteur.current?.centrerSur(x, y, f),
@@ -57,6 +77,7 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
         if (annule || !conteneur.current || !couche.current) return;
         moteur.current = new MoteurVue(conteneur.current, couche.current, page, {
           surAppui: (x, y) => appuiPlan.current?.(x, y),
+          surAppuiLong: (x, y) => appuiLong.current?.(x, y),
           surVue: (z, ajuste) => setZoom(Math.round((z / ajuste) * 100)),
         });
         if (focus) moteur.current.centrerSur(focus.x, focus.y);
@@ -90,13 +111,40 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
               data-x={m.x}
               data-y={m.y}
               title={m.titre ?? m.libelle}
+              onContextMenu={(e) => e.preventDefault()}
+              onPointerDown={(e) => {
+                if (!surAppuiLongMarqueur) return;
+                annulerAppuiLong();
+                const etat = { minuterie: 0, declenche: false, x: e.clientX, y: e.clientY };
+                etat.minuterie = window.setTimeout(() => {
+                  etat.declenche = true;
+                  navigator.vibrate?.(40);
+                  surAppuiLongMarqueur(m.id);
+                }, 500);
+                appuiLongMarqueur.current = etat;
+              }}
+              onPointerMove={(e) => {
+                const a = appuiLongMarqueur.current;
+                if (a && Math.hypot(e.clientX - a.x, e.clientY - a.y) > 8) annulerAppuiLong();
+              }}
+              onPointerUp={annulerAppuiLong}
+              onPointerLeave={annulerAppuiLong}
               onClick={(e) => {
                 e.stopPropagation();
+                if (appuiLongMarqueur.current?.declenche) {
+                  appuiLongMarqueur.current = null;
+                  return;
+                }
                 surAppuiMarqueur?.(m.id);
               }}
             >
               <span className="marqueur-point" />
-              {m.libelle && <span className="marqueur-libelle">{m.libelle}</span>}
+              {m.libelle && (
+                <span className="marqueur-libelle">
+                  {m.libelle}
+                  {m.pastille ? <span className="marqueur-pastille">{m.pastille}</span> : null}
+                </span>
+              )}
             </button>
           ))}
       </div>

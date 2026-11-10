@@ -28,7 +28,7 @@ describe('EspaceProjet', () => {
     await s.ecrireFichier('01_PHOTOS/01_R+1/temoin.txt', 'x');
     const cr = await e.ajouterNiveau('ss', 'BL');
     expect(cr).toContain('Dossier renommé : 01_R+1 → 02_R+1');
-    const photos = (await s.lister('01_PHOTOS')).map((x) => x.nom).sort();
+    const photos = (await s.lister('01_PHOTOS')).map((x) => x.nom).filter((n) => n !== '_A-CLASSER').sort();
     expect(photos).toEqual(['00_SS1', '01_RDC', '02_R+1', '03_TT']);
     expect(await s.existe('01_PHOTOS/02_R+1/temoin.txt')).toBe(true);
     // Idempotent : une seconde application ne change rien.
@@ -77,7 +77,7 @@ describe('EspaceProjet', () => {
     await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'TT', indice: 'A', pages: 1 }, 'BL');
     await expect(e.supprimerNiveau(e.niveauParCode('TT')!.id)).rejects.toThrow(/a un plan/);
     await e.supprimerNiveau(e.niveauParCode('R+1')!.id);
-    expect((await s.lister('01_PHOTOS')).map((x) => x.nom).sort()).toEqual(['00_RDC', '01_TT']);
+    expect((await s.lister('01_PHOTOS')).map((x) => x.nom).filter((n) => n !== '_A-CLASSER').sort()).toEqual(['00_RDC', '01_TT']);
   });
 });
 
@@ -88,7 +88,7 @@ describe('ordre des niveaux', () => {
     await e.ajouterNiveau('R+4 mezzanine', 'BL');
     expect(e.niveaux.map((n) => n.code)).toEqual(['RDC', 'R+4', 'R+4-MEZZANINE', 'R+5', 'TT']);
     expect(e.libelle(e.niveauParCode('R+4-MEZZANINE')!)).toBe('R+4 mezzanine');
-    expect((await s.lister('01_PHOTOS')).map((x) => x.nom).sort()).toEqual([
+    expect((await s.lister('01_PHOTOS')).map((x) => x.nom).filter((n) => n !== '_A-CLASSER').sort()).toEqual([
       '00_RDC', '01_R+4', '02_R+4-MEZZANINE', '03_R+5', '04_TT',
     ]);
 
@@ -142,6 +142,15 @@ describe('locaux', () => {
     expect(r.map((x) => [x.local.numero, x.niveau.code])).toEqual([['LT1105', 'R+1']]);
   });
 
+  it('numérote automatiquement les locaux sans numéro', async () => {
+    const { e, planId } = await projetAvecPlan();
+    await e.creerLocal(planId, { nom: 'BUREAUX', numero: null, surface: null, x: 0.6, y: 0.5 }, 'BL');
+    await e.creerLocal(planId, { nom: 'BUREAUX', numero: null, surface: null, x: 0.2, y: 0.5 }, 'BL');
+    await e.creerLocal(planId, { nom: 'TGBT', numero: 'R1-01', surface: null, x: 0.1, y: 0.1 }, 'BL');
+    expect(await e.numeroterLocauxSansNumero('BL')).toEqual(['2 locaux numérotés automatiquement']);
+    expect(e.locauxDuPlan(planId).map((l) => `${l.numero} ${l.x}`)).toEqual(['R1-01 0.1', 'R1-02 0.2', 'R1-03 0.6']);
+  });
+
   it('refuse un numéro en double et un nom vide, modifie et supprime', async () => {
     const { e, planId } = await projetAvecPlan();
     const l = await e.creerLocal(planId, { nom: 'Bureau', numero: '101', surface: null, x: 0.1, y: 0.1 }, 'BL');
@@ -151,5 +160,132 @@ describe('locaux', () => {
     expect(e.locaux[0].nom).toBe('Bureau direction');
     await e.supprimerLocal(l.id);
     expect(e.locaux).toHaveLength(0);
+  });
+});
+
+describe('repères et photos', () => {
+  const jpeg = (t: string) => new Blob([`JPEG ${t}`], { type: 'image/jpeg' });
+  const entree = (repereId: string | null, t: string, prisLe = new Date(2026, 9, 30, 10, 0, 0)) => ({
+    repereId, jpeg: jpeg(t), miniature: jpeg(`m${t}`), largeur: 4, hauteur: 3, source: 'appli' as const, prisLe,
+  });
+
+  async function projet() {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, { ...infos, codeAffaire: 'XXX' }, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    const planId = e.plans[0].id;
+    const tgbt = await e.creerLocal(planId, { nom: 'Local TGBT', numero: '012', surface: null, x: 0.5, y: 0.5 }, 'BL');
+    return { s, e, planId, tgbt };
+  }
+
+  it('nomme et range les photos selon CONCEPTION §A.6', async () => {
+    const { s, e, planId, tgbt } = await projet();
+    const r = await e.creerRepere(planId, 0.51, 0.52, 'BL');
+    expect(r.numero).toBe('P001');
+    expect(r.localId).toBe(tgbt.id); // rattaché au local le plus proche
+    await e.ajouterPhoto(entree(r.id, '1'), 'BL');
+    await e.ajouterPhoto(entree(r.id, '2'), 'BL');
+    await e.ajouterPhoto(entree(r.id, '3', new Date(2027, 2, 15, 9, 0, 0)), 'BL');
+    const dossier = '01_PHOTOS/01_R+1/R+1.012_Local-TGBT';
+    expect((await s.lister(dossier)).map((x) => x.nom).sort()).toEqual([
+      'XXX_R+1.012_P001_2026-10-30_01.jpg',
+      'XXX_R+1.012_P001_2026-10-30_02.jpg',
+      'XXX_R+1.012_P001_2027-03-15_01.jpg',
+    ]);
+    const rouvert = await EspaceProjet.ouvrir(s);
+    expect(rouvert.photosDuRepere(r.id).map((p) => p.rang)).toEqual([1, 2, 1]);
+  });
+
+  it('rattache hors local un repère éloigné, et numérote un local sans numéro à la 1re photo', async () => {
+    const { s, e, planId } = await projet();
+    const loin = await e.creerRepere(planId, 0.05, 0.05, 'BL');
+    expect(loin.localId).toBeNull();
+    await e.ajouterPhoto(entree(loin.id, 'a'), 'BL');
+    expect(await s.existe('01_PHOTOS/01_R+1/R+1.000_Hors-local/XXX_R+1.000_P001_2026-10-30_01.jpg')).toBe(true);
+
+    const bureaux = await e.creerLocal(planId, { nom: 'BUREAUX', numero: null, surface: null, x: 0.9, y: 0.9 }, 'BL');
+    const r = await e.creerRepere(planId, 0.9, 0.9, 'BL');
+    await e.ajouterPhoto(entree(r.id, 'b'), 'BL');
+    expect(e.locaux.find((l) => l.id === bureaux.id)!.numero).toBe('R1-01');
+    expect(await s.existe('01_PHOTOS/01_R+1/R+1.R1-01_BUREAUX/XXX_R+1.R1-01_P002_2026-10-30_01.jpg')).toBe(true);
+  });
+
+  it('classe une photo du panier, puis la renvoie au panier', async () => {
+    const { s, e, planId } = await projet();
+    const p = await e.ajouterPhoto(entree(null, 'x'), 'BL');
+    expect(p.fichier).toMatch(/^01_PHOTOS\/_A-CLASSER\/XXX_A-CLASSER_2026-10-30_100000_.{4}\.jpg$/);
+    expect(e.photosAClasser()).toHaveLength(1);
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    const classee = await e.classerPhoto(p.id, r.id, 'BL');
+    expect(classee.fichier).toBe('01_PHOTOS/01_R+1/R+1.012_Local-TGBT/XXX_R+1.012_P001_2026-10-30_01.jpg');
+    expect(await s.existe(p.fichier)).toBe(false);
+    expect(e.photosAClasser()).toHaveLength(0);
+    const retour = await e.classerPhoto(p.id, null, 'BL');
+    expect(retour.fichier.startsWith('01_PHOTOS/_A-CLASSER/')).toBe(true);
+    // Le dossier du local, devenu vide, est supprimé.
+    expect(await s.existe('01_PHOTOS/01_R+1/R+1.012_Local-TGBT')).toBe(false);
+  });
+
+  it('renomme les photos quand le local change de numéro ou de nom, ou le niveau de place', async () => {
+    const { s, e, planId, tgbt } = await projet();
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    await e.ajouterPhoto(entree(r.id, '1'), 'BL');
+    await e.modifierLocal(tgbt.id, { ...tgbt, numero: '013', nom: 'TGBT principal' }, 'BL');
+    expect(await s.existe('01_PHOTOS/01_R+1/R+1.013_TGBT-principal/XXX_R+1.013_P001_2026-10-30_01.jpg')).toBe(true);
+    expect(await s.existe('01_PHOTOS/01_R+1/R+1.012_Local-TGBT')).toBe(false);
+
+    await e.ajouterNiveau('SS1', 'BL'); // les dossiers de niveau sont renumérotés
+    const photo = e.photos[0];
+    expect(photo.fichier).toBe('01_PHOTOS/02_R+1/R+1.013_TGBT-principal/XXX_R+1.013_P001_2026-10-30_01.jpg');
+    expect(await s.existe(photo.fichier)).toBe(true);
+    const rouvert = await EspaceProjet.ouvrir(s);
+    expect(await rouvert.rangerPhotos()).toEqual([]);
+  });
+
+  it('ne supprime pas un repère qui a des photos', async () => {
+    const { e, planId } = await projet();
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    const p = await e.ajouterPhoto(entree(r.id, '1'), 'BL');
+    await expect(e.supprimerRepere(r.id)).rejects.toThrow(/a des photos/);
+    await e.supprimerPhoto(p.id);
+    await e.supprimerRepere(r.id);
+    expect(e.reperes).toHaveLength(0);
+  });
+
+  it('colore les locaux photographiés dans la journée', async () => {
+    const { e, planId, tgbt } = await projet();
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    await e.ajouterPhoto(entree(r.id, '1'), 'BL');
+    expect([...e.locauxPhotographies('2026-10-30')]).toEqual([tgbt.id]);
+    expect([...e.locauxPhotographies('2026-10-31')]).toEqual([]);
+  });
+});
+
+describe('photos sur l’étiquette du local', () => {
+  it('crée un seul repère d’étiquette par local, qui suit l’étiquette', async () => {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, { ...infos, codeAffaire: 'XXX' }, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    const planId = e.plans[0].id;
+    const l = await e.creerLocal(planId, { nom: 'CTA', numero: 'LT002', surface: null, x: 0.3, y: 0.3 }, 'BL');
+    const jpeg = new Blob(['j']);
+    const p1 = await e.ajouterPhoto({ repereId: null, jpeg, miniature: jpeg, largeur: 1, hauteur: 1, source: 'import' }, 'BL');
+    const p2 = await e.ajouterPhoto({ repereId: null, jpeg, miniature: jpeg, largeur: 1, hauteur: 1, source: 'import' }, 'BL');
+
+    const r = await e.repereEtiquette(l.id, 'BL');
+    expect(r.surEtiquette).toBe(true);
+    expect((await e.repereEtiquette(l.id, 'BL')).id).toBe(r.id);
+    await e.classerPhotos([p1.id, p2.id], r.id, 'BL');
+    expect(e.photosDuLocal(l.id).map((p) => p.rang)).toEqual([1, 2]);
+    expect(e.photosAClasser()).toHaveLength(0);
+
+    await e.modifierLocal(l.id, { ...l, x: 0.35, y: 0.4 }, 'BL');
+    expect(e.reperes.find((x) => x.id === r.id)).toMatchObject({ x: 0.35, y: 0.4 });
+    expect(e.locauxProches(planId, 0.34, 0.41, 3).map((x) => x.numero)).toEqual(['LT002']);
+
+    await e.supprimerLocal(l.id, 'BL');
+    const apres = e.reperes.find((x) => x.id === r.id)!;
+    expect(apres.surEtiquette).toBeUndefined();
+    expect(apres.localId).toBeNull();
   });
 });

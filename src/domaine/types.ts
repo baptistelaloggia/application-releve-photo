@@ -96,3 +96,54 @@ export interface Local {
   modifieLe: string;
   modifiePar: string;
 }
+
+/**
+ * _data/reperes/{id}.json : un point de prise de vue, fixe, placé sur un plan.
+ * Il accumule des photos datées (suivi dans le temps).
+ */
+export interface Repere {
+  schema: number;
+  id: string;
+  planId: string;
+  /** Local de rattachement ; null : hors local. */
+  localId: string | null;
+  /** Numéro lisible, unique dans le projet (« P012 »). Simple libellé, réattribuable. */
+  numero: string;
+  libelle: string;
+  x: number;
+  y: number;
+  /**
+   * Repère « d'étiquette » : celui du local lui-même, placé sur son étiquette.
+   * Il n'est pas dessiné comme un repère : ses photos s'affichent sur l'étiquette du local.
+   */
+  surEtiquette?: boolean;
+  creeLe: string;
+  creePar: string;
+  modifieLe: string;
+  modifiePar: string;
+}
+
+/** _data/photos/{id}.json : une photo. Sans repère (repereId null), elle est dans le panier à classer. */
+export interface Photo {
+  schema: number;
+  id: string;
+  repereId: string | null;
+  /** Chemin du JPEG dans le projet (01_PHOTOS/…). */
+  fichier: string;
+  /** Chemin de la miniature (_data/miniatures/{id}.jpg). */
+  miniature: string;
+  /** Jour de la prise de vue, heure locale (AAAA-MM-JJ). */
+  date: string;
+  prisLe: string;
+  prisPar: string;
+  /** Rang de la photo pour ce repère et ce jour (1, 2…), repris dans le nom du fichier. */
+  rang: number;
+  largeur: number;
+  hauteur: number;
+  taille: number;
+  empreinte: string;
+  commentaire: string;
+  /** appli : appareil photo de l'appli ; appareil : appareil photo du téléphone ; import : fichier importé. */
+  source: 'appli' | 'appareil' | 'import';
+  nomOrigine?: string;
+}

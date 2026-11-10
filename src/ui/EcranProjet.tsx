@@ -21,6 +21,7 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [nouveauNiveau, setNouveauNiveau] = useState('');
   const [detectionGlobale, setDetectionGlobale] = useState(false);
+  const sansNumero = espace.locaux.filter((l) => !l.numero).length;
   const [planOuvert, setPlanOuvert] = useState<{ planId: string; localId: string | null } | null>(null);
   const [occupe, setOccupe] = useState(false);
   const { projet } = espace;
@@ -217,6 +218,18 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
             <button onClick={() => setDetectionGlobale(true)} disabled={occupe}>
               Détecter les locaux sur tous les plans…
             </button>
+            {sansNumero > 0 && (
+              <button
+                disabled={occupe}
+                onClick={() => {
+                  if (confirm(`Attribuer un numéro automatique (« R2-04 »…) aux ${sansNumero} locaux qui n'en ont pas ?`)) {
+                    void executer(() => espace.numeroterLocauxSansNumero(auteur));
+                  }
+                }}
+              >
+                Numéroter les locaux sans numéro ({sansNumero})
+              </button>
+            )}
           </div>
         )}
       </section>

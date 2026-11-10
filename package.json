@@ -10,7 +10,7 @@
     "build:test": "tsc -b && vite build --mode fichier-unique",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/parcours-lot1.mjs"
+    "test:e2e": "node tests/e2e/parcours-lot1.mjs && node --experimental-strip-types --no-warnings tests/e2e/terrain-lot3.mjs"
   },
   "dependencies": {
     "idb": "^8.0.4",

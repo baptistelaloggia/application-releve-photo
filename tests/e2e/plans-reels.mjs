@@ -91,6 +91,7 @@ try {
   await page.locator('.visionneuse[data-fond-pret]').waitFor({ timeout: 60_000 });
   await capture('3-plan-SS1');
   const t1 = Date.now();
+  await page.getByRole('tab', { name: /Locaux/ }).click();
   await page.getByRole('button', { name: 'Détecter les locaux' }).click();
   await page.getByRole('heading', { name: 'Locaux détectés' }).waitFor({ timeout: 60_000 });
   console.log(`Détection : ${((Date.now() - t1) / 1000).toFixed(1)} s ; ${await page.locator('.liste-candidats li').count()} propositions`);
@@ -110,6 +111,7 @@ try {
   console.log(`Recherche « tgbt » : marqueur sélectionné = ${selection} ; fiche = ${await page.locator('.fiche-local input').first().inputValue()}`);
   assert.equal(selection, 'LT1105');
   await capture('6-TGBT-zoome');
+  await page.getByText('Affichage', { exact: true }).click();
   await page.getByRole('button', { name: 'Nom', exact: true }).click();
   await page.locator('.visionneuse').hover();
   await page.mouse.wheel(0, 500); // zoom arrière, pour voir plusieurs étiquettes

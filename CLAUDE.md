@@ -40,6 +40,9 @@ Ce fichier n'en est que le résumé opérationnel.
   chiffres, `+`, `-`, jamais `_` ni `.`). L'ordre des niveaux est enregistré (`ordre`) et modifiable.
 - Un carnet de plans multi-pages est découpé à l'import : une page = le plan d'un niveau.
 - Locaux : `_data/locaux/{uuid}.json`, rattachés à un plan, numéro unique dans le projet. Voir CONCEPTION §A.6 ter.
+- Repères `_data/reperes/`, photos `_data/photos/`, miniatures `_data/miniatures/`, panier `01_PHOTOS/_A-CLASSER/`.
+  Le chemin d'une photo se déduit de son repère, de son local, de son niveau et de sa date (`cheminAttendu`) :
+  après toute modification, `rangerPhotos` remet les fichiers en place. Voir CONCEPTION §A.6 quater.
 - Nom des plans : `{Projet}_{Niveau}.pdf` (sans indice ni lot ; l'indice est dans `_data/`).
 - Dossiers de niveau sous `01_PHOTOS/` préfixés d'un numéro d'ordre (`00_SS1`, `01_RDC`, `02_R+1`…), pour
   le tri dans l'Explorateur ; partout ailleurs, le code seul. Voir CONCEPTION §A.6 bis.
@@ -81,10 +84,12 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   et ses implémentations ; `src/projet/` : logique d'un projet (`EspaceProjet`) ; `src/pdf/` : pdf.js et pdf-lib ;
   `src/ui/` : écrans React ; `src/ui/plan/` : visionneuse de plans (`MoteurVue` : zoom, tuiles, gestes)
   et écran plan (détection, fiche local). Détection des locaux : `src/domaine/locaux.ts` ; recherche :
-  `src/domaine/recherche.ts`.
+  `src/domaine/recherche.ts`. Photos : `src/photo/` (compression, EXIF, caméra) et `src/ui/photo/`
+  (visée, miniatures, visionneuse) ; panneaux terrain : `src/ui/plan/PanneauxTerrain.tsx`.
 - Toute écriture dans le dossier projet passe par `EspaceProjet` et l'interface `Stockage`, jamais directement.
 - `npm test` : tests unitaires. `npm run build && npm run build:test && npm run test:e2e` : parcours complet
-  dans Chromium. `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
+  dans Chromium (dont `terrain-lot3.mjs` : 300 photos en mode avion, fausse caméra ; `NB_PHOTOS` pour réduire).
+  `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
 - Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.
 
 ## Conventions de travail

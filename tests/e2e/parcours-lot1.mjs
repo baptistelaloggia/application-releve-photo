@@ -214,6 +214,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   // Lot 2 : ouverture du plan R+1, détection des locaux, enregistrement.
   await page.locator('tr:has(strong:text-is("R+1"))').getByRole('button', { name: 'Ouvrir' }).click();
   await page.locator('.visionneuse[data-fond-pret]').waitFor();
+  await page.getByRole('tab', { name: /Locaux/ }).click();
   await page.getByRole('button', { name: 'Détecter les locaux' }).click();
   await page.getByRole('button', { name: 'Enregistrer 4 locaux' }).waitFor();
   await capture('3-detection');
@@ -268,11 +269,15 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
     '01_PHOTOS/04_R+3/',
     '01_PHOTOS/05_R+2-MEZZANINE/',
     '01_PHOTOS/06_TT/',
+    '01_PHOTOS/_A-CLASSER/',
     '02_EXPORTS/',
     '_data/',
     '_data/locaux/',
+    '_data/miniatures/',
     '_data/niveaux/',
+    '_data/photos/',
     '_data/plans/',
+    '_data/reperes/',
     '_data/projet.json',
   ].sort());
   assert.equal(arbo.filter((l) => l.startsWith('_data/niveaux/') && l.endsWith('.json')).length, 7);
