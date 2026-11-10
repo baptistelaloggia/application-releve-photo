@@ -197,3 +197,72 @@ button.projet .discret { font-size: 0.85rem; }
 .marqueur-local::before, .marqueur-selection::before,
 .marqueur-candidat::before, .marqueur-candidat-ecarte::before {
   bottom: calc(var(--decalage, 14px) - 8px); height: 8px; }
+
+/* ---------------------------------------------------------------- terrain : repères, photos */
+.marqueur-local-visite { --couleur: #1b6e3a; }
+.marqueur-local-visite .marqueur-point { display: none; }
+.marqueur-local-visite::before { bottom: calc(var(--decalage, 14px) - 8px); height: 8px; }
+/* Repère : posé par l'utilisateur (pas de texte du plan dessous) : point plein et étiquette proche. */
+.marqueur-repere, .marqueur-repere-selection { --couleur: #c0392b; --decalage: 12px; z-index: 1; }
+.marqueur-repere-selection { --couleur: #e8743b; z-index: 3; }
+.marqueur-repere .marqueur-point, .marqueur-repere-selection .marqueur-point {
+  background: var(--couleur); width: 14px; height: 14px; left: -7px; top: -7px; border: 2px solid #fff; }
+.marqueur-repere::before, .marqueur-repere-selection::before { display: none; }
+.marqueur-repere .marqueur-libelle, .marqueur-repere-selection .marqueur-libelle { font-size: 11px; padding: 3px 5px; }
+.marqueur-pastille { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: 6px; background: #fff;
+  color: var(--couleur); font-weight: 700; }
+
+.onglets { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid var(--bord); }
+.onglets button { flex: 1; border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; min-height: 44px; }
+.onglets button.actif { border-bottom-color: var(--accent); font-weight: 600; }
+.aide-terrain { background: var(--info-fond); border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; display: grid; gap: 4px; }
+.enregistrement { background: var(--info-fond); border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; }
+.groupe-photos { margin: 8px 0; }
+.grille-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-top: 4px; }
+.vignette { padding: 0; border: none; background: none; min-height: 0; border-radius: 6px; overflow: hidden; line-height: 0; }
+.miniature { display: inline-block; background: var(--fond); border-radius: 6px; overflow: hidden; }
+.miniature img { width: 100%; height: 100%; object-fit: cover; }
+.liste-panier { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.liste-panier li { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; }
+.petit-texte { font-size: 0.75rem; }
+.fiche-local select, .fiche-local textarea { font: inherit; width: 100%; border: 1px solid var(--bord); border-radius: 8px;
+  padding: 8px; background: var(--carte); color: var(--texte); min-height: 44px; }
+
+.camera { position: fixed; inset: 0; z-index: 50; background: #000; color: #fff; }
+.camera-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.camera-eclair { position: absolute; inset: 0; background: #fff; opacity: 0.7; pointer-events: none; }
+.camera-haut { position: absolute; left: 0; right: 0; top: 0; display: flex; gap: 12px; align-items: center; padding: 12px;
+  background: linear-gradient(rgb(0 0 0 / 0.6), transparent); }
+.camera-titre { font-weight: 600; text-shadow: 0 1px 2px #000; }
+.camera-fermer { background: rgb(0 0 0 / 0.5); color: #fff; border-color: rgb(255 255 255 / 0.5); }
+.camera-erreur { position: absolute; left: 16px; right: 16px; top: 80px; background: #3b1d1b; color: #f2b8b5; padding: 12px; border-radius: 8px; }
+.camera-bas { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; padding: 16px 16px 28px; background: linear-gradient(transparent, rgb(0 0 0 / 0.6)); }
+.camera-compteur { font-size: 0.9rem; text-shadow: 0 1px 2px #000; }
+.camera-declencheur { width: 80px; height: 80px; border-radius: 50%; border: 5px solid #fff; background: rgb(255 255 255 / 0.3); padding: 0; }
+.camera-declencheur:active { background: #fff; }
+.camera-natif { justify-self: end; font-size: 0.8rem; color: #fff; border: 1px solid rgb(255 255 255 / 0.6); border-radius: 8px;
+  padding: 8px 10px; background: rgb(0 0 0 / 0.4); cursor: pointer; }
+.camera-natif input { display: none; }
+
+.voile-photo { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.92); display: flex; flex-direction: column; }
+.photo-image { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; color: #ccc; }
+.photo-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.photo-infos { background: var(--carte); padding: 12px 16px; max-height: 45vh; overflow-y: auto; }
+.photo-infos textarea { width: 100%; font: inherit; border: 1px solid var(--bord); border-radius: 8px; padding: 8px;
+  background: var(--carte); color: var(--texte); }
+.options-plan { position: relative; }
+.options-plan > summary { list-style: none; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;
+  padding: 0 14px; border: 1px solid var(--bord); border-radius: 8px; background: var(--carte); }
+.options-plan > summary::-webkit-details-marker { display: none; }
+.options-plan > summary::after { content: ' ▾'; color: var(--discret); }
+.options-plan-contenu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; display: grid; gap: 10px; padding: 12px;
+  background: var(--carte); border: 1px solid var(--bord); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); white-space: nowrap; }
+@media (max-width: 760px) {
+  .barre-plan { gap: 6px; padding: 6px 8px; }
+  .barre-plan select { max-width: 42vw; }
+  .barre-plan > button, .options-plan > summary { padding: 0 10px; }
+  .zone-vue { flex: 1 1 65%; }
+  .panneau-plan { flex: 0 1 35%; padding: 8px 12px; }
+  .options-plan-contenu { left: auto; right: -60px; }
+}

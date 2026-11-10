@@ -142,6 +142,19 @@ Règles issues du lot 1 (04/11/2026) :
 - **Affichage des plans** : image de fond de la page entière, puis tuiles de 512 px calculées à la demande pour le zoom courant (jusqu'à 8 pixels par point PDF). Le zoom se fait à la molette, au pincement ou au double appui.
 - [À VÉRIFIER, à trancher avant le lot 3] **Locaux sans numéro** (par ex. « BUREAUX » en plateau) : le dossier photos prévu est `{Niveau}.{N°local}_{NomLocal}`. Il faut décider comment nommer le dossier d'un local sans numéro.
 
+## A.6 quater Repères et photos (lot 3, 10/11/2026)
+
+- **Repère** : `_data/reperes/{uuid}.json` (plan, local de rattachement ou aucun, numéro `P001`… unique dans le projet, libellé facultatif, position relative). À sa création, il est rattaché au **local le plus proche**, s'il est à moins de 6 % de la page [À VÉRIFIER sur le terrain : les locaux sont des points, pas des contours]. Le local se corrige dans la fiche du repère.
+- **Photo** : `_data/photos/{uuid}.json` (repère ou panier, chemin du JPEG, miniature, date du jour, heure, auteur, rang, dimensions, taille, empreinte SHA-256, commentaire, source : appli, appareil du téléphone ou import). Miniature de 320 px dans `_data/miniatures/{uuid}.jpg`.
+- **Rangement** : `01_PHOTOS/{NN}_{Niveau}/{Niveau}.{N°local}_{NomLocal}/{Projet}_{Niveau}.{N°local}_{P001}_{AAAA-MM-JJ}_{rang}.jpg`. Hors local : `{Niveau}.000_Hors-local`. Un local photographé sans numéro reçoit un numéro automatique à sa 1re photo. Quand un local, un repère ou un niveau change, les photos concernées sont renommées et déplacées automatiquement ; un dossier de local vidé est supprimé.
+- **Panier à classer** : `01_PHOTOS/_A-CLASSER/{Projet}_A-CLASSER_{date}_{heure}_{id}.jpg`, puis classement sur un repère existant ou nouveau.
+- **Terrain, 2 appuis par photo** : appui sur un repère, la visée de l'appli s'ouvre ; appui sur le déclencheur, la photo est prise, et l'on reste en visée pour la rafale. Appui long (0,5 s) sur le plan : nouveau repère, puis visée. Chaque appui sur le déclencheur est mis en file : aucun n'est perdu, même en rafale rapide. L'appareil photo du téléphone reste accessible depuis la visée, avec une validation de plus.
+- **Compression** : grand côté ramené à 3 264 px, JPEG de qualité 0,82, réduite jusqu'à 0,58 si nécessaire pour rester sous 1,5 Mo. La photo est redressée selon son orientation EXIF, et le segment **EXIF d'origine est recopié** (orientation remise à « normale »). Une photo déjà petite est gardée telle quelle. La date de prise de vue des photos importées est reprise de l'EXIF.
+- **Visite** : les photos sont regroupées par jour (date de la photo), sans fichier « visite » distinct pour l'instant. Les locaux photographiés dans la journée sont en vert sur le plan.
+- **Commentaire** : champ texte sur chaque photo. La dictée vocale passe par le micro du clavier du téléphone (fonction du clavier Android).
+- **Validation** (test automatique, fausse caméra de Chromium) : 300 photos en mode avion sur un même repère, prises en 21 s, toutes enregistrées en 56 s, sans perte. [À VÉRIFIER sur un vrai téléphone : vraies photos de 12 Mpx, compression de 1 à 2 s chacune en arrière-plan, place disponible dans le stockage du navigateur.]
+- [À VÉRIFIER] Temps d'ouverture d'un projet sur le serveur quand il compte plusieurs milliers de photos : un fichier JSON lu par photo.
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
@@ -174,7 +187,7 @@ Règles issues du lot 1 (04/11/2026) :
 | 0. Cadrage | Test de lecture des locaux sur de vrais PDF, maquettes des écrans, demande à la DSI | Spécification validée |
 | 1. Socle | Dépôt, PWA installable, création du projet, import des PDF, renommage, arborescence sur le serveur partagé | Projet créé sur le serveur (**réalisé le 04/11/2026**, validation sur le serveur réel à faire par l'utilisateur) |
 | 2. Plans et locaux | Affichage par tuiles, détection et correction des locaux, recherche | « Je tape TGBT, je trouve le local » (**réalisé le 05/11/2026**, vérifié sur un vrai carnet : le TGBT du SS1 est trouvé) |
-| 3. Terrain | Repères, photo en 2 appuis, panier à classer, hors ligne, compression | Visite de 300 photos en mode avion |
+| 3. Terrain | Repères, photo en 2 appuis, panier à classer, hors ligne, compression | Visite de 300 photos en mode avion (**réalisé le 10/11/2026**, validé en test automatique ; essai sur téléphone à faire) |
 | 4. Synchro zip | Export et import `.zip`, rangement, contrôle des doublons | **Première version utilisable de bout en bout** |
 | 5. SharePoint transit | MSAL, envoi depuis le téléphone, collecte par le PC puis purge | Deux personnes sur un même projet |
 | 6. Suivi dans le temps | Transparence, frise, avant/après, direction | Même cadrage à 2 dates |

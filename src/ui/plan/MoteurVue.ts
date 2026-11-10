@@ -25,6 +25,8 @@ const DEMI_HAUTEUR_ETIQUETTE = 16;
 export interface EvenementsMoteur {
   /** Appui court sur le plan (hors marqueur), en coordonnées relatives 0 à 1. */
   surAppui?: (x: number, y: number) => void;
+  /** Appui long (0,5 s sans bouger) sur le plan : nouveau repère. */
+  surAppuiLong?: (x: number, y: number) => void;
   /** Le zoom a changé (pour l'affichage du pourcentage, par exemple). */
   surVue?: (zoom: number, zoomAjuste: number) => void;
 }
@@ -58,7 +60,9 @@ export class MoteurVue {
     ty: number;
     distance?: number;
     milieu?: { x: number; y: number };
+    long?: boolean;
   } = null;
+  private minuterieLong = 0;
   private readonly observateur: ResizeObserver;
   private dejaAjuste = false;
 
@@ -94,6 +98,7 @@ export class MoteurVue {
     conteneur.addEventListener('pointerup', this.surPointeurHaut);
     conteneur.addEventListener('pointercancel', this.surPointeurHaut);
     conteneur.addEventListener('dblclick', this.surDoubleClic);
+    conteneur.addEventListener('contextmenu', this.surMenuContextuel);
     this.observateur = new ResizeObserver(() => {
       if (!this.dejaAjuste) this.ajuster();
       else this.appliquer();
@@ -112,7 +117,9 @@ export class MoteurVue {
     this.conteneur.removeEventListener('pointerup', this.surPointeurHaut);
     this.conteneur.removeEventListener('pointercancel', this.surPointeurHaut);
     this.conteneur.removeEventListener('dblclick', this.surDoubleClic);
+    this.conteneur.removeEventListener('contextmenu', this.surMenuContextuel);
     window.clearTimeout(this.minuterieTuiles);
+    window.clearTimeout(this.minuterieLong);
     this.monde.remove();
     this.tuiles.clear();
   }
@@ -325,7 +332,24 @@ export class MoteurVue {
     this.conteneur.setPointerCapture(e.pointerId);
     this.pointeurs.set(e.pointerId, this.positionLocale(e));
     this.demarrerGeste();
+    window.clearTimeout(this.minuterieLong);
+    if (this.pointeurs.size === 1 && this.evenements.surAppuiLong) {
+      const depart = this.positionLocale(e);
+      this.minuterieLong = window.setTimeout(() => {
+        const g = this.geste;
+        if (!g || g.deplace || this.pointeurs.size !== 1) return;
+        g.long = true;
+        const r = this.versRelatif(depart.x, depart.y);
+        if (r.x >= 0 && r.x <= 1 && r.y >= 0 && r.y <= 1) {
+          navigator.vibrate?.(40);
+          this.evenements.surAppuiLong?.(r.x, r.y);
+        }
+      }, 500);
+    }
   };
+
+  /** Le menu contextuel (appui long sur téléphone, clic droit) laisserait place à l'appui long. */
+  private surMenuContextuel = (e: Event) => e.preventDefault();
 
   private demarrerGeste() {
     const points = [...this.pointeurs.values()];
@@ -353,6 +377,7 @@ export class MoteurVue {
       const dy = points[0].y - g.depart.y;
       if (!g.deplace && Math.hypot(dx, dy) < 6) return;
       g.deplace = true;
+      window.clearTimeout(this.minuterieLong);
       this.tx = g.tx + dx;
       this.ty = g.ty + dy;
       this.appliquer();
@@ -373,9 +398,10 @@ export class MoteurVue {
     if (!this.pointeurs.has(e.pointerId)) return;
     this.pointeurs.delete(e.pointerId);
     const g = this.geste;
+    window.clearTimeout(this.minuterieLong);
     if (this.pointeurs.size === 0) {
       this.geste = null;
-      if (g && !g.deplace && performance.now() - g.debut < 500 && e.type === 'pointerup') {
+      if (g && !g.deplace && !g.long && performance.now() - g.debut < 500 && e.type === 'pointerup') {
         const p = this.positionLocale(e);
         const r = this.versRelatif(p.x, p.y);
         if (r.x >= 0 && r.x <= 1 && r.y >= 0 && r.y <= 1) this.evenements.surAppui?.(r.x, r.y);

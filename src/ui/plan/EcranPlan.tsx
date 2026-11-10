@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LocalDetecte } from '../../domaine/locaux';
-import type { Local } from '../../domaine/types';
+import type { Local, Photo } from '../../domaine/types';
+import { dateLocale } from '../../domaine/nommage';
+import { compresserPhoto } from '../../photo/compression';
+import { CameraTerrain } from '../photo/CameraTerrain';
+import { VisionneusePhoto } from '../photo/VisionneusePhoto';
+import { FicheRepere, PanneauPanier, PanneauTerrain } from './PanneauxTerrain';
 import type { EspaceProjet, ResultatLocal, SaisieLocal } from '../../projet/EspaceProjet';
 import { proposerLocaux } from '../../pdf/pdf';
 import { ecrireReglage, lireReglage } from '../../stockage/registre';
@@ -31,7 +36,11 @@ type Mode =
   | { type: 'ajout' }
   | { type: 'brouillon'; x: number; y: number }
   | { type: 'deplacement'; localId: string }
+  | { type: 'deplacementRepere'; repereId: string }
+  | { type: 'classement'; photoId: string }
   | { type: 'detection'; candidats: Candidat[]; sansTexte: boolean };
+
+const PREFIXE_REPERE = 'repere:';
 
 const court = (t: string, n = 16) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
@@ -45,6 +54,54 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const [occupe, setOccupe] = useState(false);
   const [, setVersion] = useState(0);
   const vue = useRef<CommandesVisionneuse>(null);
+  const [repereSel, setRepereSel] = useState<string | null>(null);
+  const [camera, setCamera] = useState<{ repereId: string | null } | null>(null);
+  const [onglet, setOnglet] = useState<'terrain' | 'locaux' | 'panier'>('terrain');
+  const [photoOuverte, setPhotoOuverte] = useState<{ photos: Photo[]; index: number } | null>(null);
+
+  // File d'enregistrement des photos : la compression (1 à 2 s par photo sur téléphone)
+  // se fait en arrière-plan, pour pouvoir enchaîner les prises de vue sans attendre.
+  const file = useRef<Promise<void>>(Promise.resolve());
+  const [enAttente, setEnAttente] = useState(0);
+  function enregistrerPhoto(original: Blob, source: Photo['source'], prisLe: Date, repereId: string | null, nomOrigine?: string) {
+    setEnAttente((n) => n + 1);
+    file.current = file.current.then(async () => {
+      try {
+        const c = await compresserPhoto(original);
+        await espace.ajouterPhoto(
+          {
+            repereId,
+            jpeg: c.jpeg,
+            miniature: c.miniature,
+            largeur: c.largeur,
+            hauteur: c.hauteur,
+            source,
+            prisLe: source !== 'appli' && c.dateExif ? c.dateExif : prisLe,
+            nomOrigine,
+          },
+          auteur,
+        );
+      } catch (e) {
+        setErreur(`Photo non enregistrée : ${texteErreur(e)}`);
+      } finally {
+        setEnAttente((n) => n - 1);
+        setVersion((v) => v + 1);
+      }
+    });
+  }
+  // Ne pas quitter la page tant que des photos sont en cours d'enregistrement.
+  useEffect(() => {
+    if (enAttente === 0) return;
+    const retenir = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', retenir);
+    return () => window.removeEventListener('beforeunload', retenir);
+  }, [enAttente]);
+
+  // Appui sur un repère : ouvre l'appareil photo (par défaut) ou la fiche du repère.
+  const [appuiRepere, setAppuiRepere] = useState<'photo' | 'fiche'>('photo');
+  useEffect(() => {
+    void lireReglage<'photo' | 'fiche'>('appuiRepere').then((v) => v && setAppuiRepere(v));
+  }, []);
 
   useEffect(() => {
     let annule = false;
@@ -97,6 +154,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   // ------------------------------------------------------------ marqueurs
 
   const marqueurs: Marqueur[] = [];
+  const photographies = espace.locauxPhotographies(dateLocale(new Date()));
   for (const l of locaux) {
     if (mode.type === 'deplacement' && mode.localId === l.id) continue;
     marqueurs.push({
@@ -104,9 +162,23 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       x: l.x,
       y: l.y,
       libelle: texteEtiquette(l),
-      titre: [l.numero, l.nom].filter(Boolean).join(' · '),
-      style: l.id === selection ? 'selection' : 'local',
+      titre: [l.numero, l.nom].filter(Boolean).join(' · ') + (photographies.has(l.id) ? ' (photographié aujourd’hui)' : ''),
+      style: l.id === selection ? 'selection' : photographies.has(l.id) ? 'local-visite' : 'local',
     });
+  }
+  if (mode.type !== 'detection') {
+    for (const rep of espace.reperesDuPlan(planId)) {
+      if (mode.type === 'deplacementRepere' && mode.repereId === rep.id) continue;
+      marqueurs.push({
+        id: PREFIXE_REPERE + rep.id,
+        x: rep.x,
+        y: rep.y,
+        libelle: etiquettes === 'nom' && rep.libelle ? court(rep.libelle, 22) : rep.numero,
+        titre: `${rep.numero}${rep.libelle ? ` · ${rep.libelle}` : ''}`,
+        style: rep.id === repereSel ? 'repere-selection' : 'repere',
+        pastille: espace.photosDuRepere(rep.id).length || undefined,
+      });
+    }
   }
   if (mode.type === 'detection') {
     for (const c of mode.candidats) {
@@ -125,7 +197,43 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
 
   // ------------------------------------------------------------ actions
 
+  function ouvrirCamera(repereId: string | null) {
+    setCamera({ repereId });
+  }
+
+  /** Appui long : nouveau repère (rattaché au local le plus proche), puis appareil photo. */
+  function surAppuiLongPlan(x: number, y: number) {
+    if (mode.type === 'classement') return surAppuiPlan(x, y);
+    if (mode.type !== 'consultation') return;
+    void executer(async () => {
+      const r = await espace.creerRepere(planId, x, y, auteur);
+      setSelection(null);
+      setRepereSel(r.id);
+      ouvrirCamera(r.id);
+    });
+  }
+
   function surAppuiPlan(x: number, y: number) {
+    if (mode.type === 'classement') {
+      const photoId = mode.photoId;
+      void executer(async () => {
+        const r = await espace.creerRepere(planId, x, y, auteur);
+        await espace.classerPhoto(photoId, r.id, auteur);
+        setMode({ type: 'consultation' });
+        setSelection(null);
+        setRepereSel(r.id);
+      });
+      return;
+    }
+    if (mode.type === 'deplacementRepere') {
+      const id = mode.repereId;
+      void executer(async () => {
+        await espace.modifierRepere(id, { x, y, localId: espace.localProche(planId, x, y)?.id ?? null }, auteur);
+        setMode({ type: 'consultation' });
+        setRepereSel(id);
+      });
+      return;
+    }
     if (mode.type === 'ajout' || mode.type === 'brouillon') {
       setSelection(null);
       setMode({ type: 'brouillon', x, y });
@@ -138,6 +246,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       });
     } else if (mode.type === 'consultation') {
       setSelection(null);
+      setRepereSel(null);
     }
   }
 
@@ -147,10 +256,37 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       setMode({ ...mode, candidats: mode.candidats.map((c) => (c.cle === cle ? { ...c, retenu: !c.retenu } : c)) });
       return;
     }
+    if (id.startsWith(PREFIXE_REPERE)) {
+      const repereId = id.slice(PREFIXE_REPERE.length);
+      if (mode.type === 'classement') {
+        const photoId = mode.photoId;
+        void executer(async () => {
+          await espace.classerPhoto(photoId, repereId, auteur);
+          setMode({ type: 'consultation' });
+          setRepereSel(repereId);
+        });
+        return;
+      }
+      if (mode.type !== 'consultation') return;
+      setSelection(null);
+      setRepereSel(repereId);
+      if (appuiRepere === 'photo') ouvrirCamera(repereId);
+      return;
+    }
     if (mode.type === 'consultation' || mode.type === 'ajout') {
       setMode({ type: 'consultation' });
+      setRepereSel(null);
       setSelection(id);
     }
+  }
+
+  function titreCamera(repereId: string | null) {
+    const rep = repereId ? espace.reperes.find((x) => x.id === repereId) : undefined;
+    if (!rep) return 'Photo sans repère → panier à classer';
+    const local = rep.localId ? espace.locaux.find((l) => l.id === rep.localId) : undefined;
+    return [rep.numero, niveau.code, local ? `${local.numero ?? ''} ${local.nom}`.trim() : 'hors local', rep.libelle]
+      .filter(Boolean)
+      .join(' · ');
   }
 
   const detecter = () =>
@@ -174,6 +310,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       return;
     }
     setMode({ type: 'consultation' });
+    setRepereSel(null);
     setSelection(r.local.id);
     vue.current?.centrerSur(r.local.x, r.local.y);
   };
@@ -181,6 +318,9 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   // ------------------------------------------------------------ rendu
 
   const selectionne = selection ? espace.locaux.find((l) => l.id === selection) : undefined;
+  const repereSelectionne = repereSel ? espace.reperes.find((x) => x.id === repereSel) : undefined;
+  const nbPanier = espace.photosAClasser().length;
+  const modePlacement = ['ajout', 'brouillon', 'deplacement', 'deplacementRepere', 'classement'].includes(mode.type);
 
   return (
     <div className="ecran-plan">
@@ -200,15 +340,37 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         <span className="discret mono">
           {plan.fichier.split('/').pop()} · ind. {plan.indice}
         </span>
-        <div className="bascule" role="group" aria-label="Texte des étiquettes">
-          <span className="discret">Étiquettes :</span>
-          <button className={etiquettes === 'numero' ? 'actif' : undefined} aria-pressed={etiquettes === 'numero'} onClick={() => choisirEtiquettes('numero')}>
-            Numéro
-          </button>
-          <button className={etiquettes === 'nom' ? 'actif' : undefined} aria-pressed={etiquettes === 'nom'} onClick={() => choisirEtiquettes('nom')}>
-            Nom
-          </button>
-        </div>
+        <details className="options-plan">
+          <summary>Affichage</summary>
+          <div className="options-plan-contenu">
+            <div className="bascule" role="group" aria-label="Texte des étiquettes">
+              <span className="discret">Étiquettes :</span>
+              <button className={etiquettes === 'numero' ? 'actif' : undefined} aria-pressed={etiquettes === 'numero'} onClick={() => choisirEtiquettes('numero')}>
+                Numéro
+              </button>
+              <button className={etiquettes === 'nom' ? 'actif' : undefined} aria-pressed={etiquettes === 'nom'} onClick={() => choisirEtiquettes('nom')}>
+                Nom
+              </button>
+            </div>
+            <div className="bascule" role="group" aria-label="Appui sur un repère">
+              <span className="discret">Appui sur repère :</span>
+              {(['photo', 'fiche'] as const).map((v) => (
+                <button
+                  key={v}
+                  className={appuiRepere === v ? 'actif' : undefined}
+                  aria-pressed={appuiRepere === v}
+                  onClick={() => {
+                    setAppuiRepere(v);
+                    void ecrireReglage('appuiRepere', v);
+                  }}
+                >
+                  {v === 'photo' ? 'Photo' : 'Fiche'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </details>
+        {enAttente > 0 && <span className="enregistrement">Enregistrement de {enAttente} photo{enAttente > 1 ? 's' : ''}…</span>}
         <div className="barre-recherche-plan">
           <BarreRecherche espace={espace} surChoix={choisirResultat} />
         </div>
@@ -226,16 +388,23 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               fichier={fichier}
               marqueurs={marqueurs}
               focus={localFocus ? { x: localFocus.x, y: localFocus.y } : null}
-              modePlacement={mode.type === 'ajout' || mode.type === 'brouillon' || mode.type === 'deplacement'}
+              modePlacement={modePlacement}
               surAppuiPlan={surAppuiPlan}
+              surAppuiLongPlan={surAppuiLongPlan}
               surAppuiMarqueur={surAppuiMarqueur}
             />
           ) : (
             <div className="vue-etat">Lecture du plan…</div>
           )}
-          {(mode.type === 'ajout' || mode.type === 'deplacement') && (
+          {(mode.type === 'ajout' || mode.type === 'deplacement' || mode.type === 'deplacementRepere' || mode.type === 'classement') && (
             <div className="consigne">
-              {mode.type === 'ajout' ? 'Touchez le plan à l’emplacement du local.' : 'Touchez la nouvelle position du local.'}
+              {mode.type === 'ajout'
+                ? 'Touchez le plan à l’emplacement du local.'
+                : mode.type === 'classement'
+                  ? 'Touchez un repère, ou le plan pour créer un repère.'
+                  : mode.type === 'deplacementRepere'
+                    ? 'Touchez la nouvelle position du repère.'
+                    : 'Touchez la nouvelle position du local.'}
               <button className="petit" onClick={() => setMode({ type: 'consultation' })}>
                 Annuler
               </button>
@@ -266,6 +435,25 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                   setMode({ type: 'consultation' });
                 })
               }
+            />
+          ) : repereSelectionne && mode.type !== 'brouillon' ? (
+            <FicheRepere
+              key={repereSelectionne.id}
+              espace={espace}
+              repere={repereSelectionne}
+              occupe={occupe}
+              surPhoto={() => ouvrirCamera(repereSelectionne.id)}
+              surDeplacer={() => setMode({ type: 'deplacementRepere', repereId: repereSelectionne.id })}
+              surSupprimer={() => {
+                if (!confirm(`Supprimer le repère ${repereSelectionne.numero} ?`)) return;
+                void executer(async () => {
+                  await espace.supprimerRepere(repereSelectionne.id);
+                  setRepereSel(null);
+                });
+              }}
+              surModifier={(maj) => executer(async () => void (await espace.modifierRepere(repereSelectionne.id, maj, auteur)))}
+              surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
+              surFermer={() => setRepereSel(null)}
             />
           ) : mode.type === 'brouillon' ? (
             <FicheLocal
@@ -303,10 +491,48 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               }}
             />
           ) : (
+            <>
+            <div className="onglets" role="tablist">
+              {(
+                [
+                  ['terrain', 'Terrain'],
+                  ['locaux', `Locaux (${locaux.length})`],
+                  ['panier', `Panier (${nbPanier})`],
+                ] as const
+              ).map(([cle, texte]) => (
+                <button key={cle} role="tab" aria-selected={onglet === cle} className={onglet === cle ? 'actif' : undefined} onClick={() => setOnglet(cle)}>
+                  {texte}
+                </button>
+              ))}
+            </div>
+            {onglet === 'terrain' ? (
+              <PanneauTerrain
+                espace={espace}
+                planId={planId}
+                occupe={occupe}
+                surPhotoSansRepere={() => ouvrirCamera(null)}
+                surChoixRepere={(rep) => {
+                  setRepereSel(rep.id);
+                  vue.current?.centrerSur(rep.x, rep.y, 4);
+                }}
+              />
+            ) : onglet === 'panier' ? (
+              <PanneauPanier
+                espace={espace}
+                occupe={occupe}
+                surPhotoSansRepere={() => ouvrirCamera(null)}
+                surImporter={(fichiers) => {
+                  for (const f of fichiers) enregistrerPhoto(f, 'import', new Date(f.lastModified || Date.now()), null, f.name);
+                }}
+                surPlacer={(photo) => setMode({ type: 'classement', photoId: photo.id })}
+                surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
+              />
+            ) : (
             <ListeLocaux
               locaux={locaux}
               occupe={occupe || !fichier}
               surChoix={(l) => {
+                setRepereSel(null);
                 setSelection(l.id);
                 vue.current?.centrerSur(l.x, l.y);
               }}
@@ -315,10 +541,31 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 setSelection(null);
                 setMode({ type: 'ajout' });
               }}
+              surNumeroter={() => executer(async () => surJournal(await espace.numeroterLocauxSansNumero(auteur, planId)))}
             />
+            )}
+            </>
           )}
         </aside>
       </div>
+
+      {camera && (
+        <CameraTerrain
+          titre={titreCamera(camera.repereId)}
+          enAttente={enAttente}
+          surCapture={(photo, source, prisLe) => enregistrerPhoto(photo, source, prisLe, camera.repereId)}
+          surFermer={() => setCamera(null)}
+        />
+      )}
+      {photoOuverte && (
+        <VisionneusePhoto
+          espace={espace}
+          photos={photoOuverte.photos}
+          indexInitial={photoOuverte.index}
+          surFermer={() => setPhotoOuverte(null)}
+          surModifie={() => setVersion((v) => v + 1)}
+        />
+      )}
     </div>
   );
 }
@@ -331,13 +578,16 @@ function ListeLocaux({
   surChoix,
   surDetecter,
   surAjouter,
+  surNumeroter,
 }: {
   locaux: Local[];
   occupe: boolean;
   surChoix: (l: Local) => void;
   surDetecter: () => void;
   surAjouter: () => void;
+  surNumeroter: () => void;
 }) {
+  const sansNumero = locaux.filter((l) => !l.numero).length;
   return (
     <>
       <div className="boutons">
@@ -347,6 +597,11 @@ function ListeLocaux({
         <button onClick={surAjouter} disabled={occupe}>
           + Ajouter un local
         </button>
+        {sansNumero > 0 && (
+          <button className="petit" onClick={surNumeroter} disabled={occupe}>
+            Numéroter les {sansNumero} sans numéro
+          </button>
+        )}
       </div>
       <h2>
         Locaux de ce plan <span className="discret">({locaux.length})</span>

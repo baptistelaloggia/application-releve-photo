@@ -3,7 +3,15 @@ import { ouvrirPagePlan } from '../../pdf/pdf';
 import { texteErreur } from '../commun';
 import { MoteurVue } from './MoteurVue';
 
-export type StyleMarqueur = 'local' | 'local-auto' | 'selection' | 'candidat' | 'candidat-ecarte' | 'brouillon';
+export type StyleMarqueur =
+  | 'local'
+  | 'local-visite'
+  | 'selection'
+  | 'candidat'
+  | 'candidat-ecarte'
+  | 'brouillon'
+  | 'repere'
+  | 'repere-selection';
 
 export interface Marqueur {
   id: string;
@@ -12,6 +20,8 @@ export interface Marqueur {
   libelle: string;
   titre?: string;
   style: StyleMarqueur;
+  /** Petit nombre affiché à côté de l'étiquette (nombre de photos d'un repère). */
+  pastille?: number;
 }
 
 export interface CommandesVisionneuse {
@@ -29,11 +39,12 @@ interface Props {
   /** Curseur en croix quand un appui place quelque chose. */
   modePlacement?: boolean;
   surAppuiPlan?: (x: number, y: number) => void;
+  surAppuiLongPlan?: (x: number, y: number) => void;
   surAppuiMarqueur?: (id: string) => void;
 }
 
 export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function VisionneusePlan(
-  { cle, fichier, marqueurs, focus, modePlacement, surAppuiPlan, surAppuiMarqueur },
+  { cle, fichier, marqueurs, focus, modePlacement, surAppuiPlan, surAppuiLongPlan, surAppuiMarqueur },
   ref,
 ) {
   const conteneur = useRef<HTMLDivElement>(null);
@@ -41,6 +52,8 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
   const moteur = useRef<MoteurVue | null>(null);
   const appuiPlan = useRef(surAppuiPlan);
   appuiPlan.current = surAppuiPlan;
+  const appuiLong = useRef(surAppuiLongPlan);
+  appuiLong.current = surAppuiLongPlan;
   const [etat, setEtat] = useState<'chargement' | 'pret' | string>('chargement');
   const [zoom, setZoom] = useState(100);
 
@@ -57,6 +70,7 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
         if (annule || !conteneur.current || !couche.current) return;
         moteur.current = new MoteurVue(conteneur.current, couche.current, page, {
           surAppui: (x, y) => appuiPlan.current?.(x, y),
+          surAppuiLong: (x, y) => appuiLong.current?.(x, y),
           surVue: (z, ajuste) => setZoom(Math.round((z / ajuste) * 100)),
         });
         if (focus) moteur.current.centrerSur(focus.x, focus.y);
@@ -96,7 +110,12 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
               }}
             >
               <span className="marqueur-point" />
-              {m.libelle && <span className="marqueur-libelle">{m.libelle}</span>}
+              {m.libelle && (
+                <span className="marqueur-libelle">
+                  {m.libelle}
+                  {m.pastille ? <span className="marqueur-pastille">{m.pastille}</span> : null}
+                </span>
+              )}
             </button>
           ))}
       </div>

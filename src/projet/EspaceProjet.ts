@@ -13,10 +13,15 @@ import {
   nomDossierProjet,
   nomFichierPlan,
   nomFichierPlanArchive,
+  dateLocale,
+  nomDossierLocal,
+  nomFichierPhoto,
+  nomFichierPhotoAClasser,
+  numeroRepere,
   normaliserCodeAffaire,
   normaliserIndice,
 } from '../domaine/nommage';
-import { VERSION_SCHEMA, type Local, type Niveau, type Plan, type Projet } from '../domaine/types';
+import { VERSION_SCHEMA, type Local, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
 import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
 import { ecrireJson, lireJson, type Stockage } from '../stockage/Stockage';
@@ -25,6 +30,12 @@ const FICHIER_PROJET = `${DOSSIERS.donnees}/projet.json`;
 const DOSSIER_NIVEAUX = `${DOSSIERS.donnees}/niveaux`;
 const DOSSIER_PLANS = `${DOSSIERS.donnees}/plans`;
 const DOSSIER_LOCAUX = `${DOSSIERS.donnees}/locaux`;
+const DOSSIER_REPERES = `${DOSSIERS.donnees}/reperes`;
+const DOSSIER_PHOTOS = `${DOSSIERS.donnees}/photos`;
+const DOSSIER_MINIATURES = `${DOSSIERS.donnees}/miniatures`;
+const DOSSIER_A_CLASSER = `${DOSSIERS.photos}/${DOSSIERS.aClasser}`;
+/** Distance (relative à la page) au-delà de laquelle un repère n'est rattaché à aucun local. */
+const DISTANCE_RATTACHEMENT = 0.06;
 /** Écart entre deux niveaux dans le champ « ordre ». */
 const PAS_ORDRE = 10;
 
@@ -112,6 +123,8 @@ export class EspaceProjet {
     public niveaux: Niveau[],
     public plans: Plan[],
     public locaux: Local[],
+    public reperes: Repere[],
+    public photos: Photo[],
     /** Fichiers de données illisibles rencontrés à l'ouverture. */
     public avertissements: string[],
   ) {}
@@ -134,7 +147,7 @@ export class EspaceProjet {
       creeLe: maintenant(),
       creePar: auteur,
     };
-    const espace = new EspaceProjet(stockage, projet, [], [], [], []);
+    const espace = new EspaceProjet(stockage, projet, [], [], [], [], [], []);
     const codes = [...infos.niveaux].sort((a, b) => rangNiveau(a) - rangNiveau(b));
     for (const [i, code] of codes.entries()) {
       const niveau: Niveau = {
@@ -158,7 +171,7 @@ export class EspaceProjet {
   static async ouvrir(stockage: Stockage): Promise<EspaceProjet> {
     if (!(await stockage.existe(FICHIER_PROJET))) throw new ErreurPasUnProjet();
     const projet = await lireJson<Projet>(stockage, FICHIER_PROJET);
-    const espace = new EspaceProjet(stockage, projet, [], [], [], []);
+    const espace = new EspaceProjet(stockage, projet, [], [], [], [], [], []);
     await espace.recharger();
     return espace;
   }
@@ -170,6 +183,8 @@ export class EspaceProjet {
     this.niveaux = await this.lireTous<Niveau>(DOSSIER_NIVEAUX);
     this.plans = await this.lireTous<Plan>(DOSSIER_PLANS);
     this.locaux = await this.lireTous<Local>(DOSSIER_LOCAUX);
+    this.reperes = await this.lireTous<Repere>(DOSSIER_REPERES);
+    this.photos = await this.lireTous<Photo>(DOSSIER_PHOTOS);
     this.trierNiveaux();
     // Projets créés avant l'ordre modifiable : on enregistre l'ordre du bâtiment.
     if (this.niveaux.some((n) => n.ordre === undefined)) await this.renumeroter();
@@ -233,6 +248,10 @@ export class EspaceProjet {
       DOSSIER_NIVEAUX,
       DOSSIER_PLANS,
       DOSSIER_LOCAUX,
+      DOSSIER_REPERES,
+      DOSSIER_PHOTOS,
+      DOSSIER_MINIATURES,
+      DOSSIER_A_CLASSER,
     ]) {
       if (!(await this.stockage.existe(d))) {
         await this.stockage.creerDossier(d);
@@ -257,6 +276,7 @@ export class EspaceProjet {
         continue;
       }
       await this.stockage.deplacer(`${DOSSIERS.photos}/${e.nom}`, `${DOSSIERS.photos}/${attendu}`);
+      await this.majCheminsPhotos(`${DOSSIERS.photos}/${e.nom}/`, `${DOSSIERS.photos}/${attendu}/`);
       nomsPresents.delete(e.nom);
       nomsPresents.add(attendu);
       compteRendu.push(`Dossier renommé : ${e.nom} → ${attendu}`);
@@ -543,12 +563,35 @@ export class EspaceProjet {
     const propre = this.controlerLocal(saisie, id);
     const local: Local = { ...existant, ...propre, modifieLe: maintenant(), modifiePar: auteur };
     await this.ecrireLocal(local);
+    // Le numéro et le nom du local figurent dans les noms des dossiers et des photos.
+    if (local.numero !== existant.numero || local.nom !== existant.nom) {
+      await this.rangerPhotos(this.photos.filter((p) => this.repereDe(p)?.localId === id));
+    }
     return local;
   }
 
-  async supprimerLocal(id: string): Promise<void> {
+  /**
+   * Attribue un numéro automatique (« R2-04 ») à chaque local qui n'en a pas, sur un plan ou sur
+   * tout le projet. Ordre de lecture du plan : de haut en bas, puis de gauche à droite.
+   */
+  async numeroterLocauxSansNumero(auteur: string, planId?: string): Promise<string[]> {
+    const cibles = this.locaux
+      .filter((l) => !l.numero && (!planId || l.planId === planId))
+      .sort((a, b) => a.planId.localeCompare(b.planId) || Math.round((a.y - b.y) * 50) || a.x - b.x);
+    for (const l of cibles) {
+      await this.modifierLocal(l.id, { ...l, numero: this.proposerNumero(l.planId) }, auteur);
+    }
+    return [`${cibles.length} ${cibles.length > 1 ? 'locaux numérotés' : 'local numéroté'} automatiquement`];
+  }
+
+  /** Supprime un local ; ses repères deviennent « hors local » et leurs photos sont rangées en conséquence. */
+  async supprimerLocal(id: string, auteur = '?'): Promise<void> {
     await this.stockage.supprimer(`${DOSSIER_LOCAUX}/${id}.json`);
     this.locaux = this.locaux.filter((l) => l.id !== id);
+    for (const r of this.reperes.filter((x) => x.localId === id)) {
+      await this.ecrireRepere({ ...r, localId: null, modifieLe: maintenant(), modifiePar: auteur });
+    }
+    await this.rangerPhotos(this.photos.filter((p) => p.repereId && !this.repereDe(p)?.localId));
   }
 
   /**
@@ -585,6 +628,280 @@ export class EspaceProjet {
     const plan = this.planParId(planId);
     compteRendu.unshift(`${crees} ${crees > 1 ? 'locaux' : 'local'} enregistré${crees > 1 ? 's' : ''} sur le plan ${plan?.fichier.split('/').pop() ?? ''}`);
     return compteRendu;
+  }
+
+  // ---------------------------------------------------------------- repères
+
+  repereDe(photo: Photo): Repere | undefined {
+    return photo.repereId ? this.reperes.find((r) => r.id === photo.repereId) : undefined;
+  }
+
+  reperesDuPlan(planId: string): Repere[] {
+    return this.reperes.filter((r) => r.planId === planId).sort((a, b) => a.numero.localeCompare(b.numero, 'fr', { numeric: true }));
+  }
+
+  /** Photos d'un repère, de la plus ancienne à la plus récente. */
+  photosDuRepere(repereId: string): Photo[] {
+    return this.photos.filter((p) => p.repereId === repereId).sort((a, b) => a.prisLe.localeCompare(b.prisLe));
+  }
+
+  /** Photos du panier (prises sans repère), de la plus récente à la plus ancienne. */
+  photosAClasser(): Photo[] {
+    return this.photos.filter((p) => !p.repereId).sort((a, b) => b.prisLe.localeCompare(a.prisLe));
+  }
+
+  /** Local le plus proche d'un point, s'il est assez près (les locaux sont des points, pas des contours). */
+  localProche(planId: string, x: number, y: number): Local | null {
+    let meilleur: Local | null = null;
+    let distance = DISTANCE_RATTACHEMENT;
+    for (const l of this.locaux) {
+      if (l.planId !== planId) continue;
+      const d = Math.hypot(l.x - x, l.y - y);
+      if (d < distance) {
+        distance = d;
+        meilleur = l;
+      }
+    }
+    return meilleur;
+  }
+
+  private async ecrireRepere(r: Repere) {
+    await ecrireJson(this.stockage, `${DOSSIER_REPERES}/${r.id}.json`, r);
+    this.reperes = [...this.reperes.filter((x) => x.id !== r.id), r];
+  }
+
+  /** Crée un repère ; sans local précisé, il est rattaché au local le plus proche. */
+  async creerRepere(planId: string, x: number, y: number, auteur: string, localId?: string | null): Promise<Repere> {
+    if (!this.planParId(planId)) throw new Error('Plan introuvable.');
+    if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) throw new Error('Position hors du plan.');
+    const pris = new Set(this.reperes.map((r) => r.numero));
+    let rang = this.reperes.length + 1;
+    while (pris.has(numeroRepere(rang))) rang++;
+    const date = maintenant();
+    const repere: Repere = {
+      schema: VERSION_SCHEMA,
+      id: crypto.randomUUID(),
+      planId,
+      localId: localId === undefined ? (this.localProche(planId, x, y)?.id ?? null) : localId,
+      numero: numeroRepere(rang),
+      libelle: '',
+      x,
+      y,
+      creeLe: date,
+      creePar: auteur,
+      modifieLe: date,
+      modifiePar: auteur,
+    };
+    await this.ecrireRepere(repere);
+    return repere;
+  }
+
+  async modifierRepere(id: string, maj: Partial<Pick<Repere, 'libelle' | 'localId' | 'x' | 'y'>>, auteur: string): Promise<Repere> {
+    const existant = this.reperes.find((r) => r.id === id);
+    if (!existant) throw new Error('Repère introuvable.');
+    if (maj.localId && !this.locaux.some((l) => l.id === maj.localId)) throw new Error('Local introuvable.');
+    const repere: Repere = { ...existant, ...maj, libelle: (maj.libelle ?? existant.libelle).trim(), modifieLe: maintenant(), modifiePar: auteur };
+    await this.ecrireRepere(repere);
+    if (repere.localId !== existant.localId) await this.rangerPhotos(this.photosDuRepere(id));
+    return repere;
+  }
+
+  /** Supprime un repère sans photo (les photos ne sont jamais supprimées par ricochet). */
+  async supprimerRepere(id: string): Promise<void> {
+    if (this.photos.some((p) => p.repereId === id)) {
+      throw new Error('Ce repère a des photos : supprimez-les ou renvoyez-les au panier avant de supprimer le repère.');
+    }
+    await this.stockage.supprimer(`${DOSSIER_REPERES}/${id}.json`);
+    this.reperes = this.reperes.filter((r) => r.id !== id);
+  }
+
+  // ---------------------------------------------------------------- photos
+
+  /** Chemin où la photo doit se trouver, d'après son repère, son local, son niveau et sa date. */
+  cheminAttendu(photo: Photo): string {
+    const repere = this.repereDe(photo);
+    if (!repere) {
+      // Photo du panier : son nom ne dépend de rien d'autre, il ne change pas.
+      return photo.fichier.startsWith(`${DOSSIER_A_CLASSER}/`)
+        ? photo.fichier
+        : `${DOSSIER_A_CLASSER}/${nomFichierPhotoAClasser(this.projet.codeAffaire, new Date(photo.prisLe), photo.id)}`;
+    }
+    const plan = this.planParId(repere.planId);
+    if (!plan) throw new Error(`Plan introuvable pour le repère ${repere.numero}`);
+    const niveau = this.niveauDuPlan(plan);
+    const local = repere.localId ? (this.locaux.find((l) => l.id === repere.localId) ?? null) : null;
+    return [
+      this.dossierNiveau(niveau.code),
+      nomDossierLocal(niveau.code, local),
+      nomFichierPhoto(this.projet.codeAffaire, niveau.code, local?.numero ?? null, repere.numero, photo.date, photo.rang),
+    ].join('/');
+  }
+
+  /** Premier rang libre pour un repère et un jour donnés. */
+  private rangLibre(repereId: string, date: string, sauf?: string): number {
+    const pris = new Set(this.photos.filter((p) => p.repereId === repereId && p.date === date && p.id !== sauf).map((p) => p.rang));
+    let rang = 1;
+    while (pris.has(rang)) rang++;
+    return rang;
+  }
+
+  /** Un local photographé doit avoir un numéro : il figure dans les noms de fichiers. */
+  private async numeroterLocalDuRepere(repereId: string | null, auteur: string) {
+    const repere = repereId ? this.reperes.find((r) => r.id === repereId) : undefined;
+    const local = repere?.localId ? this.locaux.find((l) => l.id === repere.localId) : undefined;
+    if (local && !local.numero) {
+      await this.modifierLocal(local.id, { ...local, numero: this.proposerNumero(local.planId) }, auteur);
+    }
+  }
+
+  /**
+   * Enregistre une photo (déjà compressée) : le JPEG à son nom normalisé, sa miniature et son JSON.
+   * Sans repère, la photo va dans le panier à classer.
+   */
+  async ajouterPhoto(
+    entree: {
+      repereId: string | null;
+      jpeg: Blob;
+      miniature: Blob;
+      largeur: number;
+      hauteur: number;
+      source: Photo['source'];
+      prisLe?: Date;
+      nomOrigine?: string;
+      commentaire?: string;
+    },
+    auteur: string,
+  ): Promise<Photo> {
+    if (entree.repereId && !this.reperes.some((r) => r.id === entree.repereId)) throw new Error('Repère introuvable.');
+    await this.numeroterLocalDuRepere(entree.repereId, auteur);
+    const prisLe = entree.prisLe ?? new Date();
+    const date = dateLocale(prisLe);
+    const id = crypto.randomUUID();
+    const photo: Photo = {
+      schema: VERSION_SCHEMA,
+      id,
+      repereId: entree.repereId,
+      fichier: '',
+      miniature: `${DOSSIER_MINIATURES}/${id}.jpg`,
+      date,
+      prisLe: prisLe.toISOString(),
+      prisPar: auteur,
+      rang: entree.repereId ? this.rangLibre(entree.repereId, date) : 0,
+      largeur: entree.largeur,
+      hauteur: entree.hauteur,
+      taille: entree.jpeg.size,
+      empreinte: await calculerEmpreinte(entree.jpeg),
+      commentaire: entree.commentaire?.trim() ?? '',
+      source: entree.source,
+      ...(entree.nomOrigine ? { nomOrigine: entree.nomOrigine } : {}),
+    };
+    photo.fichier = this.cheminAttendu(photo);
+    if (await this.stockage.existe(photo.fichier)) throw new Error(`Le fichier ${photo.fichier} existe déjà.`);
+    await this.stockage.ecrireFichier(photo.fichier, entree.jpeg);
+    await this.stockage.ecrireFichier(photo.miniature, entree.miniature);
+    await ecrireJson(this.stockage, `${DOSSIER_PHOTOS}/${id}.json`, photo);
+    this.photos = [...this.photos, photo];
+    return photo;
+  }
+
+  private async ecrirePhoto(p: Photo) {
+    await ecrireJson(this.stockage, `${DOSSIER_PHOTOS}/${p.id}.json`, p);
+    this.photos = [...this.photos.filter((x) => x.id !== p.id), p];
+  }
+
+  /** Classe une photo du panier sur un repère (ou la renvoie au panier avec null). */
+  async classerPhoto(photoId: string, repereId: string | null, auteur: string): Promise<Photo> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (!photo) throw new Error('Photo introuvable.');
+    if (repereId && !this.reperes.some((r) => r.id === repereId)) throw new Error('Repère introuvable.');
+    await this.numeroterLocalDuRepere(repereId, auteur);
+    const modifiee: Photo = { ...photo, repereId, rang: repereId ? this.rangLibre(repereId, photo.date, photo.id) : 0 };
+    await this.deplacerPhoto(photo, modifiee);
+    return this.photos.find((p) => p.id === photoId)!;
+  }
+
+  async commenterPhoto(photoId: string, commentaire: string): Promise<void> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (!photo) throw new Error('Photo introuvable.');
+    await this.ecrirePhoto({ ...photo, commentaire: commentaire.trim() });
+  }
+
+  async supprimerPhoto(photoId: string): Promise<void> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (!photo) return;
+    await this.stockage.supprimer(photo.fichier);
+    await this.stockage.supprimer(photo.miniature);
+    await this.stockage.supprimer(`${DOSSIER_PHOTOS}/${photo.id}.json`);
+    this.photos = this.photos.filter((p) => p.id !== photoId);
+  }
+
+  async lirePhoto(photo: Photo): Promise<Blob> {
+    return this.stockage.lireFichier(photo.fichier);
+  }
+
+  async lireMiniature(photo: Photo): Promise<Blob> {
+    return this.stockage.lireFichier(photo.miniature);
+  }
+
+  /** Déplace le JPEG à son nouveau chemin, puis enregistre le JSON (dans cet ordre : jamais de JSON vers un fichier absent). */
+  private async deplacerPhoto(avant: Photo, apres: Photo) {
+    const chemin = this.cheminAttendu({ ...apres, fichier: avant.fichier });
+    if (chemin !== avant.fichier) {
+      let cible = chemin;
+      if (await this.stockage.existe(cible)) {
+        // Rang déjà pris sur le disque (photo d'un collègue pas encore relue) : rang suivant.
+        let rang = apres.rang;
+        do {
+          rang++;
+          cible = this.cheminAttendu({ ...apres, rang, fichier: avant.fichier });
+        } while (await this.stockage.existe(cible));
+        apres = { ...apres, rang };
+      }
+      await this.stockage.deplacer(avant.fichier, cible);
+      await this.supprimerDossierSiVide(avant.fichier.split('/').slice(0, -1).join('/'));
+      apres = { ...apres, fichier: cible };
+    }
+    await this.ecrirePhoto(apres);
+  }
+
+  /** Remet chaque photo à son chemin attendu (après modification d'un local, d'un repère…). */
+  async rangerPhotos(photos: Photo[] = this.photos): Promise<string[]> {
+    const compteRendu: string[] = [];
+    for (const p of photos) {
+      const actuelle = this.photos.find((x) => x.id === p.id);
+      if (!actuelle) continue;
+      const attendu = this.cheminAttendu(actuelle);
+      if (attendu === actuelle.fichier) continue;
+      await this.deplacerPhoto(actuelle, actuelle);
+      compteRendu.push(`Photo rangée : ${attendu.split('/').pop()}`);
+    }
+    return compteRendu;
+  }
+
+  /** Après renommage d'un dossier de niveau, met à jour le chemin des photos qu'il contient. */
+  private async majCheminsPhotos(ancien: string, nouveau: string) {
+    for (const p of this.photos.filter((x) => x.fichier.startsWith(ancien))) {
+      await this.ecrirePhoto({ ...p, fichier: nouveau + p.fichier.slice(ancien.length) });
+    }
+  }
+
+  private async supprimerDossierSiVide(dossier: string) {
+    if (!dossier.startsWith(`${DOSSIERS.photos}/`) || dossier === DOSSIER_A_CLASSER) return;
+    if (dossier.split('/').length < 3) return; // jamais les dossiers de niveau
+    if ((await this.stockage.existe(dossier)) && (await this.stockage.lister(dossier)).length === 0) {
+      await this.stockage.supprimer(dossier);
+    }
+  }
+
+  /** Locaux ayant au moins une photo prise ce jour-là (coloriés sur le plan pendant la visite). */
+  locauxPhotographies(date: string): Set<string> {
+    const resultat = new Set<string>();
+    for (const p of this.photos) {
+      if (p.date !== date) continue;
+      const localId = this.repereDe(p)?.localId;
+      if (localId) resultat.add(localId);
+    }
+    return resultat;
   }
 
   /** Recherche dans tous les locaux du projet, par nom, numéro et niveau. */
