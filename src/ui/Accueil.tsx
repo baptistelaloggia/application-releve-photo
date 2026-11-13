@@ -86,7 +86,14 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
                 <button className="projet" onClick={() => ouvrirRecent(p)} disabled={occupe}>
                   <strong>{p.nom}</strong>
                   <span className="discret">
-                    {p.dossier} · {p.type === 'dossier' ? 'dossier PC' : 'appareil'} · ouvert le {dateLisible(p.dernierAcces)}
+                    {p.dossier} · {p.type === 'dossier' ? (surPC ? 'dossier PC' : 'dossier du téléphone') : 'appareil'} · ouvert le{' '}
+                    {dateLisible(p.dernierAcces)}
+                    {!surPC && p.type === 'dossier' && (
+                      <span className="texte-erreur">
+                        {' '}
+                        · très lent sur téléphone : recréez ce projet avec « Nouveau projet » (stockage interne de l'appli)
+                      </span>
+                    )}
                   </span>
                 </button>
                 <button

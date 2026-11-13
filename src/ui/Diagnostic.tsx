@@ -8,6 +8,7 @@ export function Diagnostic({ surRetour }: { surRetour: () => void }) {
   const [resultat, setResultat] = useState<{ dossier: string; etapes: EtapeDiagnostic[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
+  const [enCours, setEnCours] = useState<string | null>(null);
 
   async function lancer() {
     setErreur(null);
@@ -16,12 +17,13 @@ export function Diagnostic({ surRetour }: { surRetour: () => void }) {
       const handle = await choisirDossier('diagnostic');
       if (!handle) return;
       setOccupe(true);
-      const etapes = await diagnostiquer(new StockageDossier(handle, handle.name));
+      const etapes = await diagnostiquer(new StockageDossier(handle, handle.name), setEnCours);
       setResultat({ dossier: handle.name, etapes });
     } catch (e) {
       setErreur(texteErreur(e));
     } finally {
       setOccupe(false);
+      setEnCours(null);
     }
   }
 
@@ -44,6 +46,7 @@ export function Diagnostic({ surRetour }: { surRetour: () => void }) {
         </button>
         <button onClick={surRetour}>Retour</button>
       </div>
+      {enCours && <Message type="info">En cours : {enCours}…</Message>}
       {erreur && <Message type="erreur">{erreur}</Message>}
       {resultat && (
         <>
