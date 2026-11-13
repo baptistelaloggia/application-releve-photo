@@ -26,6 +26,16 @@ async function appareil(nom, options) {
     await contexte.addInitScript(() => {
       window.showDirectoryPicker = async ({ id } = {}) =>
         (await navigator.storage.getDirectory()).getDirectoryHandle(`simule-${id ?? 'x'}`, { create: true });
+      // Comme sur le PC de test du 16/11/2026 : le stockage interne refuse d'écrire les paquets .zip.
+      const origine = FileSystemFileHandle.prototype.createWritable;
+      FileSystemFileHandle.prototype.createWritable = async function (...a) {
+        const flux = await origine.apply(this, a);
+        if (!this.name.endsWith('.zip')) return flux;
+        flux.write = async () => {
+          throw new DOMException('An attempt was made to write to a file or directory which could not be modified due to the state of the underlying filesystem.', 'NoModificationAllowedError');
+        };
+        return flux;
+      };
     });
   }
   const page = await contexte.newPage();
@@ -75,8 +85,10 @@ try {
   await p.getByRole('button', { name: 'Enregistrer 2 locaux' }).click();
   await p.getByText(/2 locaux enregistrés/).waitFor();
 
-  await p.getByRole('button', { name: 'Préparer le paquet pour le téléphone' }).click();
+  await p.getByRole('button', { name: 'Préparer le paquet pour le téléphone' }).dblclick(); // double clic : un seul export
   await p.getByText('Paquet prêt :').waitFor();
+  await p.getByText(/stockage interne du navigateur refusé \(NoModificationAllowedError/).waitFor();
+  assert.equal(await p.getByText(/^Paquet préparé :/).count(), 1);
   const aller = await telecharger(p, 'aller.zip');
   assert.match(aller.nom, new RegExp(`^${dossier}_pour-telephone_\\d{4}-\\d{2}-\\d{2}_\\d{4}\\.zip$`));
 

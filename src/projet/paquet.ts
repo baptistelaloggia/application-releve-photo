@@ -47,9 +47,46 @@ function nomPaquet(projet: Projet, sens: SensPaquet, d = new Date()) {
   return `${projet.dossier}_${sens === 'vers-telephone' ? 'pour-telephone' : 'retour-terrain'}_${dateLocale(d)}_${heure}.zip`;
 }
 
-/** Dossier du stockage interne où sont préparés les paquets (vidé à chaque nouvel export). */
-async function dossierPaquets(): Promise<FileSystemDirectoryHandle> {
-  return (await navigator.storage.getDirectory()).getDirectoryHandle('paquets', { create: true });
+/** Destination du paquet en cours d'écriture. */
+interface Sortie {
+  ecrire(morceau: Uint8Array): Promise<void>;
+  terminer(): Promise<File>;
+  abandonner(): Promise<void>;
+}
+
+/**
+ * Écriture dans le stockage interne du navigateur (sans limite de mémoire). Chaque export a son
+ * propre fichier temporaire : un fichier resté verrouillé par un essai précédent (double clic,
+ * export interrompu) ne bloque plus le suivant (« NoModificationAllowedError », 16/11/2026).
+ * Renvoie null si ce stockage est indisponible.
+ */
+async function sortieInterne(nom: string): Promise<Sortie | null> {
+  try {
+    const dossier = await (await navigator.storage.getDirectory()).getDirectoryHandle('paquets', { create: true });
+    for await (const ancien of dossier.keys()) await dossier.removeEntry(ancien).catch(() => undefined);
+    const handle = await dossier.getFileHandle(`${Date.now()}-${crypto.randomUUID().slice(0, 8)}.zip`, { create: true });
+    const flux = await handle.createWritable();
+    return {
+      ecrire: (m) => flux.write(m as Uint8Array<ArrayBuffer>),
+      terminer: async () => {
+        await flux.close();
+        return new File([await handle.getFile()], nom, { type: 'application/zip' });
+      },
+      abandonner: () => flux.abort().catch(() => undefined),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Repli : paquet construit en mémoire (sans risque pour un paquet sans photos). */
+function sortieMemoire(nom: string): Sortie {
+  const morceaux: Uint8Array[] = [];
+  return {
+    ecrire: async (m) => void morceaux.push(m),
+    terminer: async () => new File(morceaux as Uint8Array<ArrayBuffer>[], nom, { type: 'application/zip' }),
+    abandonner: async () => void (morceaux.length = 0),
+  };
 }
 
 /**
@@ -62,12 +99,34 @@ export async function exporterPaquet(
   auteur: string,
   photosATransmettre: Photo[],
   progression: (texte: string) => void,
-): Promise<{ fichier: File; nom: string }> {
+): Promise<{ fichier: File; nom: string; enMemoire: boolean; incident?: string }> {
   const nom = nomPaquet(espace.projet, sens);
-  const dossier = await dossierPaquets();
-  for await (const ancien of dossier.keys()) await dossier.removeEntry(ancien).catch(() => undefined);
-  const handle = await dossier.getFileHandle(nom, { create: true });
-  const sortie = await handle.createWritable();
+  progression('Préparation du paquet…');
+  const interne = await sortieInterne(nom);
+  if (interne) {
+    try {
+      return { ...(await construirePaquet(espace, sens, auteur, photosATransmettre, progression, interne, nom)), enMemoire: false };
+    } catch (e) {
+      // Le stockage interne du navigateur a refusé l'écriture (constaté le 16/11/2026 sur un PC :
+      // « NoModificationAllowedError ») : nouvel essai, le paquet étant construit en mémoire.
+      if (!(e instanceof DOMException)) throw e;
+      progression('Nouvel essai, en mémoire…');
+      const r = await construirePaquet(espace, sens, auteur, photosATransmettre, progression, sortieMemoire(nom), nom);
+      return { ...r, enMemoire: true, incident: `${e.name} : ${e.message}` };
+    }
+  }
+  return { ...(await construirePaquet(espace, sens, auteur, photosATransmettre, progression, sortieMemoire(nom), nom)), enMemoire: true };
+}
+
+async function construirePaquet(
+  espace: EspaceProjet,
+  sens: SensPaquet,
+  auteur: string,
+  photosATransmettre: Photo[],
+  progression: (texte: string) => void,
+  sortie: Sortie,
+  nom: string,
+): Promise<{ fichier: File; nom: string }> {
 
   // Le zip produit ses morceaux au fil de l'eau ; on les écrit dans l'ordre, et l'on attend
   // l'écriture après chaque fichier pour ne pas accumuler les données en mémoire.
@@ -75,7 +134,7 @@ export async function exporterPaquet(
   let erreur: unknown = null;
   const zip = new Zip((e, morceau) => {
     if (e) erreur = e;
-    else ecritures = ecritures.then(() => sortie.write(morceau as Uint8Array<ArrayBuffer>));
+    else ecritures = ecritures.then(() => sortie.ecrire(morceau));
   });
   const ajouter = async (chemin: string, contenu: Uint8Array, compresser: boolean) => {
     const f = compresser ? new ZipDeflate(chemin, { level: 6 }) : new ZipPassThrough(chemin);
@@ -114,12 +173,11 @@ export async function exporterPaquet(
     zip.end();
     await ecritures;
     if (erreur) throw erreur;
-    await sortie.close();
+    return { fichier: await sortie.terminer(), nom };
   } catch (e) {
-    await sortie.abort().catch(() => undefined);
+    await sortie.abandonner();
     throw e;
   }
-  return { fichier: await handle.getFile(), nom };
 }
 
 /**
