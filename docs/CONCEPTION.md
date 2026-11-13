@@ -127,13 +127,22 @@ Niveaux intermédiaires et ordre (demandés le 10/11/2026) :
 Règles issues du lot 1 (04/11/2026) :
 - **Un seul plan courant par niveau.** [À VÉRIFIER : grands bâtiments avec plusieurs feuilles (zones) par niveau.]
 - **Carnets de plans** : un PDF contenant un niveau par page est découpé à l'import. Chaque page retenue devient le plan `{Projet}_{Niveau}.pdf` de son niveau, avec son contenu vectoriel. Le niveau de chaque page est reconnu d'après son titre (« PLAN DE NIVEAU - R+2 », « … - ENTRESOL », « … - TOIT »…), et l'utilisateur peut le corriger avant l'import. Le JSON du plan garde le nom du carnet d'origine et le numéro de page (`pageOrigine`).
-- **Équivalences reconnues** : `R+0` → `RDC`, `ENTRESOL` → `ES`, `TOIT` / `TOITURE` → `TT`, `R1` → `R+1`.
+- **Équivalences reconnues** : `R+0` → `RDC`, `ENTRESOL` → `ES`, `TOIT` / `TOITURE` → `TT`, `R1` ou `R01` → `R+1`, `R06M` → `R+6M` (niveau intermédiaire, placé au-dessus du R+6).
+- **Titres reconnus** (16/11/2026, second carnet d'essai) : « PLAN DE NIVEAU - R+2 », et aussi le titre en bas de page « PLAN - R+2 MARCHE » et le cartouche « PLAN R02 ». Sur ce second carnet, les 10 niveaux ont été reconnus.
 
 ## A.6 ter Locaux (lot 2, 05/11/2026)
 
 - Un local = un fichier `_data/locaux/{uuid}.json` : plan de rattachement (`planId`), numéro (facultatif), nom, surface (facultative), position de son étiquette (x, y relatifs 0 à 1), origine (`auto` : détecté puis validé ; `manuel` : placé à la main), auteur et date de création et de modification.
 - **Détection** : l'appli lit le texte vectoriel de la page et regroupe les lignes empilées et centrées de même hauteur. Elle retient les groupes qui contiennent un numéro (lettres puis chiffres, comme `SF202`, `LT1104.B`, ou chiffres seuls s'il y a une surface) ou une surface (`33,7 m²`). Un nom seul est retenu s'il désigne un type de local (bureau, sanit., local, circ., stockage, CTA, TGBT…), s'il est en majuscules et s'il se trouve dans la zone dessinée. Les propositions sont toujours **vérifiées par l'utilisateur** avant enregistrement, et une nouvelle détection ne recrée pas les locaux déjà présents.
 - Essai sur le carnet réel : 141 étiquettes complètes et 83 noms seuls sur 10 niveaux ; 47 locaux numérotés au SS1, dont le TGBT (LT1105). Quelques faux positifs restent à décocher (cartouche de la page toiture).
+- **Règles complémentaires de détection** (16/11/2026, second carnet d'essai) :
+  - numéros en plusieurs parties : `SDR-RDC-42`, `ACC-R01-23`, `SAN.A-R01-01`, `BR.B-R04-xx` ;
+  - noms en minuscules et sur plusieurs lignes (« Salle de / réunion ») ;
+  - l'altitude (« +35.95 m ») et le type d'ERP (« Type L,W ») font partie de l'étiquette, mais pas du nom ;
+  - la ligne de surface termine toujours une étiquette, ce qui sépare deux étiquettes empilées ;
+  - **pas de local en dessous de 4 m²** (gaines techniques, placards) ;
+  - une étiquette nettement plus petite que les étiquettes avec surface est écartée (étiquettes de portes « RDC-P34 / 1UP / PF30 », annotations).
+  - Résultat : sur le second carnet, la « Salle de réunion SDR-RDC-42 » et l'« ERP Espace Coupole » sont trouvées, sans gaines ni portes. Sur le premier carnet, seules des annotations ont disparu.
 - **Numéro unique** dans le projet ; nom obligatoire.
 - **Numéro automatique** (10/11/2026) : à la création d'un local, l'appli propose le premier numéro libre du niveau, sous la forme `{niveau sans +}-{rang}` (`R2-01`, `RDC-03`, `SS1-12`, `R4-MEZ-01`), modifiable ou effaçable. Un local sans numéro peut en recevoir un d'un clic.
 - **Étiquettes sur le plan** : placées au-dessus de l'étiquette du local dessinée sur le plan, pour la laisser lisible. Elles affichent au choix le numéro ou le nom (choix mémorisé sur l'appareil).

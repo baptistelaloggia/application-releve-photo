@@ -20,7 +20,7 @@ describe('détection des locaux', () => {
       ...etiquette(400, 600, ['LOCAL GSM +', 'OPE 2', 'LT1115', '19 m²']),
       ...etiquette(1500, 900, ['TGBT', '012', '12,5 m²']),
       ...etiquette(1800, 300, ['403', 'MENAGE', 'ME1101', '9,7 m²']),
-      ...etiquette(1800, 900, ['SAS CPCU', 'LT1104.B', '3,5 m²']),
+      ...etiquette(1800, 900, ['SAS CPCU', 'LT1104.B', '5,5 m²']),
     ];
     const locaux = detecterLocaux(textes, L, H);
     expect(locaux.map((l) => [l.nom, l.numero, l.surface, l.confiance])).toEqual(
@@ -30,7 +30,7 @@ describe('détection des locaux', () => {
         ['LOCAL GSM + OPE 2', 'LT1115', 19, 'forte'],
         ['TGBT', '012', 12.5, 'forte'],
         ['MENAGE', 'ME1101', 9.7, 'forte'],
-        ['SAS CPCU', 'LT1104.B', 3.5, 'forte'],
+        ['SAS CPCU', 'LT1104.B', 5.5, 'forte'],
       ]),
     );
     expect(locaux).toHaveLength(6);
@@ -71,6 +71,50 @@ describe('détection des locaux', () => {
       ...etiquette(2250, 1100, ['Bureau de Contrôle']),
     ];
     expect(detecterLocaux(textes, L, H).filter((x) => x.confiance === 'moyenne').map((x) => x.nom)).toEqual(['BUREAUX']);
+  });
+
+  it('lit les numéros en plusieurs parties, sans altitude ni type ERP dans le nom', () => {
+    const textes = [
+      ...etiquette(400, 400, ['Salle de', 'réunion', 'SDR-RDC-42', '90.8 m²']),
+      { texte: '+35.95 m', x: 380, y: 400 + 4 * 6.9, largeur: 40, hauteur: 6.9, angle: 0 },
+      ...etiquette(800, 400, ['ERP Espace', 'Coupole', 'Type L,W', 'ACC-R01-23', '200.2 m²']),
+      ...etiquette(1200, 400, ['Bureau', 'BR.B-R04-xx', '18.2 m²']),
+      ...etiquette(1600, 400, ['Sanitaires', 'SAN.A-R01-01', '12 m²']),
+    ];
+    expect(detecterLocaux(textes, L, H).map((l) => [l.nom, l.numero, l.surface])).toEqual([
+      ['Salle de réunion', 'SDR-RDC-42', 90.8],
+      ['ERP Espace Coupole', 'ACC-R01-23', 200.2],
+      ['Bureau', 'BR.B-R04-xx', 18.2],
+      ['Sanitaires', 'SAN.A-R01-01', 12],
+    ]);
+  });
+
+  it('écarte les étiquettes de portes, écrites en petit', () => {
+    const textes = [
+      ...etiquette(400, 400, ['Salle de', 'réunion', 'SDR-RDC-42', '90.8 m²'], 10.5),
+      ...etiquette(800, 400, ['Lobby', 'ACC-RDC-30', '82.6 m²'], 10.5),
+      ...etiquette(1200, 400, ['Palier', 'PLR-RDC-20', '20.8 m²'], 10.5),
+      ...etiquette(600, 600, ['RDC-P34', 'PF30'], 3.9),
+      ...etiquette(900, 600, ['RDC-P86', '1UP'], 3.9),
+    ];
+    expect(detecterLocaux(textes, L, H).map((l) => l.numero)).toEqual(['SDR-RDC-42', 'ACC-RDC-30', 'PLR-RDC-20']);
+  });
+
+  it('ne crée pas de local en dessous de 4 m² (gaines, placards)', () => {
+    const textes = [
+      ...etiquette(400, 400, ['GN', 'GN-R01-12', '0.6 m²']),
+      ...etiquette(800, 400, ['Placard', 'PLR-R01-03', '3.9 m²']),
+      ...etiquette(1200, 400, ['Local ménage', 'ME-R01-02', '4 m²']),
+    ];
+    expect(detecterLocaux(textes, L, H).map((l) => l.numero)).toEqual(['ME-R01-02']);
+  });
+
+  it('sépare deux étiquettes empilées sans espace : la surface termine l’étiquette', () => {
+    const textes = etiquette(1000, 300, ['Open Space', 'BR.B-R01-05', '12.8 m²', 'Bureau', 'BR.B-R01-06', '9.6 m²']);
+    expect(detecterLocaux(textes, L, H).map((l) => [l.nom, l.numero])).toEqual([
+      ['Open Space', 'BR.B-R01-05'],
+      ['Bureau', 'BR.B-R01-06'],
+    ]);
   });
 
   it('ne fusionne pas deux étiquettes voisines', () => {

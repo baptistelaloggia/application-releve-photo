@@ -32,7 +32,7 @@ export function estCodeNiveauAutorise(code: string): boolean {
  */
 export function normaliserCodeNiveau(saisie: string): string {
   const standard = normaliserCodeStandard(saisie);
-  if (MOTIF_CODE.test(standard)) return standard;
+  if (MOTIF_CODE.test(standard) || /^R\+\d{1,2}[A-Z]{1,3}$/.test(standard)) return standard;
   return saisie
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -53,7 +53,10 @@ function normaliserCodeStandard(saisie: string): string {
   const ss = /^SS0*([1-9]\d?)$/.exec(c);
   if (ss) return `SS${ss[1]}`;
   if (c === 'SS' || c === 'SOUS-SOL' || c === 'SOUSSOL') return 'SS1';
-  if (c === 'R+0' || c === 'R0') return 'RDC';
+  if (/^R\+?0+$/.test(c)) return 'RDC';
+  // « R06M », « R+6M » (mezzanine du R+6) : niveau intermédiaire « R+6M ».
+  const intermediaire = /^R\+?0*([1-9]\d?)([A-Z]{1,3})$/.exec(c);
+  if (intermediaire) return `R+${intermediaire[1]}${intermediaire[2]}`;
   if (c === 'ENTRESOL') return 'ES';
   if (c === 'TOIT' || c === 'TOITURE') return 'TT';
   return c;
@@ -73,7 +76,7 @@ export function rangNiveau(code: string): number {
   if (etage) return Number(etage[1]);
   // Niveau intermédiaire : juste au-dessus du niveau standard qui commence son code
   // (« R+4-MEZZANINE » au-dessus de R+4), sinon sous la toiture.
-  const prefixe = /^(SS\d+|ES|RDC|R\+\d+|TT)-/.exec(code);
+  const prefixe = /^(SS\d+|ES|RDC|R\+\d+|TT)(?:-|(?=[A-Z]))/.exec(code);
   if (prefixe) return rangNiveau(prefixe[1]) + 0.5;
   return 999;
 }
@@ -190,6 +193,17 @@ export function devinerNiveauPage(texte: string): string | null {
     if (ss) code = ss[1] ? `SS${ss[1]}` : 'SS1';
     code = normaliserCodeNiveau(code);
     if (estCodeNiveauValide(code)) trouves.add(code);
+  }
+  // Titre du plan, en bas de page ou dans le cartouche : « PLAN - R+2 MARCHE », « PLAN R02 »,
+  // « PLAN R06M », « PLAN TOITURE », « PLAN SS1 ».
+  const titre = /PLAN ?[-–:]? ?(R ?\+ ?\d{1,2}[A-Z]{0,3}|R0\d[A-Z]{0,3}|R\d{1,2}[A-Z]{0,3}|RDC|SS ?\d?|ES|ENTRESOL|TT|TOIT(?:URE)?|REZ[- ]DE[- ]CHAUSSEE|SOUS[- ]SOL ?\d?)(?=$|[^A-Z0-9+])/g;
+  for (const m of t.matchAll(titre)) {
+    let code = m[1].replace(/ /g, '');
+    if (/^REZ/.test(code)) code = 'RDC';
+    const ss = /^SOUS-?SOL(\d?)$/.exec(code);
+    if (ss) code = ss[1] ? `SS${ss[1]}` : 'SS1';
+    code = normaliserCodeNiveau(code);
+    if (estCodeNiveauAutorise(code)) trouves.add(code);
   }
   // Plusieurs niveaux différents en titre : on laisse l'utilisateur choisir.
   return trouves.size === 1 ? [...trouves][0] : null;

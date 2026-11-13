@@ -39,8 +39,17 @@ export interface LocalDetecte {
 }
 
 const MOTIF_SURFACE = /^(\d{1,5}(?:[  ]\d{3})*(?:[,.]\d{1,2})?)\s*m(?:²|2)$/i;
-/** Numéro de local : lettres puis chiffres (SF202, REST002, LT1115, B.104) ou chiffres seuls (012). */
-const MOTIF_NUMERO_LETTRES = /^[A-Z]{1,5}[.-]?\d{1,5}(?:\.?[A-Z])?$/;
+/**
+ * Numéro de local : lettres puis chiffres (SF202, REST002, LT1115, LT1104.B), ou numéro en plusieurs
+ * parties séparées par « - » ou « . » (SDR-RDC-42, ACC-R01-23, SAN.A-R01-01, BR.B-R04-xx),
+ * toujours avec au moins un chiffre ; ou chiffres seuls (012) si l'étiquette a une surface.
+ */
+const MOTIF_NUMERO_LETTRES = /^(?=[^ ]*\d)(?:[A-Z]{1,5}[.-]?\d{1,5}(?:\.?[A-Z])?|[A-Z][A-Z0-9]*(?:[.-][A-Z0-9]+)+(?:[.-][a-z]{1,3})?)$/;
+/** Altitude (« +35.95 m », « -3,20 m NGF ») et type d'ERP (« Type L,W ») : pas des noms de local. */
+const MOTIF_ALTITUDE = /^[+-]?\d+(?:[.,]\d+)?\s*m(?:\s*NGF)?$/i;
+const MOTIF_TYPE_ERP = /^Type\s+[A-Z]{1,3}(?:\s*[,/]\s*[A-Z]{1,3})*$/;
+/** En dessous de cette surface (m²), l'étiquette désigne une gaine ou un placard : pas de local créé. */
+export const SURFACE_MINIMALE = 4;
 const MOTIF_NUMERO_CHIFFRES = /^\d{2,4}[A-Z]?$/;
 
 /** Mots qui désignent des locaux (comparés sans accents, en majuscules, en début de mot). */
@@ -76,6 +85,11 @@ function estBruit(t: string) {
   const c = t.trim();
   return c === '' || /^[\d\s,.\-+/x×]+$/.test(c) || /^[A-Z]$/.test(c) || !/[A-Za-z]/.test(c);
 }
+/** Mention qui fait partie de l'étiquette (et la garde d'un seul tenant), mais pas du nom. */
+function estMention(t: string) {
+  const c = t.trim();
+  return MOTIF_ALTITUDE.test(c) || MOTIF_TYPE_ERP.test(c);
+}
 
 interface Ligne {
   texte: string;
@@ -100,6 +114,8 @@ function regrouper(lignes: Ligne[]): Ligne[][] {
     for (const s of triees) {
       if (utilisee.has(s) || s.cy <= derniere.cy) continue;
       if (s.cy - derniere.cy > 1.9 * derniere.h) continue;
+      // La surface est la dernière ligne d'une étiquette : ce qui suit appartient à l'étiquette suivante.
+      if (estSurface(derniere.texte)) break;
       const memeTaille = Math.abs(s.h - l.h) <= 0.2 * l.h;
       const aligne = Math.abs(s.cx - derniere.cx) <= 2.2 * l.h;
       if (memeTaille && aligne) {
@@ -137,9 +153,11 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
     groupe.forEach((l, i) => {
       if (i === indexNumero) return;
       if (surface === null && estSurface(l.texte)) surface = lireSurface(l.texte);
-      else if (!estBruit(l.texte)) noms.push(l.texte);
+      else if (!estBruit(l.texte) && !estMention(l.texte)) noms.push(l.texte);
     });
     if (noms.length === 0 || noms.length > 3) continue;
+    // Gaines techniques, placards… : pas de local en dessous de SURFACE_MINIMALE.
+    if (surface !== null && surface < SURFACE_MINIMALE) continue;
     const nom = noms.join(' ');
     // Nom seul : il doit désigner un local, être en majuscules et rester court
     // (« Bureau de Contrôle » dans le cartouche, longues légendes : écartés).
@@ -162,6 +180,13 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
 
   // Les étiquettes « moyennes » doivent avoir une taille de texte comparable aux étiquettes sûres :
   // cela écarte les annotations en petit texte et les titres en gros caractères.
+  // Référence : les étiquettes avec surface, les plus sûres. Toute étiquette nettement plus petite
+  // (étiquettes de portes « RDC-P34 / 1UP / PF30 », annotations) est écartée, même avec un numéro.
+  const hauteursSurfaces = candidats.filter((c) => c.surface !== null).map((c) => c.h).sort((a, b) => a - b);
+  const refSurfaces = hauteursSurfaces.length >= 3 ? hauteursSurfaces[Math.floor(hauteursSurfaces.length / 2)] : null;
+  if (refSurfaces !== null) {
+    for (let i = candidats.length - 1; i >= 0; i--) if (candidats[i].h < 0.6 * refSurfaces) candidats.splice(i, 1);
+  }
   const hauteursFortes = candidats.filter((c) => c.confiance === 'forte').map((c) => c.h).sort((a, b) => a - b);
   const reference = hauteursFortes.length ? hauteursFortes[Math.floor(hauteursFortes.length / 2)] : null;
   // Elles doivent aussi se trouver dans la zone dessinée, c'est-à-dire près des étiquettes sûres,
