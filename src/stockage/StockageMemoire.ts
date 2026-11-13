@@ -1,4 +1,4 @@
-import { decouperChemin, ErreurIntrouvable, type EntreeDossier, type Stockage } from './Stockage';
+import { decouperChemin, ErreurIntrouvable, type EntreeDossier, type FichierLu, type Stockage } from './Stockage';
 
 type Noeud = { type: 'dossier'; enfants: Map<string, Noeud> } | { type: 'fichier'; contenu: Blob };
 
@@ -48,6 +48,12 @@ export class StockageMemoire implements Stockage {
   async lister(cheminDossier: string): Promise<EntreeDossier[]> {
     const enfants = this.dossier(cheminDossier, false);
     return [...enfants].map(([nom, n]) => ({ nom, type: n.type }));
+  }
+
+  async lireDossier(cheminDossier: string): Promise<FichierLu[]> {
+    const n = this.trouver(cheminDossier);
+    if (!n || n.type !== 'dossier') return [];
+    return [...n.enfants].flatMap(([nom, e]) => (e.type === 'fichier' ? [{ nom, contenu: e.contenu }] : []));
   }
 
   async creerDossier(cheminDossier: string) {

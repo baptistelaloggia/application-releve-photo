@@ -70,3 +70,15 @@ export async function compresserPhoto(original: Blob): Promise<PhotoCompressee> 
     image.close();
   }
 }
+
+/** Miniature et dimensions d'une photo déjà enregistrée (réparation d'un projet). */
+export async function preparerMiniature(jpeg: Blob): Promise<{ miniature: Blob; largeur: number; hauteur: number }> {
+  const image = await createImageBitmap(jpeg, { imageOrientation: 'from-image' });
+  try {
+    const em = Math.min(1, COTE_MINIATURE / Math.max(image.width, image.height));
+    const miniature = await versJpeg(image, Math.round(image.width * em), Math.round(image.height * em), 0.7);
+    return { miniature, largeur: image.width, hauteur: image.height };
+  } finally {
+    image.close();
+  }
+}

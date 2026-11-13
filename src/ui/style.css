@@ -273,3 +273,7 @@ button.projet .discret { font-size: 0.85rem; }
 .rattachement { background: var(--fond); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
 .puce { border-radius: 999px; }
 .ecran-plan > .bandeau-info { margin: 8px 12px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.lien-niveau { border: none; background: none; padding: 4px 0; min-height: 44px; text-align: left; color: var(--accent);
+  display: inline-flex; gap: 6px; align-items: baseline; cursor: pointer; }
+.lien-niveau span { text-decoration: underline; text-underline-offset: 3px; }
+.lien-niveau:hover span { text-decoration-thickness: 2px; }
