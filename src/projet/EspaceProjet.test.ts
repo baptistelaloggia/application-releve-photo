@@ -413,3 +413,19 @@ describe('synchronisation serveur ↔ téléphone (sans zip)', () => {
     expect(await relu.rangerPhotos()).toEqual([]);
   });
 });
+
+describe('numéros longs', () => {
+  it('accepte les numéros en plusieurs parties jusqu’à 20 caractères', async () => {
+    const e = await EspaceProjet.creer(new StockageMemoire(), infos, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    const cr = await e.enregistrerDetection(
+      e.plans[0].id,
+      [{ nom: 'Circulation A1', numero: 'CRC.A1-R02-01', surface: 20, x: 0.5, y: 0.5, confiance: 'forte', lignes: [] }],
+      'BL',
+    );
+    expect(cr).toEqual(['1 local enregistré sur le plan XXX_R+1.pdf']);
+    await expect(
+      e.creerLocal(e.plans[0].id, { nom: 'Trop long', numero: 'A'.repeat(21), surface: null, x: 0.1, y: 0.1 }, 'BL'),
+    ).rejects.toThrow(/20 caractères/);
+  });
+});

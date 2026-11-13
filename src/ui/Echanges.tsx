@@ -58,8 +58,10 @@ export function Echanges({ espace, auteur, surPC, paquetInitial, surPaquetLu, su
   const aTransmettre = toutes ? espace.photos : nouvelles;
 
   async function exporter() {
+    if (progression) return; // déjà en cours (double clic)
     setErreur(null);
     setExporte(null);
+    setProgression('Préparation du paquet…');
     try {
       const sens = surPC ? 'vers-telephone' : 'vers-serveur';
       const resultat = await exporterPaquet(espace, sens, auteur, aTransmettre, setProgression);
@@ -68,7 +70,12 @@ export function Echanges({ espace, auteur, surPC, paquetInitial, surPaquetLu, su
         setDeja(await photosExportees(espace.projet.id));
       }
       setExporte(resultat);
-      surJournal([`Paquet préparé : ${resultat.nom} (${tailleLisible(resultat.fichier.size)})`]);
+      surJournal([
+        `Paquet préparé : ${resultat.nom} (${tailleLisible(resultat.fichier.size)})`,
+        ...(resultat.incident
+          ? [`Attention : stockage interne du navigateur refusé (${resultat.incident}) ; paquet construit en mémoire.`]
+          : []),
+      ]);
     } catch (e) {
       setErreur(texteErreur(e));
     } finally {

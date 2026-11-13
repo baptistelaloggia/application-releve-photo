@@ -858,7 +858,7 @@ function FicheLocal({
       <div className="grille-formulaire">
         <label>
           Numéro
-          <input value={numero} maxLength={12} placeholder="facultatif" onChange={(e) => setNumero(e.target.value.toUpperCase())} />
+          <input value={numero} maxLength={20} placeholder="facultatif" onChange={(e) => setNumero(e.target.value.toUpperCase())} />
           {numeroPropose && !numero && (
             <button type="button" className="petit" onClick={() => setNumero(numeroPropose)}>
               Numéro automatique : {numeroPropose}

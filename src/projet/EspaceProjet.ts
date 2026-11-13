@@ -551,8 +551,8 @@ export class EspaceProjet {
     const nom = saisie.nom.trim().replace(/\s+/g, ' ');
     const numero = saisie.numero?.trim().toUpperCase() || null;
     if (!nom) throw new Error('Le nom du local est obligatoire.');
-    if (numero && !/^[A-Z0-9.+-]{1,12}$/.test(numero)) {
-      throw new Error('Le numéro ne doit contenir que des lettres, des chiffres, des points ou des tirets (12 caractères au plus).');
+    if (numero && !/^[A-Z0-9.+-]{1,20}$/.test(numero)) {
+      throw new Error('Le numéro ne doit contenir que des lettres, des chiffres, des points ou des tirets (20 caractères au plus).');
     }
     if (numero) {
       const doublon = this.locaux.find((l) => l.numero === numero && l.id !== idModifie);
