@@ -14,7 +14,16 @@ export default defineConfig(({ mode }) => {
     base: './',
     define: {
       __FICHIER_UNIQUE__: JSON.stringify(fichierUnique),
-      __VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+      // Version affichée en bas de page : numéro, date de construction, et commit publié.
+      __VERSION__: JSON.stringify(
+        [
+          process.env.npm_package_version ?? '0.0.0',
+          new Date().toISOString().slice(0, 16).replace('T', ' '),
+          process.env.GITHUB_SHA?.slice(0, 7),
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      ),
     },
     resolve: fichierUnique
       ? { alias: { 'virtual:pwa-register': fileURLToPath(new URL('./src/pwa-absent.ts', import.meta.url)) } }

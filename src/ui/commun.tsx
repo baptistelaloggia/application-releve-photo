@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 export function Journal({ lignes }: { lignes: string[] }) {
   if (lignes.length === 0) return null;
@@ -17,8 +17,13 @@ export function Journal({ lignes }: { lignes: string[] }) {
 }
 
 export function Message({ type, children }: { type: 'erreur' | 'info' | 'succes'; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Un message d'erreur ou d'avancement est toujours ramené à l'écran.
+  useEffect(() => {
+    if (type !== 'succes') ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [type, children]);
   return (
-    <div className={`message message-${type}`} role={type === 'erreur' ? 'alert' : 'status'}>
+    <div ref={ref} className={`message message-${type}`} role={type === 'erreur' ? 'alert' : 'status'}>
       {children}
     </div>
   );
@@ -31,6 +36,7 @@ export function texteErreur(e: unknown): string {
   if (e instanceof DOMException && e.name === 'SecurityError') {
     return "Le navigateur interdit l'accès à cet emplacement (dossier système ?). Choisissez un autre dossier.";
   }
+  if (e instanceof DOMException) return `${e.message} (${e.name})`;
   return e instanceof Error ? e.message : String(e);
 }
 

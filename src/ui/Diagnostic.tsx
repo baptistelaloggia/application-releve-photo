@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { choisirDossier } from '../stockage/acces';
+import { avecDelai, choisirDossier } from '../stockage/acces';
 import { diagnostiquer, type EtapeDiagnostic } from '../stockage/diagnostic';
 import { StockageDossier } from '../stockage/StockageDossier';
 import { Message, texteErreur } from './commun';
@@ -14,10 +14,11 @@ export function Diagnostic({ surRetour }: { surRetour: () => void }) {
     setErreur(null);
     setResultat(null);
     try {
+      setEnCours("Choix du dossier : acceptez ensuite « Modifier les fichiers » dans la fenêtre d'autorisation du navigateur");
       const handle = await choisirDossier('diagnostic');
       if (!handle) return;
       setOccupe(true);
-      const etapes = await diagnostiquer(new StockageDossier(handle, handle.name), setEnCours);
+      const etapes = await avecDelai(diagnostiquer(new StockageDossier(handle, handle.name), setEnCours), 300, 'Test du serveur');
       setResultat({ dossier: handle.name, etapes });
     } catch (e) {
       setErreur(texteErreur(e));

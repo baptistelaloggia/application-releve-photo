@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ErreurPasUnProjet, type EspaceProjet } from '../projet/EspaceProjet';
 import { ouvrirProjet } from '../projet/ouverture';
-import { choisirDossier, choixDeDossierDisponible, dossierProjetAppareil, verifierPermission } from '../stockage/acces';
+import { avecDelai, choisirDossier, choixDeDossierDisponible, dossierProjetAppareil, verifierPermission } from '../stockage/acces';
 import { listerProjetsConnus, oublierProjet, type ProjetConnu } from '../stockage/registre';
 import { dateLisible, Message, texteErreur } from './commun';
 
@@ -15,6 +15,7 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
   const [recents, setRecents] = useState<ProjetConnu[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
+  const [etape, setEtape] = useState<string | null>(null);
   const surPC = choixDeDossierDisponible();
 
   const actualiser = () => void listerProjetsConnus().then(setRecents);
@@ -33,24 +34,31 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
       );
     } finally {
       setOccupe(false);
+      setEtape(null);
     }
   }
 
   const ouvrirDossier = () =>
     executer(async () => {
+      setEtape(
+        "Choisissez le dossier du projet, puis acceptez « Modifier les fichiers » dans la fenêtre d'autorisation du navigateur (elle peut s'ouvrir derrière l'appli).",
+      );
       const handle = await choisirDossier('projet');
       if (!handle) return;
-      const { espace, connu } = await ouvrirProjet(handle, 'dossier');
+      setEtape(`Ouverture du projet « ${handle.name} »…`);
+      const { espace, connu } = await avecDelai(ouvrirProjet(handle, 'dossier'), 90, 'Ouverture du projet');
       surOuvert(espace, connu);
     });
 
   const ouvrirRecent = (p: ProjetConnu) =>
     executer(async () => {
       const handle = p.handle ?? (await dossierProjetAppareil(p.dossier));
+      setEtape("Autorisation d'accès au dossier : acceptez la demande du navigateur si elle apparaît.");
       if (!(await verifierPermission(handle, true))) {
         throw new Error("L'autorisation d'accès au dossier a été refusée.");
       }
-      const { espace, connu } = await ouvrirProjet(handle, p.type);
+      setEtape(`Ouverture du projet « ${p.nom} »…`);
+      const { espace, connu } = await avecDelai(ouvrirProjet(handle, p.type), 90, 'Ouverture du projet');
       surOuvert(espace, connu);
     });
 
@@ -62,6 +70,7 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
           partagé arrivera avec l'export .zip (lot 4).
         </Message>
       )}
+      {etape && <Message type="info">{etape}</Message>}
       {erreur && <Message type="erreur">{erreur}</Message>}
 
       <section className="actions-accueil">

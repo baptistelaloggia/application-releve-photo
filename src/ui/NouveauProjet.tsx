@@ -3,7 +3,7 @@ import { genererNiveaux, libelleNiveau, nomsDossiersNiveaux, trierNiveaux } from
 import { nomDossierProjet, normaliserCodeAffaire } from '../domaine/nommage';
 import { controlerNouveauProjet, type EspaceProjet } from '../projet/EspaceProjet';
 import { creerProjet } from '../projet/ouverture';
-import { choisirDossier, choixDeDossierDisponible, dossierAppareil } from '../stockage/acces';
+import { avecDelai, choisirDossier, choixDeDossierDisponible, dossierAppareil } from '../stockage/acces';
 import type { ProjetConnu } from '../stockage/registre';
 import { Message, texteErreur } from './commun';
 
@@ -23,6 +23,7 @@ export function NouveauProjet({ auteur, surAnnuler, surCree }: Props) {
   const [entresol, setEntresol] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
+  const [etape, setEtape] = useState<string | null>(null);
   const surPC = choixDeDossierDisponible();
 
   const niveaux = useMemo(
@@ -36,15 +37,26 @@ export function NouveauProjet({ auteur, surAnnuler, surCree }: Props) {
   async function creer() {
     setErreur(null);
     try {
+      if (surPC) {
+        setEtape(
+          "Choisissez le dossier qui contiendra le projet, puis acceptez « Modifier les fichiers » dans la fenêtre d'autorisation du navigateur (elle peut s'ouvrir derrière l'appli).",
+        );
+      }
       const parent = surPC ? await choisirDossier('parent-projets') : await dossierAppareil();
       if (!parent) return;
       setOccupe(true);
-      const { espace, connu } = await creerProjet(parent, surPC ? 'dossier' : 'appareil', infos, auteur);
+      setEtape(`Création du projet dans « ${parent.name} »…`);
+      const { espace, connu } = await avecDelai(
+        creerProjet(parent, surPC ? 'dossier' : 'appareil', infos, auteur),
+        90,
+        'Création du projet',
+      );
       surCree(espace, connu);
     } catch (e) {
       setErreur(texteErreur(e));
     } finally {
       setOccupe(false);
+      setEtape(null);
     }
   }
 
@@ -112,6 +124,7 @@ export function NouveauProjet({ auteur, surAnnuler, surCree }: Props) {
           ))}
         </Message>
       )}
+      {etape && <Message type="info">{etape}</Message>}
       {erreur && <Message type="erreur">{erreur}</Message>}
 
       <p>
