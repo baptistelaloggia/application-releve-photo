@@ -13,6 +13,7 @@ describe('test du serveur', () => {
       'Renommer un fichier',
       'Renommer un dossier',
       'Écrire 50 petits fichiers',
+      'Écrire 50 petits fichiers d’un coup',
       'Lister le dossier (50 fichiers)',
       'Lire les 50 fichiers un par un',
       'Lire les 50 fichiers d’un coup',

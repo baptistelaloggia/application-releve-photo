@@ -18,7 +18,7 @@ Application, sur téléphone Android et PC Windows, qui sert à localiser des ph
 
 Adresse : **https://baptistelaloggia.github.io/application-releve-photo/** (mise à jour automatique à chaque fusion dans `main`).
 
-- **Sur PC** : ouvrir l'adresse dans Chrome ou Edge, puis cliquer sur l'icône d'installation à droite de la barre d'adresse.
+- **Sur PC** : ouvrir l'adresse dans **Microsoft Edge**, puis menu ⋯ › Applications › « Installer ce site en tant qu'application ». Sur le poste de test, Google Chrome reste bloqué au choix d'un dossier du réseau (constaté le 13/11/2026) : utiliser Edge.
 - **Sur téléphone Android** : ouvrir l'adresse dans Chrome, puis menu ⋮ et « Ajouter à l'écran d'accueil » (ou « Installer l'application »).
 
 L'application installée fonctionne ensuite hors ligne. Les plans et les photos restent sur l'appareil ou sur le serveur : rien ne passe par GitHub.

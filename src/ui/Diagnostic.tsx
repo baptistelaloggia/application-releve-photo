@@ -15,7 +15,7 @@ export function Diagnostic({ surRetour }: { surRetour: () => void }) {
     setResultat(null);
     try {
       setEnCours("Choix du dossier : acceptez ensuite « Modifier les fichiers » dans la fenêtre d'autorisation du navigateur");
-      const handle = await choisirDossier('diagnostic');
+      const handle = await choisirDossier('diagnostic', setEnCours);
       if (!handle) return;
       setOccupe(true);
       const etapes = await avecDelai(diagnostiquer(new StockageDossier(handle, handle.name), setEnCours), 300, 'Test du serveur');

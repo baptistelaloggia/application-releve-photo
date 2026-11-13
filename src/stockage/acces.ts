@@ -36,15 +36,30 @@ export function stockageAppareilDisponible(): boolean {
   return typeof navigator.storage?.getDirectory === 'function';
 }
 
-/** Ouvre la fenêtre Windows de choix de dossier. Renvoie null si l'utilisateur annule. */
-export async function choisirDossier(idMemoire: string): Promise<FileSystemDirectoryHandle | null> {
+/** Message affiché si le choix du dossier ne rend pas la main (constaté avec Chrome le 13/11/2026). */
+export const MESSAGE_CHOIX_BLOQUE =
+  "Le navigateur n'a toujours pas rendu la main. Vérifiez qu'aucune fenêtre d'autorisation « Modifier les fichiers » " +
+  "n'est cachée derrière l'appli (Alt+Tab). Si rien ne se débloque, fermez l'appli et utilisez Microsoft Edge : " +
+  "selon la configuration du poste, Google Chrome peut rester bloqué sur un dossier du réseau.";
+
+/**
+ * Ouvre la fenêtre Windows de choix de dossier. Renvoie null si l'utilisateur annule.
+ * surAttente : appelé si le navigateur n'a pas rendu la main après 20 s.
+ */
+export async function choisirDossier(
+  idMemoire: string,
+  surAttente?: (message: string) => void,
+): Promise<FileSystemDirectoryHandle | null> {
   const f = window as FenetreAvecDossiers;
-  if (!f.showDirectoryPicker) throw new Error("Ce navigateur ne permet pas de choisir un dossier. Utilisez Chrome ou Edge sur PC.");
+  if (!f.showDirectoryPicker) throw new Error("Ce navigateur ne permet pas de choisir un dossier. Utilisez Edge (ou Chrome) sur PC.");
+  const minuterie = surAttente ? window.setTimeout(() => surAttente(MESSAGE_CHOIX_BLOQUE), 20_000) : 0;
   try {
     return await f.showDirectoryPicker({ id: idMemoire, mode: 'readwrite' });
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return null;
     throw e;
+  } finally {
+    window.clearTimeout(minuterie);
   }
 }
 
