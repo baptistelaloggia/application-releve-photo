@@ -1,4 +1,4 @@
-import type { Stockage } from './Stockage';
+import { enParallele, type Stockage } from './Stockage';
 
 /**
  * Test d'écriture dans un emplacement (CONCEPTION §A.9-4 : écriture sur lecteur réseau mappé).
@@ -52,6 +52,10 @@ export async function diagnostiquer(
         surEtape(`Écrire 50 petits fichiers (${i + 1}/50)`);
         await stockage.ecrireFichier(`${racine}/donnees/${i}.json`, `{"i":${i}}`);
       }
+    })) &&
+    (await etape('Écrire 50 petits fichiers d’un coup', async () => {
+      const n = Array.from({ length: 50 }, (_, i) => i);
+      await enParallele(n, 8, (i) => stockage.ecrireFichier(`${racine}/donnees-2/${i}.json`, `{"i":${i}}`));
     })) &&
     (await etape('Lister le dossier (50 fichiers)', async () => {
       const n = (await stockage.lister(`${racine}/donnees`)).length;

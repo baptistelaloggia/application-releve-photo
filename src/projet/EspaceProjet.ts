@@ -24,7 +24,7 @@ import {
 import { VERSION_SCHEMA, type Local, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
 import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
-import { ecrireJson, lireJson, type Stockage } from '../stockage/Stockage';
+import { ecrireJson, enParallele, lireJson, type Stockage } from '../stockage/Stockage';
 
 const FICHIER_PROJET = `${DOSSIERS.donnees}/projet.json`;
 const DOSSIER_NIVEAUX = `${DOSSIERS.donnees}/niveaux`;
@@ -38,6 +38,8 @@ const DOSSIER_A_CLASSER = `${DOSSIERS.photos}/${DOSSIERS.aClasser}`;
 const DISTANCE_RATTACHEMENT = 0.06;
 /** Écart entre deux niveaux dans le champ « ordre ». */
 const PAS_ORDRE = 10;
+/** Écritures simultanées pour les enregistrements groupés (détection des locaux…). */
+const ECRITURES_SIMULTANEES = 8;
 
 export class ErreurPasUnProjet extends Error {
   constructor() {
@@ -572,10 +574,17 @@ export class EspaceProjet {
   }
 
   async creerLocal(planId: string, saisie: SaisieLocal, auteur: string, origine: Local['origine'] = 'manuel'): Promise<Local> {
+    const local = this.construireLocal(planId, saisie, auteur, origine);
+    await this.ecrireLocal(local);
+    return local;
+  }
+
+  /** Contrôle la saisie et prépare un nouveau local, sans l'écrire. */
+  private construireLocal(planId: string, saisie: SaisieLocal, auteur: string, origine: Local['origine']): Local {
     if (!this.planParId(planId)) throw new Error('Plan introuvable.');
     const propre = this.controlerLocal(saisie);
     const date = maintenant();
-    const local: Local = {
+    return {
       schema: VERSION_SCHEMA,
       id: crypto.randomUUID(),
       planId,
@@ -586,8 +595,6 @@ export class EspaceProjet {
       modifieLe: date,
       modifiePar: auteur,
     };
-    await this.ecrireLocal(local);
-    return local;
   }
 
   async modifierLocal(id: string, saisie: SaisieLocal, auteur: string): Promise<Local> {
@@ -652,20 +659,35 @@ export class EspaceProjet {
 
   /** Enregistre les locaux détectés retenus par l'utilisateur. Renvoie le compte rendu. */
   async enregistrerDetection(planId: string, retenus: LocalDetecte[], auteur: string): Promise<string[]> {
-    let crees = 0;
     const compteRendu: string[] = [];
+    // 1. Contrôles, un local après l'autre (doublons de numéro compris), en mémoire.
+    const nouveaux: Local[] = [];
     for (const d of retenus) {
       if (this.dejaPresent(planId, d)) {
         compteRendu.push(`Déjà présent, ignoré : ${d.numero ?? ''} ${d.nom}`.replace('  ', ' '));
         continue;
       }
       try {
-        await this.creerLocal(planId, { nom: d.nom, numero: d.numero, surface: d.surface, x: d.x, y: d.y }, auteur, 'auto');
-        crees++;
+        const l = this.construireLocal(planId, { nom: d.nom, numero: d.numero, surface: d.surface, x: d.x, y: d.y }, auteur, 'auto');
+        this.locaux = [...this.locaux, l];
+        nouveaux.push(l);
       } catch (e) {
         compteRendu.push(`Attention : ${d.nom} non enregistré (${e instanceof Error ? e.message : String(e)})`);
       }
     }
+    // 2. Écritures en parallèle : sur un lecteur réseau, chaque écriture prend 0,2 s environ
+    //    (mesuré le 13/11/2026) ; 8 à la fois divisent d'autant la durée.
+    const echecs = new Set<string>();
+    await enParallele(nouveaux, ECRITURES_SIMULTANEES, async (l) => {
+      try {
+        await ecrireJson(this.stockage, `${DOSSIER_LOCAUX}/${l.id}.json`, l);
+      } catch (e) {
+        echecs.add(l.id);
+        compteRendu.push(`Attention : ${l.nom} non enregistré (${e instanceof Error ? e.message : String(e)})`);
+      }
+    });
+    this.locaux = this.locaux.filter((l) => !echecs.has(l.id));
+    const crees = nouveaux.length - echecs.size;
     const plan = this.planParId(planId);
     compteRendu.unshift(`${crees} ${crees > 1 ? 'locaux' : 'local'} enregistré${crees > 1 ? 's' : ''} sur le plan ${plan?.fichier.split('/').pop() ?? ''}`);
     return compteRendu;

@@ -42,7 +42,7 @@ export function NouveauProjet({ auteur, surAnnuler, surCree }: Props) {
           "Choisissez le dossier qui contiendra le projet, puis acceptez « Modifier les fichiers » dans la fenêtre d'autorisation du navigateur (elle peut s'ouvrir derrière l'appli).",
         );
       }
-      const parent = surPC ? await choisirDossier('parent-projets') : await dossierAppareil();
+      const parent = surPC ? await choisirDossier('parent-projets', setEtape) : await dossierAppareil();
       if (!parent) return;
       setOccupe(true);
       setEtape(`Création du projet dans « ${parent.name} »…`);

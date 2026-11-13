@@ -43,7 +43,7 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
       setEtape(
         "Choisissez le dossier du projet, puis acceptez « Modifier les fichiers » dans la fenêtre d'autorisation du navigateur (elle peut s'ouvrir derrière l'appli).",
       );
-      const handle = await choisirDossier('projet');
+      const handle = await choisirDossier('projet', setEtape);
       if (!handle) return;
       setEtape(`Ouverture du projet « ${handle.name} »…`);
       const { espace, connu } = await avecDelai(ouvrirProjet(handle, 'dossier'), 90, 'Ouverture du projet');
