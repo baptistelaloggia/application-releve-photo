@@ -61,6 +61,17 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const [photoOuverte, setPhotoOuverte] = useState<{ photos: Photo[]; index: number } | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  // Le menu « Affichage » se ferme dès qu'on touche ailleurs (le plan, le panneau…).
+  const menuAffichage = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const fermer = (e: PointerEvent) => {
+      const m = menuAffichage.current;
+      if (m?.open && !m.contains(e.target as Node)) m.open = false;
+    };
+    document.addEventListener('pointerdown', fermer, true);
+    return () => document.removeEventListener('pointerdown', fermer, true);
+  }, []);
+
   /** Après un placement depuis le panier : retour au panier pour continuer le classement. */
   function apresPlacement(nb: number, cible: string) {
     setMode({ type: 'consultation' });
@@ -408,7 +419,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         <span className="discret mono">
           {plan.fichier.split('/').pop()} · ind. {plan.indice}
         </span>
-        <details className="options-plan">
+        <details className="options-plan" ref={menuAffichage}>
           <summary>Affichage</summary>
           <div className="options-plan-contenu">
             <div className="bascule" role="group" aria-label="Texte des étiquettes">

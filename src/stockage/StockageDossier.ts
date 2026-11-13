@@ -1,4 +1,7 @@
-import { decouperChemin, ErreurIntrouvable, type EntreeDossier, type Stockage } from './Stockage';
+import { decouperChemin, enParallele, ErreurIntrouvable, type EntreeDossier, type FichierLu, type Stockage } from './Stockage';
+
+/** Lectures simultanées sur un dossier : le temps d'accès du réseau se recouvre. */
+const LECTURES_SIMULTANEES = 16;
 
 /**
  * Stockage dans un dossier accessible par un « handle » de dossier :
@@ -65,6 +68,19 @@ export class StockageDossier implements Stockage {
       resultat.push({ nom, type: h.kind === 'directory' ? 'dossier' : 'fichier' });
     }
     return resultat;
+  }
+
+  async lireDossier(cheminDossier: string): Promise<FichierLu[]> {
+    let d: FileSystemDirectoryHandle;
+    try {
+      d = await this.dossier(decouperChemin(cheminDossier), false);
+    } catch (e) {
+      if (e instanceof ErreurIntrouvable) return [];
+      throw e;
+    }
+    const fichiers: FileSystemFileHandle[] = [];
+    for await (const h of d.values()) if (h.kind === 'file') fichiers.push(h as FileSystemFileHandle);
+    return enParallele(fichiers, LECTURES_SIMULTANEES, async (h) => ({ nom: h.name, contenu: await h.getFile() }));
   }
 
   async creerDossier(cheminDossier: string) {

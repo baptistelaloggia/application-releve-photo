@@ -289,3 +289,59 @@ describe('photos sur l’étiquette du local', () => {
     expect(apres.localId).toBeNull();
   });
 });
+
+describe('ouverture rapide', () => {
+  it('lit les données dossier par dossier, sans un accès par fichier', async () => {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, infos, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    for (let i = 0; i < 200; i++) {
+      await e.creerLocal(e.plans[0].id, { nom: `Bureau ${i}`, numero: `B${i}`, surface: null, x: 0.5, y: 0.5 }, 'BL');
+    }
+    let lectures = 0;
+    const compte = <T extends (...a: never[]) => unknown>(f: T) => ((...a: Parameters<T>) => (lectures++, f.apply(s, a))) as T;
+    s.lireFichier = compte(s.lireFichier);
+    s.lireDossier = compte(s.lireDossier);
+    s.existe = compte(s.existe);
+    const rouvert = await EspaceProjet.ouvrir(s);
+    expect(rouvert.locaux).toHaveLength(200);
+    expect(rouvert.fichiersLus).toBe(200 + 3 + 1);
+    expect(lectures).toBeLessThan(12);
+  });
+});
+
+describe('réparation', () => {
+  it('met de côté un JSON vide et retrouve la photo correspondante d’après son nom', async () => {
+    const s = new StockageMemoire();
+    const e = await EspaceProjet.creer(s, { ...infos, codeAffaire: 'XXX' }, 'BL');
+    await e.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    const planId = e.plans[0].id;
+    await e.creerLocal(planId, { nom: 'TGBT', numero: '012', surface: null, x: 0.5, y: 0.5 }, 'BL');
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    const jpeg = new Blob(['photo']);
+    const p = await e.ajouterPhoto({ repereId: r.id, jpeg, miniature: jpeg, largeur: 4, hauteur: 3, source: 'appli', prisLe: new Date(2026, 9, 30, 10) }, 'BL');
+    // Écriture interrompue : le JSON de la photo est resté vide.
+    await s.ecrireFichier(`_data/photos/${p.id}.json`, '');
+    // Une photo du panier sans JSON du tout.
+    await s.ecrireFichier('01_PHOTOS/_A-CLASSER/XXX_A-CLASSER_2026-10-31_090502_ab12.jpg', jpeg);
+
+    const rouvert = await EspaceProjet.ouvrir(s);
+    expect(rouvert.illisibles).toEqual([`_data/photos/${p.id}.json`]);
+    expect(rouvert.photos).toHaveLength(0);
+    const cr = await rouvert.reparer('BL', async () => ({ miniature: jpeg, largeur: 4, hauteur: 3 }));
+    expect(cr).toContain('Photo retrouvée et rattachée au repère P001 : XXX_R+1.012_P001_2026-10-30_01.jpg');
+    expect(cr).toContain('Photo retrouvée, mise dans le panier : XXX_A-CLASSER_2026-10-31_090502_ab12.jpg');
+    expect(await s.existe(`_data/illisibles/photos_${p.id}.json`)).toBe(true);
+    expect(rouvert.photosDuRepere(r.id).map((x) => [x.date, x.rang, x.fichier])).toEqual([
+      ['2026-10-30', 1, '01_PHOTOS/01_R+1/R+1.012_TGBT/XXX_R+1.012_P001_2026-10-30_01.jpg'],
+    ]);
+    expect(rouvert.photosAClasser()).toHaveLength(1);
+
+    const relu = await EspaceProjet.ouvrir(s);
+    expect(relu.avertissements).toEqual([]);
+    expect(relu.photos).toHaveLength(2);
+    expect(await relu.reparer('BL', async () => ({ miniature: jpeg, largeur: 1, hauteur: 1 }))).toEqual([
+      'Rien à réparer : toutes les photos sont connues de l’application.',
+    ]);
+  });
+});

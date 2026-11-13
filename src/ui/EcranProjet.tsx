@@ -7,6 +7,7 @@ import { EcranPlan } from './plan/EcranPlan';
 import { dateLisible, Journal, Message, tailleLisible, texteErreur } from './commun';
 import { ImportPlans } from './ImportPlans';
 import { DetectionGlobale } from './DetectionGlobale';
+import { preparerMiniature } from '../photo/compression';
 
 interface Props {
   espace: EspaceProjet;
@@ -17,7 +18,10 @@ interface Props {
 
 export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
   const [, setVersion] = useState(0);
-  const [journal, setJournal] = useState<string[]>(espace.avertissements.map((a) => `Attention : ${a}`));
+  const [journal, setJournal] = useState<string[]>(() => [
+    ...espace.avertissements.map((a) => `Attention : ${a}`),
+    `Projet lu en ${espace.dureeLecture.toFixed(1).replace('.', ',')} s (${espace.fichiersLus} fichiers de données)`,
+  ]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [nouveauNiveau, setNouveauNiveau] = useState('');
   const [detectionGlobale, setDetectionGlobale] = useState(false);
@@ -82,6 +86,20 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
           </div>
         </div>
         {erreur && <Message type="erreur">{erreur}</Message>}
+        {espace.illisibles.length > 0 && (
+          <Message type="erreur">
+            {espace.illisibles.length} fichier{espace.illisibles.length > 1 ? 's' : ''} de données illisible
+            {espace.illisibles.length > 1 ? 's' : ''} (écriture interrompue, par exemple appli fermée pendant un
+            enregistrement). La réparation les met de côté et retrouve les photos concernées d'après leur nom.{' '}
+            <button
+              className="petit"
+              disabled={occupe}
+              onClick={() => void executer(() => espace.reparer(auteur, preparerMiniature))}
+            >
+              Réparer
+            </button>
+          </Message>
+        )}
         <BarreRecherche espace={espace} surChoix={(r) => setPlanOuvert({ planId: r.plan.id, localId: r.local.id })} />
         <Journal lignes={journal} />
       </section>
@@ -108,7 +126,19 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
                 return (
                   <tr key={n.id}>
                     <td>
-                      <strong>{n.code}</strong> <span className="discret">{espace.libelle(n)}</span>
+                      {plan ? (
+                        <button
+                          className="lien-niveau"
+                          title="Ouvrir le plan de ce niveau"
+                          onClick={() => setPlanOuvert({ planId: plan.id, localId: null })}
+                        >
+                          <strong>{n.code}</strong> <span>{espace.libelle(n)}</span>
+                        </button>
+                      ) : (
+                        <>
+                          <strong>{n.code}</strong> <span className="discret">{espace.libelle(n)}</span>
+                        </>
+                      )}
                     </td>
                     <td className="mono">{espace.dossierNiveau(n.code).split('/')[1]}</td>
                     <td>

@@ -178,7 +178,10 @@ export class EspaceProjet {
 
   /** Relit niveaux et plans depuis le disque (par ex. après modification par un collègue). */
   async recharger(): Promise<void> {
+    const debut = performance.now();
     this.avertissements = [];
+    this.illisibles = [];
+    this.fichiersLus = 0;
     this.projet = await lireJson<Projet>(this.stockage, FICHIER_PROJET);
     this.niveaux = await this.lireTous<Niveau>(DOSSIER_NIVEAUX);
     this.plans = await this.lireTous<Plan>(DOSSIER_PLANS);
@@ -188,17 +191,28 @@ export class EspaceProjet {
     this.trierNiveaux();
     // Projets créés avant l'ordre modifiable : on enregistre l'ordre du bâtiment.
     if (this.niveaux.some((n) => n.ordre === undefined)) await this.renumeroter();
+    this.dureeLecture = (performance.now() - debut) / 1000;
   }
 
+  /** Fichiers de données illisibles trouvés à la dernière lecture (chemins dans le projet). */
+  illisibles: string[] = [];
+  /** Nombre de fichiers de données lus et durée de la dernière lecture (s), pour le compte rendu. */
+  fichiersLus = 0;
+  dureeLecture = 0;
+
+  /** Lit tous les JSON d'un dossier de données, en une fois (voir Stockage.lireDossier). */
   private async lireTous<T>(dossier: string): Promise<T[]> {
-    if (!(await this.stockage.existe(dossier))) return [];
     const resultat: T[] = [];
-    for (const e of await this.stockage.lister(dossier)) {
-      if (e.type !== 'fichier' || !e.nom.endsWith('.json')) continue;
+    for (const f of await this.stockage.lireDossier(dossier)) {
+      if (!f.nom.endsWith('.json')) continue;
+      this.fichiersLus++;
       try {
-        resultat.push(await lireJson<T>(this.stockage, `${dossier}/${e.nom}`));
+        resultat.push(JSON.parse(await f.contenu.text()) as T);
       } catch {
-        this.avertissements.push(`Fichier de données illisible, ignoré : ${dossier}/${e.nom}`);
+        this.illisibles.push(`${dossier}/${f.nom}`);
+        this.avertissements.push(
+          `Fichier de données illisible, ignoré : ${dossier}/${f.nom} (${f.contenu.size === 0 ? 'vide : écriture interrompue ?' : `${f.contenu.size} octets`})`,
+        );
       }
     }
     return resultat;
@@ -936,6 +950,87 @@ export class EspaceProjet {
     if ((await this.stockage.existe(dossier)) && (await this.stockage.lister(dossier)).length === 0) {
       await this.stockage.supprimer(dossier);
     }
+  }
+
+  // ---------------------------------------------------------------- réparation
+
+  /** Tous les fichiers d'un dossier et de ses sous-dossiers (chemins dans le projet). */
+  private async listerRecursif(dossier: string): Promise<string[]> {
+    if (!(await this.stockage.existe(dossier))) return [];
+    const chemins: string[] = [];
+    for (const e of await this.stockage.lister(dossier)) {
+      const c = `${dossier}/${e.nom}`;
+      if (e.type === 'dossier') chemins.push(...(await this.listerRecursif(c)));
+      else chemins.push(c);
+    }
+    return chemins;
+  }
+
+  /**
+   * Répare le projet après une écriture interrompue (appli fermée pendant un enregistrement,
+   * coupure du réseau…) :
+   * - les fichiers de données illisibles sont mis de côté dans _data/illisibles/ (jamais effacés) ;
+   * - les photos présentes dans 01_PHOTOS mais inconnues de l'appli sont retrouvées : leur nom
+   *   donne leur repère, leur date et leur rang ; à défaut, elles vont au panier.
+   * preparer : calcule miniature et dimensions d'une photo (fourni par l'écran, qui sait décoder les images).
+   */
+  async reparer(
+    auteur: string,
+    preparer: (jpeg: Blob) => Promise<{ miniature: Blob; largeur: number; hauteur: number }>,
+  ): Promise<string[]> {
+    const compteRendu: string[] = [];
+    for (const chemin of this.illisibles) {
+      const cible = `${DOSSIERS.donnees}/illisibles/${chemin.split('/').slice(1).join('_')}`;
+      if (await this.stockage.existe(cible)) await this.stockage.supprimer(cible);
+      await this.stockage.deplacer(chemin, cible);
+      compteRendu.push(`Fichier illisible mis de côté : ${cible}`);
+    }
+    this.illisibles = [];
+    this.avertissements = this.avertissements.filter((a) => !a.startsWith('Fichier de données illisible'));
+
+    const connus = new Set(this.photos.map((p) => p.fichier));
+    const orphelines = (await this.listerRecursif(DOSSIERS.photos)).filter((c) => /\.jpe?g$/i.test(c) && !connus.has(c));
+    const motif = /_(P\d{3,})_(\d{4}-\d{2}-\d{2})_(\d{2,})\.jpe?g$/i;
+    const motifPanier = /_A-CLASSER_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})_/;
+    for (const chemin of orphelines) {
+      const jpeg = await this.stockage.lireFichier(chemin);
+      const nom = chemin.split('/').pop()!;
+      const m = motif.exec(nom);
+      const mp = motifPanier.exec(nom);
+      const repere = m ? this.reperes.find((r) => r.numero === m[1]) : undefined;
+      const date = m?.[2] ?? mp?.[1] ?? dateLocale(new Date());
+      const heure = mp ? `${mp[2]}:${mp[3]}:${mp[4]}` : '12:00:00';
+      const prisLe = new Date(`${date}T${heure}`);
+      const { miniature, largeur, hauteur } = await preparer(jpeg);
+      const id = crypto.randomUUID();
+      const rang = repere ? (m && !this.photos.some((p) => p.repereId === repere.id && p.date === date && p.rang === +m[3]) ? +m[3] : this.rangLibre(repere.id, date)) : 0;
+      const photo: Photo = {
+        schema: VERSION_SCHEMA,
+        id,
+        repereId: repere?.id ?? null,
+        fichier: chemin,
+        miniature: `${DOSSIER_MINIATURES}/${id}.jpg`,
+        date,
+        prisLe: prisLe.toISOString(),
+        prisPar: auteur,
+        rang,
+        largeur,
+        hauteur,
+        taille: jpeg.size,
+        empreinte: await calculerEmpreinte(jpeg),
+        commentaire: '',
+        source: 'import',
+        nomOrigine: nom,
+      };
+      await this.stockage.ecrireFichier(photo.miniature, miniature);
+      await this.ecrirePhoto(photo);
+      await this.rangerPhotos([photo]);
+      compteRendu.push(
+        repere ? `Photo retrouvée et rattachée au repère ${repere.numero} : ${nom}` : `Photo retrouvée, mise dans le panier : ${nom}`,
+      );
+    }
+    if (compteRendu.length === 0) compteRendu.push('Rien à réparer : toutes les photos sont connues de l’application.');
+    return compteRendu;
   }
 
   /** Locaux ayant au moins une photo prise ce jour-là (coloriés sur le plan pendant la visite). */

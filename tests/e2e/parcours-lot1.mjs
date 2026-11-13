@@ -212,8 +212,19 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   await page.getByText('Dossier renommé : 05_R+3 → 04_R+3').waitFor();
 
   // Lot 2 : ouverture du plan R+1, détection des locaux, enregistrement.
-  await page.locator('tr:has(strong:text-is("R+1"))').getByRole('button', { name: 'Ouvrir' }).click();
+  // Le plan s'ouvre d'un clic sur le nom du niveau.
+  await page.locator('.lien-niveau', { hasText: 'R+1' }).click();
   await page.locator('.visionneuse[data-fond-pret]').waitFor();
+  // Le menu « Affichage » se ferme quand on touche le plan.
+  await page.getByText('Affichage', { exact: true }).click();
+  await page.getByRole('button', { name: 'Fiche', exact: true }).click();
+  assert.equal(await page.locator('details.options-plan').evaluate((d) => d.open), true);
+  const vue = await page.locator('.visionneuse').boundingBox();
+  await page.mouse.click(vue.x + 20, vue.y + vue.height - 20);
+  assert.equal(await page.locator('details.options-plan').evaluate((d) => d.open), false);
+  await page.getByText('Affichage', { exact: true }).click();
+  await page.getByRole('button', { name: 'Photo', exact: true }).click();
+  await page.mouse.click(vue.x + 20, vue.y + vue.height - 20);
   await page.getByRole('tab', { name: /Locaux/ }).click();
   await page.getByRole('button', { name: 'Détecter les locaux' }).click();
   await page.getByRole('button', { name: 'Enregistrer 4 locaux' }).waitFor();

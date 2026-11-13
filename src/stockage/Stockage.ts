@@ -10,6 +10,25 @@
  * Les chemins sont relatifs à la racine du projet, séparés par « / »
  * (par ex. « 00_PLANS/XXX_R+1.pdf »).
  */
+export interface FichierLu {
+  nom: string;
+  contenu: Blob;
+}
+
+/** Exécute des tâches avec au plus `simultanees` en cours à la fois. */
+export async function enParallele<T, R>(elements: T[], simultanees: number, tache: (e: T) => Promise<R>): Promise<R[]> {
+  const resultats: R[] = new Array(elements.length);
+  let suivant = 0;
+  async function ouvrier() {
+    while (suivant < elements.length) {
+      const i = suivant++;
+      resultats[i] = await tache(elements[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(simultanees, elements.length) }, ouvrier));
+  return resultats;
+}
+
 export interface EntreeDossier {
   nom: string;
   type: 'fichier' | 'dossier';
@@ -21,6 +40,13 @@ export interface Stockage {
 
   existe(chemin: string): Promise<boolean>;
   lister(cheminDossier: string): Promise<EntreeDossier[]>;
+  /**
+   * Lit d'un coup tous les fichiers d'un dossier (sans ses sous-dossiers).
+   * Bien plus rapide que lireFichier fichier par fichier sur un lecteur réseau :
+   * le dossier n'est ouvert qu'une fois, et les lectures se font en parallèle.
+   * Renvoie [] si le dossier n'existe pas.
+   */
+  lireDossier(cheminDossier: string): Promise<FichierLu[]>;
   /** Crée le dossier et ses parents s'ils n'existent pas (sans erreur s'il existe). */
   creerDossier(cheminDossier: string): Promise<void>;
 
