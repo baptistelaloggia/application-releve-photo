@@ -84,3 +84,27 @@ export async function demanderStockagePersistant(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Limite la durée d'une opération sur un dossier : au-delà, une erreur explicite est levée
+ * (l'opération elle-même n'est pas annulée, mais l'utilisateur sait ce qui se passe).
+ */
+export function avecDelai<T>(operation: Promise<T>, secondes: number, quoi: string): Promise<T> {
+  return new Promise<T>((ok, ko) => {
+    const minuterie = window.setTimeout(
+      () =>
+        ko(
+          new Error(
+            `${quoi} : aucune réponse du dossier après ${secondes} s. Causes possibles : fenêtre d'autorisation du navigateur ` +
+              "restée ouverte derrière l'appli, lecteur réseau déconnecté, ou accès aux dossiers bloqué par une règle de l'entreprise " +
+              '(à vérifier avec la DSI).',
+          ),
+        ),
+      secondes * 1000,
+    );
+    operation.then(
+      (v) => (window.clearTimeout(minuterie), ok(v)),
+      (e) => (window.clearTimeout(minuterie), ko(e)),
+    );
+  });
+}
