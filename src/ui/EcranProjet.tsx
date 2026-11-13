@@ -20,7 +20,7 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
   const [, setVersion] = useState(0);
   const [journal, setJournal] = useState<string[]>(() => [
     ...espace.avertissements.map((a) => `Attention : ${a}`),
-    `Projet lu en ${espace.dureeLecture.toFixed(1).replace('.', ',')} s (${espace.fichiersLus} fichiers de données)`,
+    `Projet ouvert en ${espace.dureeOuverture.toFixed(1).replace('.', ',')} s, dont lecture ${espace.dureeLecture.toFixed(1).replace('.', ',')} s (${espace.fichiersLus} fichiers de données) : ${espace.detailLecture.join(' ; ')}`,
   ]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [nouveauNiveau, setNouveauNiveau] = useState('');

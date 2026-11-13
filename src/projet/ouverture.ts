@@ -27,8 +27,10 @@ async function memoriser(espace: EspaceProjet, handle: FileSystemDirectoryHandle
 
 /** Ouvre le projet contenu dans un dossier, et le mémorise dans la liste des projets récents. */
 export async function ouvrirProjet(handle: FileSystemDirectoryHandle, type: TypeEmplacement) {
+  const debut = performance.now();
   const espace = await EspaceProjet.ouvrir(new StockageDossier(handle, libelle(type, handle.name)));
   const connu = await memoriser(espace, handle, type);
+  espace.dureeOuverture = (performance.now() - debut) / 1000;
   return { espace, connu };
 }
 
