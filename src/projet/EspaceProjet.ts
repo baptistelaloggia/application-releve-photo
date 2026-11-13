@@ -182,17 +182,36 @@ export class EspaceProjet {
     this.avertissements = [];
     this.illisibles = [];
     this.fichiersLus = 0;
-    this.projet = await lireJson<Projet>(this.stockage, FICHIER_PROJET);
-    this.niveaux = await this.lireTous<Niveau>(DOSSIER_NIVEAUX);
-    this.plans = await this.lireTous<Plan>(DOSSIER_PLANS);
-    this.locaux = await this.lireTous<Local>(DOSSIER_LOCAUX);
-    this.reperes = await this.lireTous<Repere>(DOSSIER_REPERES);
-    this.photos = await this.lireTous<Photo>(DOSSIER_PHOTOS);
+    this.detailLecture = [];
+    // Les dossiers sont lus en même temps : sur un lecteur réseau, chaque accès a un temps
+    // de latence, qui se recouvre ainsi au lieu de s'additionner.
+    const mesurer = async <T>(libelle: string, lecture: () => Promise<T>): Promise<T> => {
+      const t0 = performance.now();
+      const v = await lecture();
+      const n = Array.isArray(v) ? ` (${v.length})` : '';
+      this.detailLecture.push(`${libelle}${n} ${((performance.now() - t0) / 1000).toFixed(1).replace('.', ',')} s`);
+      return v;
+    };
+    const [projet, niveaux, plans, locaux, reperes, photos] = await Promise.all([
+      mesurer('projet', () => lireJson<Projet>(this.stockage, FICHIER_PROJET)),
+      mesurer('niveaux', () => this.lireTous<Niveau>(DOSSIER_NIVEAUX)),
+      mesurer('plans', () => this.lireTous<Plan>(DOSSIER_PLANS)),
+      mesurer('locaux', () => this.lireTous<Local>(DOSSIER_LOCAUX)),
+      mesurer('repères', () => this.lireTous<Repere>(DOSSIER_REPERES)),
+      mesurer('photos', () => this.lireTous<Photo>(DOSSIER_PHOTOS)),
+    ]);
+    Object.assign(this, { projet, niveaux, plans, locaux, reperes, photos });
     this.trierNiveaux();
     // Projets créés avant l'ordre modifiable : on enregistre l'ordre du bâtiment.
     if (this.niveaux.some((n) => n.ordre === undefined)) await this.renumeroter();
     this.dureeLecture = (performance.now() - debut) / 1000;
   }
+
+  /** Durée totale de l'ouverture du projet (s), lecture comprise. */
+  dureeOuverture = 0;
+
+  /** Durée de lecture de chaque dossier de données (« locaux (224) 1,2 s »), pour le diagnostic. */
+  detailLecture: string[] = [];
 
   /** Fichiers de données illisibles trouvés à la dernière lecture (chemins dans le projet). */
   illisibles: string[] = [];

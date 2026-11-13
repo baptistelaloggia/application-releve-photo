@@ -35,8 +35,8 @@ export function Diagnostic({ surRetour }: { surRetour: () => void }) {
         <li>Acceptez la demande d'autorisation du navigateur (« Modifier les fichiers »).</li>
       </ol>
       <p className="discret">
-        Le test crée un dossier « _test-releve-photo-… », y écrit un fichier de 1 Mo, le relit, le renomme, puis supprime le
-        tout.
+        Le test crée un dossier « _test-releve-photo-… », y écrit un fichier de 1 Mo, le relit, le renomme, mesure la
+        lecture de 50 petits fichiers (comme à l'ouverture d'un projet), puis supprime le tout.
       </p>
       <div className="boutons">
         <button className="principal" onClick={lancer} disabled={occupe}>
