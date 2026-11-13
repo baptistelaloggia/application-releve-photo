@@ -1,9 +1,11 @@
 /**
  * Accès aux emplacements de stockage selon l'appareil.
  * - PC (Chrome, Edge) : choix d'un vrai dossier Windows (File System Access API).
- * - Téléphone Android : pas de choix de dossier possible dans le navigateur ;
- *   on utilise le stockage interne privé de l'appli (OPFS). Les échanges avec
- *   le serveur passeront par le paquet .zip (lot 4) puis SharePoint (lot 5).
+ * - Téléphone : toujours le stockage interne privé de l'appli (OPFS). Chrome sur Android sait
+ *   aussi choisir un dossier du téléphone, mais chaque accès y passe par le gestionnaire de
+ *   documents d'Android et prend plusieurs secondes (mesuré le 13/11/2026 : 10 s pour lire un
+ *   seul petit fichier dans Téléchargements). Les échanges avec le serveur passent par le
+ *   paquet .zip (lot 4) puis SharePoint (lot 5).
  */
 
 type FenetreAvecDossiers = Window & {
@@ -19,8 +21,15 @@ type HandleAvecPermission = FileSystemDirectoryHandle & {
   requestPermission?: (d: { mode: 'readwrite' }) => Promise<PermissionState>;
 };
 
+/** Téléphone ou tablette (Android, iOS). */
+export function estTelephone(): boolean {
+  const ua = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+  return ua.userAgentData?.mobile ?? /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+}
+
+/** Choix d'un vrai dossier : sur PC seulement (voir plus haut pour le téléphone). */
 export function choixDeDossierDisponible(): boolean {
-  return typeof (window as FenetreAvecDossiers).showDirectoryPicker === 'function';
+  return typeof (window as FenetreAvecDossiers).showDirectoryPicker === 'function' && !estTelephone();
 }
 
 export function stockageAppareilDisponible(): boolean {

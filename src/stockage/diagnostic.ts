@@ -11,13 +11,18 @@ export interface EtapeDiagnostic {
   detail?: string;
 }
 
-export async function diagnostiquer(stockage: Stockage): Promise<EtapeDiagnostic[]> {
+export async function diagnostiquer(
+  stockage: Stockage,
+  /** Appelé au début de chaque étape, pour afficher l'avancement. */
+  surEtape: (etape: string) => void = () => undefined,
+): Promise<EtapeDiagnostic[]> {
   const racine = `_test-releve-photo-${Date.now()}`;
   const etapes: EtapeDiagnostic[] = [];
   const contenu = new Blob([new Uint8Array(1024 * 1024).map((_, i) => i % 251)]);
   // Les 50 petits fichiers sont écrits un par un : cela prend quelques secondes sur un lecteur réseau.
 
   async function etape(nom: string, action: () => Promise<string | void>) {
+    surEtape(nom);
     const debut = performance.now();
     try {
       const detail = await action();
@@ -43,14 +48,20 @@ export async function diagnostiquer(stockage: Stockage): Promise<EtapeDiagnostic
     (await etape('Renommer un dossier', () => stockage.deplacer(`${racine}/sous-dossier`, `${racine}/01_dossier-renomme`))) &&
     // Lecture d'un dossier de données comme à l'ouverture d'un projet : 50 petits fichiers JSON.
     (await etape('Écrire 50 petits fichiers', async () => {
-      for (let i = 0; i < 50; i++) await stockage.ecrireFichier(`${racine}/donnees/${i}.json`, `{"i":${i}}`);
+      for (let i = 0; i < 50; i++) {
+        surEtape(`Écrire 50 petits fichiers (${i + 1}/50)`);
+        await stockage.ecrireFichier(`${racine}/donnees/${i}.json`, `{"i":${i}}`);
+      }
     })) &&
     (await etape('Lister le dossier (50 fichiers)', async () => {
       const n = (await stockage.lister(`${racine}/donnees`)).length;
       if (n !== 50) throw new Error(`${n} fichiers trouvés`);
     })) &&
     (await etape('Lire les 50 fichiers un par un', async () => {
-      for (let i = 0; i < 50; i++) await (await stockage.lireFichier(`${racine}/donnees/${i}.json`)).text();
+      for (let i = 0; i < 50; i++) {
+        surEtape(`Lire les 50 fichiers un par un (${i + 1}/50)`);
+        await (await stockage.lireFichier(`${racine}/donnees/${i}.json`)).text();
+      }
     })) &&
     (await etape('Lire les 50 fichiers d’un coup', async () => {
       const lus = await stockage.lireDossier(`${racine}/donnees`);
