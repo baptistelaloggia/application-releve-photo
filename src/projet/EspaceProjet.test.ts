@@ -345,3 +345,71 @@ describe('réparation', () => {
     ]);
   });
 });
+
+import { fusionner } from '../domaine/fusion';
+
+describe('synchronisation serveur ↔ téléphone (sans zip)', () => {
+  /** Transmet un projet d'un exemplaire à l'autre, comme le ferait un paquet. */
+  async function transmettre(de: EspaceProjet, vers: EspaceProjet, avecPhotos: boolean) {
+    const donnees = de.donnees();
+    const r = fusionner(vers.donnees(), avecPhotos ? donnees : { ...donnees, photos: [] });
+    const pdfs = new Map<string, Blob>();
+    for (const p of r.plans) pdfs.set(p.id, await de.lirePlan(de.planParId(p.id)!));
+    const cr = await vers.appliquerFusion(r, (id) => pdfs.get(id), 'BL');
+    for (const p of r.photosNouvelles) {
+      const source = de.photos.find((x) => x.id === p.id)!;
+      await vers.ajouterPhotoImportee(p, await de.lirePhoto(source), await de.lireMiniature(source));
+    }
+    return { r, cr };
+  }
+
+  it('fait l’aller-retour d’une visite et range tout sur le serveur', async () => {
+    const sServeur = new StockageMemoire();
+    const serveur = await EspaceProjet.creer(sServeur, { ...infos, codeAffaire: 'XXX' }, 'BL');
+    await serveur.importerPlan({ fichier: pdf('A'), nomOrigine: 'a.pdf', codeNiveau: 'R+1', indice: 'A', pages: 1 }, 'BL');
+    const planId = serveur.plans[0].id;
+    const tgbt = await serveur.creerLocal(planId, { nom: 'TGBT', numero: '012', surface: null, x: 0.5, y: 0.5 }, 'BL');
+
+    // Aller : le téléphone reçoit plans et locaux.
+    const sTel = new StockageMemoire();
+    const tel = await EspaceProjet.creerDepuisPaquet(sTel, serveur.projet);
+    await transmettre(serveur, tel, false);
+    expect(tel.locaux.map((l) => l.numero)).toEqual(['012']);
+    expect(await sTel.existe('00_PLANS/XXX_R+1.pdf')).toBe(true);
+    expect(await sTel.existe('01_PHOTOS/01_R+1')).toBe(true);
+
+    // Visite sur le téléphone : 2 photos sur le TGBT, 1 dans un nouveau local.
+    const jpeg = (t: string) => new Blob([`JPEG ${t}`]);
+    const ajout = (e: EspaceProjet, repereId: string, t: string, h: number) =>
+      e.ajouterPhoto({ repereId, jpeg: jpeg(t), miniature: jpeg(`m${t}`), largeur: 1, hauteur: 1, source: 'appli', prisLe: new Date(2026, 10, 13, h) }, 'BL');
+    const r1 = await tel.creerRepere(planId, 0.5, 0.5, 'BL');
+    await ajout(tel, r1.id, 'a', 9);
+    await ajout(tel, r1.id, 'b', 10);
+    const bureau = await tel.creerLocal(planId, { nom: 'Bureau', numero: tel.proposerNumero(planId), surface: null, x: 0.8, y: 0.8 }, 'BL');
+    const r2 = await tel.creerRepere(planId, 0.8, 0.8, 'BL');
+    await ajout(tel, r2.id, 'c', 11);
+
+    // Pendant ce temps, au bureau : un autre repère, numéroté lui aussi P001, hors local.
+    const rServeur = await serveur.creerRepere(planId, 0.2, 0.2, 'BL');
+    await ajout(serveur, rServeur.id, 'z', 8);
+
+    // Retour : le serveur importe la visite.
+    const { cr } = await transmettre(tel, serveur, true);
+    expect(cr.join('\n')).toMatch(/Repère P001 de l'autre appareil renuméroté P002/);
+    const noms = (await sServeur.lister('01_PHOTOS/01_R+1/R+1.012_TGBT')).map((x) => x.nom).sort();
+    expect(noms).toEqual(['XXX_R+1.012_P002_2026-11-13_01.jpg', 'XXX_R+1.012_P002_2026-11-13_02.jpg']);
+    expect(await sServeur.existe(`01_PHOTOS/01_R+1/R+1.${bureau.numero}_Bureau/XXX_R+1.${bureau.numero}_P003_2026-11-13_01.jpg`)).toBe(true);
+    expect(serveur.locaux.map((l) => l.nom).sort()).toEqual(['Bureau', 'TGBT']);
+    expect(serveur.photos).toHaveLength(4);
+    expect(serveur.photosDuLocal(tgbt.id)).toHaveLength(2);
+
+    // Un second import du même paquet ne change rien.
+    const encore = await transmettre(tel, serveur, true);
+    expect(encore.r.photosNouvelles).toEqual([]);
+    expect(serveur.photos).toHaveLength(4);
+    // Tout est cohérent à la réouverture.
+    const relu = await EspaceProjet.ouvrir(sServeur);
+    expect(relu.avertissements).toEqual([]);
+    expect(await relu.rangerPhotos()).toEqual([]);
+  });
+});

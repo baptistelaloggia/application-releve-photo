@@ -170,7 +170,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   const dossierProjet = `${new Date().getFullYear()}-T01_Groupe-scolaire-fictif`;
 
   // Import de deux plans : niveaux et indices devinés depuis les noms.
-  await page.locator('input[type=file]').setInputFiles([
+  await page.locator('input[type=file][accept*=pdf]').setInputFiles([
     { name: 'ARCHI_PLAN_R+1_Ind-A.pdf', mimeType: 'application/pdf', buffer: pdfFictif('Plan fictif R+1 ind A') },
     {
       name: 'plan RDC.pdf',
@@ -187,7 +187,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   await page.getByText('Plan importé : plan RDC.pdf').waitFor();
 
   // Nouvel indice du R+1 : l'indice A doit être archivé.
-  await page.locator('input[type=file]').setInputFiles([
+  await page.locator('input[type=file][accept*=pdf]').setInputFiles([
     { name: 'ARCHI_PLAN_R+1_Ind-B.pdf', mimeType: 'application/pdf', buffer: pdfFictif('Plan fictif R+1 ind B') },
   ]);
   await page.getByText("remplace l'indice A (archivé)").waitFor();

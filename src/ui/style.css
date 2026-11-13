@@ -277,3 +277,8 @@ button.projet .discret { font-size: 0.85rem; }
   display: inline-flex; gap: 6px; align-items: baseline; cursor: pointer; }
 .lien-niveau span { text-decoration: underline; text-underline-offset: 3px; }
 .lien-niveau:hover span { text-decoration-thickness: 2px; }
+.bouton-fichier.grand { min-height: 64px; font-size: 1.05rem; justify-content: center; }
+.bouton-fichier.desactive { opacity: 0.5; pointer-events: none; }
+.resultat-export, .apercu-import { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--fond); }
+.apercu-import h3 { font-size: 1rem; margin: 0 0 8px; }
+.alertes-import { color: var(--erreur); margin: 8px 0; padding-left: 20px; }

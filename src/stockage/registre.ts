@@ -52,3 +52,14 @@ export async function lireReglage<T>(cle: string): Promise<T | undefined> {
 export async function ecrireReglage(cle: string, valeur: unknown): Promise<void> {
   await (await ouvrirBase()).put('reglages', valeur, cle);
 }
+
+/** Photos déjà exportées depuis cet appareil (pour ne transmettre que les nouvelles). */
+export async function photosExportees(projetId: string): Promise<Set<string>> {
+  return new Set((await lireReglage<string[]>(`photosExportees:${projetId}`)) ?? []);
+}
+
+export async function marquerPhotosExportees(projetId: string, ids: Iterable<string>): Promise<void> {
+  const deja = await photosExportees(projetId);
+  for (const id of ids) deja.add(id);
+  await ecrireReglage(`photosExportees:${projetId}`, [...deja]);
+}
