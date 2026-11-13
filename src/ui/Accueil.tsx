@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ErreurPasUnProjet, type EspaceProjet } from '../projet/EspaceProjet';
-import { ouvrirProjet } from '../projet/ouverture';
-import { avecDelai, choisirDossier, choixDeDossierDisponible, dossierProjetAppareil, verifierPermission } from '../stockage/acces';
+import { creerProjetDepuisPaquet, ouvrirProjet } from '../projet/ouverture';
+import { lireEnTete } from '../projet/paquet';
+import { avecDelai, choisirDossier, choixDeDossierDisponible, dossierAppareil, dossierProjetAppareil, verifierPermission } from '../stockage/acces';
 import { listerProjetsConnus, oublierProjet, type ProjetConnu } from '../stockage/registre';
 import { dateLisible, Message, texteErreur } from './commun';
 
 interface Props {
   surNouveau: () => void;
   surDiagnostic: () => void;
-  surOuvert: (espace: EspaceProjet, connu: ProjetConnu) => void;
+  surOuvert: (espace: EspaceProjet, connu: ProjetConnu, paquet?: File | null) => void;
 }
 
 export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
@@ -50,6 +51,36 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
       surOuvert(espace, connu);
     });
 
+  /**
+   * Paquet .zip reçu de l'autre appareil : ouvre le projet s'il est déjà connu ici,
+   * sinon le crée (stockage interne sur téléphone, dossier du serveur sur PC), puis l'importe.
+   */
+  const importerPaquet = (fichier: File) =>
+    executer(async () => {
+      setEtape('Lecture du paquet…');
+      const { manifeste } = await lireEnTete(fichier);
+      const connu = recents.find((p) => p.id === manifeste.projet.id);
+      if (connu) {
+        const handle = connu.handle ?? (await dossierProjetAppareil(connu.dossier));
+        if (!(await verifierPermission(handle, true))) throw new Error("L'autorisation d'accès au dossier a été refusée.");
+        setEtape(`Ouverture du projet « ${connu.nom} »…`);
+        const { espace, connu: c } = await avecDelai(ouvrirProjet(handle, connu.type), 90, 'Ouverture du projet');
+        surOuvert(espace, c, fichier);
+        return;
+      }
+      let parent: FileSystemDirectoryHandle | null;
+      if (surPC) {
+        setEtape(
+          `Nouveau projet « ${manifeste.projet.nom} » : choisissez le dossier du serveur qui le contiendra, puis acceptez « Modifier les fichiers ».`,
+        );
+        parent = await choisirDossier('parent-projets', setEtape);
+      } else parent = await dossierAppareil();
+      if (!parent) return;
+      setEtape(`Création du projet « ${manifeste.projet.nom} »…`);
+      const { espace, connu: c } = await creerProjetDepuisPaquet(parent, surPC ? 'dossier' : 'appareil', manifeste.projet);
+      surOuvert(espace, c, fichier);
+    });
+
   const ouvrirRecent = (p: ProjetConnu) =>
     executer(async () => {
       const handle = p.handle ?? (await dossierProjetAppareil(p.dossier));
@@ -82,6 +113,19 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
             Ouvrir un projet existant…
           </button>
         )}
+        <label className={`bouton-fichier grand${occupe ? ' desactive' : ''}`}>
+          Importer un paquet .zip…
+          <input
+            type="file"
+            accept=".zip,application/zip"
+            disabled={occupe}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void importerPaquet(f);
+            }}
+          />
+        </label>
       </section>
 
       <section className="carte">

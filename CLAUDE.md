@@ -86,9 +86,12 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   et écran plan (détection, fiche local). Détection des locaux : `src/domaine/locaux.ts` ; recherche :
   `src/domaine/recherche.ts`. Photos : `src/photo/` (compression, EXIF, caméra) et `src/ui/photo/`
   (visée, miniatures, visionneuse) ; panneaux terrain : `src/ui/plan/PanneauxTerrain.tsx`.
+  Synchronisation (lot 4) : règles de fusion `src/domaine/fusion.ts` (pures, testées), paquet .zip
+  `src/projet/paquet.ts` (fflate, lecture et écriture en continu), écran `src/ui/Echanges.tsx`.
 - Toute écriture dans le dossier projet passe par `EspaceProjet` et l'interface `Stockage`, jamais directement.
 - `npm test` : tests unitaires. `npm run build && npm run build:test && npm run test:e2e` : parcours complet
   dans Chromium (dont `terrain-lot3.mjs` : 300 photos en mode avion, fausse caméra ; `NB_PHOTOS` pour réduire).
+  `synchro-lot4.mjs` : aller-retour PC ↔ téléphone par paquets (`NB_SYNCHRO` photos).
   `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
 - Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.
 - **Le dépôt est public** (10/11/2026) : rien de confidentiel dans le code, les tests, les messages de commit ni la

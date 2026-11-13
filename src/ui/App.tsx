@@ -12,7 +12,7 @@ type Ecran =
   | { type: 'accueil' }
   | { type: 'nouveau' }
   | { type: 'diagnostic' }
-  | { type: 'projet'; espace: EspaceProjet; connu: ProjetConnu };
+  | { type: 'projet'; espace: EspaceProjet; connu: ProjetConnu; paquet?: File | null };
 
 export function App() {
   const [ecran, setEcran] = useState<Ecran>({ type: 'accueil' });
@@ -29,7 +29,8 @@ export function App() {
     if (!__FICHIER_UNIQUE__) activerHorsLigne((installer) => setMajDisponible(() => installer));
   }, []);
 
-  const ouvert = (espace: EspaceProjet, connu: ProjetConnu) => setEcran({ type: 'projet', espace, connu });
+  const ouvert = (espace: EspaceProjet, connu: ProjetConnu, paquet?: File | null) =>
+    setEcran({ type: 'projet', espace, connu, paquet });
   const accueil = () => setEcran({ type: 'accueil' });
 
   return (
@@ -75,7 +76,14 @@ export function App() {
         ) : ecran.type === 'diagnostic' ? (
           <Diagnostic surRetour={accueil} />
         ) : (
-          <EcranProjet key={ecran.connu.id} espace={ecran.espace} connu={ecran.connu} auteur={auteur} surFermer={accueil} />
+          <EcranProjet
+            key={ecran.connu.id}
+            espace={ecran.espace}
+            connu={ecran.connu}
+            auteur={auteur}
+            paquetInitial={ecran.paquet}
+            surFermer={accueil}
+          />
         )}
       </main>
       <footer className="pied">Version {__VERSION__} · les données restent dans vos dossiers</footer>

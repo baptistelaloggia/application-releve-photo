@@ -62,3 +62,29 @@ export async function creerProjet(
   const connu = await memoriser(espace, handle, type);
   return { espace, connu };
 }
+
+/**
+ * Crée sur cet appareil l'exemplaire d'un projet reçu par paquet .zip, dans le dossier parent
+ * donné (PC : dossier du serveur ; téléphone : stockage interne). Les données sont importées ensuite.
+ */
+export async function creerProjetDepuisPaquet(
+  parent: FileSystemDirectoryHandle,
+  type: TypeEmplacement,
+  projet: import('../domaine/types').Projet,
+) {
+  let existant: FileSystemDirectoryHandle | null = null;
+  try {
+    existant = await parent.getDirectoryHandle(projet.dossier);
+  } catch (e) {
+    if (!(e instanceof DOMException && e.name === 'NotFoundError')) throw e;
+  }
+  if (existant) {
+    throw new Error(
+      `Un dossier « ${projet.dossier} » existe déjà à cet emplacement : ouvrez-le comme projet, puis utilisez « Importer un paquet ».`,
+    );
+  }
+  const handle = await parent.getDirectoryHandle(projet.dossier, { create: true });
+  const espace = await EspaceProjet.creerDepuisPaquet(new StockageDossier(handle, libelle(type, projet.dossier)), projet);
+  const connu = await memoriser(espace, handle, type);
+  return { espace, connu };
+}

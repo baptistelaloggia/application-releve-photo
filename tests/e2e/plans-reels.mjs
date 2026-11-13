@@ -57,7 +57,7 @@ try {
   await page.getByRole('heading', { name: 'Essai carnet de plans' }).waitFor();
 
   const debut = Date.now();
-  await page.locator('input[type=file]').setInputFiles({
+  await page.locator('input[type=file][accept*=pdf]').setInputFiles({
     name: basename(plans), mimeType: 'application/pdf', buffer: await readFile(plans),
   });
   // Niveaux reconnus page par page.

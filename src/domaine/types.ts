@@ -146,4 +146,6 @@ export interface Photo {
   /** appli : appareil photo de l'appli ; appareil : appareil photo du téléphone ; import : fichier importé. */
   source: 'appli' | 'appareil' | 'import';
   nomOrigine?: string;
+  /** Dernier changement de classement ou de commentaire (synchronisation entre appareils). */
+  modifieLe?: string;
 }

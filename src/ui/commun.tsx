@@ -18,10 +18,15 @@ export function Journal({ lignes }: { lignes: string[] }) {
 
 export function Message({ type, children }: { type: 'erreur' | 'info' | 'succes'; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  // Un message d'erreur ou d'avancement est toujours ramené à l'écran.
+  const dernierTexte = useRef<string | null>(null);
+  // Un message d'erreur ou d'avancement est ramené à l'écran, une seule fois par texte
+  // (et non à chaque affichage, ce qui ferait bouger la page sans arrêt).
   useEffect(() => {
-    if (type !== 'succes') ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-  }, [type, children]);
+    const texte = ref.current?.textContent ?? '';
+    if (type === 'succes' || texte === dernierTexte.current) return;
+    dernierTexte.current = texte;
+    ref.current?.scrollIntoView?.({ block: 'nearest' });
+  });
   return (
     <div ref={ref} className={`message message-${type}`} role={type === 'erreur' ? 'alert' : 'status'}>
       {children}

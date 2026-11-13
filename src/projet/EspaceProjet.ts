@@ -24,6 +24,7 @@ import {
 import { VERSION_SCHEMA, type Local, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
 import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
+import type { DonneesProjet, ResultatFusion } from '../domaine/fusion';
 import { ecrireJson, enParallele, lireJson, type Stockage } from '../stockage/Stockage';
 
 const FICHIER_PROJET = `${DOSSIERS.donnees}/projet.json`;
@@ -165,6 +166,18 @@ export class EspaceProjet {
     }
     await espace.appliquerArborescence();
     // projet.json en dernier : sa présence signifie « projet complet ».
+    await ecrireJson(stockage, FICHIER_PROJET, projet);
+    return espace;
+  }
+
+  /**
+   * Crée, dans un dossier vide, l'exemplaire d'un projet reçu par paquet .zip
+   * (même identifiant de projet). Les données arrivent ensuite par appliquerFusion.
+   */
+  static async creerDepuisPaquet(stockage: Stockage, projet: Projet): Promise<EspaceProjet> {
+    if (await stockage.existe(FICHIER_PROJET)) throw new Error('Ce dossier contient déjà un projet.');
+    const espace = new EspaceProjet(stockage, projet, [], [], [], [], [], []);
+    await espace.appliquerArborescence();
     await ecrireJson(stockage, FICHIER_PROJET, projet);
     return espace;
   }
@@ -910,7 +923,12 @@ export class EspaceProjet {
     if (!photo) throw new Error('Photo introuvable.');
     if (repereId && !this.reperes.some((r) => r.id === repereId)) throw new Error('Repère introuvable.');
     await this.numeroterLocalDuRepere(repereId, auteur);
-    const modifiee: Photo = { ...photo, repereId, rang: repereId ? this.rangLibre(repereId, photo.date, photo.id) : 0 };
+    const modifiee: Photo = {
+      ...photo,
+      repereId,
+      rang: repereId ? this.rangLibre(repereId, photo.date, photo.id) : 0,
+      modifieLe: maintenant(),
+    };
     await this.deplacerPhoto(photo, modifiee);
     return this.photos.find((p) => p.id === photoId)!;
   }
@@ -923,7 +941,7 @@ export class EspaceProjet {
   async commenterPhoto(photoId: string, commentaire: string): Promise<void> {
     const photo = this.photos.find((p) => p.id === photoId);
     if (!photo) throw new Error('Photo introuvable.');
-    await this.ecrirePhoto({ ...photo, commentaire: commentaire.trim() });
+    await this.ecrirePhoto({ ...photo, commentaire: commentaire.trim(), modifieLe: maintenant() });
   }
 
   async supprimerPhoto(photoId: string): Promise<void> {
@@ -990,6 +1008,91 @@ export class EspaceProjet {
     if (dossier.split('/').length < 3) return; // jamais les dossiers de niveau
     if ((await this.stockage.existe(dossier)) && (await this.stockage.lister(dossier)).length === 0) {
       await this.stockage.supprimer(dossier);
+    }
+  }
+
+  // ---------------------------------------------------------------- synchronisation (lot 4)
+
+  /** Toutes les données du projet (pour un paquet .zip). */
+  donnees(): DonneesProjet {
+    return { niveaux: this.niveaux, plans: this.plans, locaux: this.locaux, reperes: this.reperes, photos: this.photos };
+  }
+
+  /**
+   * Applique le résultat d'une fusion (voir domaine/fusion.ts), sauf les photos nouvelles,
+   * ajoutées ensuite une à une par ajouterPhotoImportee à mesure que le paquet est lu.
+   * pdfDuPlan : le PDF d'un plan nouveau, lu dans le paquet.
+   */
+  async appliquerFusion(r: ResultatFusion, pdfDuPlan: (planId: string) => Blob | undefined, auteur: string): Promise<string[]> {
+    const compteRendu = [...r.compteRendu];
+    for (const n of r.niveaux) {
+      this.niveaux.push(n);
+      await ecrireJson(this.stockage, `${DOSSIER_NIVEAUX}/${n.id}.json`, n);
+    }
+    this.trierNiveaux();
+    await this.renumeroter();
+    for (const p of r.plans) {
+      const pdf = pdfDuPlan(p.id);
+      const code = this.niveaux.find((n) => n.id === p.niveauId)?.code;
+      if (!pdf || !code) {
+        compteRendu.push(`Attention : PDF du plan ${code ?? '?'} absent du paquet, plan non ajouté.`);
+        continue;
+      }
+      const plan: Plan = { ...p, fichier: `${DOSSIERS.plans}/${nomFichierPlan(this.projet.codeAffaire, code)}`, historique: [] };
+      await this.stockage.ecrireFichier(plan.fichier, pdf);
+      await ecrireJson(this.stockage, `${DOSSIER_PLANS}/${plan.id}.json`, plan);
+      this.plans.push(plan);
+    }
+    const plansConnus = new Set(this.plans.map((p) => p.id));
+    await enParallele(r.locaux.filter((l) => plansConnus.has(l.planId)), ECRITURES_SIMULTANEES, (l) => this.ecrireLocal(l));
+    await enParallele(r.reperes.filter((x) => plansConnus.has(x.planId)), ECRITURES_SIMULTANEES, (x) => this.ecrireRepere(x));
+    compteRendu.push(...(await this.appliquerArborescence()));
+    // Photos déjà connues, reclassées ou commentées sur l'autre appareil.
+    for (const p of r.photosModifiees) {
+      const avant = this.photos.find((x) => x.id === p.id);
+      if (avant) await this.deplacerPhoto(avant, { ...p, rang: p.repereId ? this.rangLibre(p.repereId, p.date, p.id) : 0 });
+    }
+    // Locaux renommés ou renumérotés : leurs photos changent de nom.
+    const locauxModifies = new Set(r.locaux.map((l) => l.id));
+    compteRendu.push(...(await this.rangerPhotos(this.photos.filter((p) => locauxModifies.has(this.repereDe(p)?.localId ?? '')))));
+    // Un local qui va recevoir des photos doit avoir un numéro (il figure dans les noms de fichiers).
+    for (const repereId of new Set(r.photosNouvelles.flatMap((p) => (p.repereId ? [p.repereId] : [])))) {
+      await this.numeroterLocalDuRepere(repereId, auteur);
+    }
+    return compteRendu;
+  }
+
+  /**
+   * Ajoute une photo reçue par paquet (identifiant, date et auteur d'origine conservés) :
+   * rang et chemin recalculés ici. Peut être appelée plusieurs fois en parallèle.
+   */
+  async ajouterPhotoImportee(meta: Photo, jpeg: Blob, miniature: Blob | null): Promise<Photo> {
+    if (this.photos.some((p) => p.id === meta.id)) return this.photos.find((p) => p.id === meta.id)!;
+    const repereId = meta.repereId && this.reperes.some((r) => r.id === meta.repereId) ? meta.repereId : null;
+    // Réservation immédiate du rang et du chemin, avant toute écriture.
+    const photo: Photo = {
+      ...meta,
+      repereId,
+      rang: repereId ? this.rangLibre(repereId, meta.date) : 0,
+      fichier: '',
+      miniature: `${DOSSIER_MINIATURES}/${meta.id}.jpg`,
+      taille: jpeg.size,
+    };
+    photo.fichier = this.cheminAttendu(photo);
+    this.photos = [...this.photos, photo];
+    try {
+      while (await this.stockage.existe(photo.fichier)) {
+        // Fichier présent mais inconnu (photo d'un collègue pas encore relue) : rang suivant.
+        photo.rang++;
+        photo.fichier = this.cheminAttendu(photo);
+      }
+      await this.stockage.ecrireFichier(photo.fichier, jpeg);
+      if (miniature) await this.stockage.ecrireFichier(photo.miniature, miniature);
+      await ecrireJson(this.stockage, `${DOSSIER_PHOTOS}/${photo.id}.json`, photo);
+      return photo;
+    } catch (e) {
+      this.photos = this.photos.filter((p) => p.id !== photo.id);
+      throw e;
     }
   }
 

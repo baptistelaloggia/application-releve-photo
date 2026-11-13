@@ -7,24 +7,34 @@ import { EcranPlan } from './plan/EcranPlan';
 import { dateLisible, Journal, Message, tailleLisible, texteErreur } from './commun';
 import { ImportPlans } from './ImportPlans';
 import { DetectionGlobale } from './DetectionGlobale';
+import { Echanges } from './Echanges';
+import { choixDeDossierDisponible } from '../stockage/acces';
 import { preparerMiniature } from '../photo/compression';
 
 interface Props {
   espace: EspaceProjet;
   connu: ProjetConnu;
   auteur: string;
+  /** Paquet .zip à importer dès l'ouverture. */
+  paquetInitial?: File | null;
   surFermer: () => void;
 }
 
-export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
+export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }: Props) {
   const [, setVersion] = useState(0);
   const [journal, setJournal] = useState<string[]>(() => [
     ...espace.avertissements.map((a) => `Attention : ${a}`),
+    ...(espace.fichiersLus === 0
+      ? []
+      : [
     `Projet ouvert en ${espace.dureeOuverture.toFixed(1).replace('.', ',')} s, dont lecture ${espace.dureeLecture.toFixed(1).replace('.', ',')} s (${espace.fichiersLus} fichiers de données) : ${espace.detailLecture.join(' ; ')}`,
+        ]),
   ]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [nouveauNiveau, setNouveauNiveau] = useState('');
   const [detectionGlobale, setDetectionGlobale] = useState(false);
+  // Paquet reçu à l'ouverture : lu une seule fois (pas à chaque retour depuis un plan).
+  const [paquet, setPaquet] = useState<File | null>(paquetInitial ?? null);
   const sansNumero = espace.locaux.filter((l) => !l.numero).length;
   const [planOuvert, setPlanOuvert] = useState<{ planId: string; localId: string | null } | null>(null);
   const [occupe, setOccupe] = useState(false);
@@ -103,6 +113,16 @@ export function EcranProjet({ espace, connu, auteur, surFermer }: Props) {
         <BarreRecherche espace={espace} surChoix={(r) => setPlanOuvert({ planId: r.plan.id, localId: r.local.id })} />
         <Journal lignes={journal} />
       </section>
+
+      <Echanges
+        espace={espace}
+        auteur={auteur}
+        surPC={choixDeDossierDisponible()}
+        paquetInitial={paquet}
+        surPaquetLu={() => setPaquet(null)}
+        surJournal={(lignes) => setJournal((j) => [...lignes, ...j])}
+        surModifie={() => setVersion((v) => v + 1)}
+      />
 
       <section className="carte">
         <h2>Niveaux et plans</h2>

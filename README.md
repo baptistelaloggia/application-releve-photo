@@ -12,7 +12,8 @@ Application, sur téléphone Android et PC Windows, qui sert à localiser des ph
 | 1. Socle | Réalisé : création de projet, niveaux, import et découpage des plans PDF, arborescence normalisée, test d'écriture sur le serveur |
 | 2. Plans et locaux | Réalisé : affichage fluide des plans (zoom, tuiles), détection et correction des locaux, recherche |
 | 3. Terrain | Réalisé : repères, photo en 2 appuis avec l'appareil photo de l'appli, rafale, panier à classer, compression (EXIF conservé), hors ligne |
-| 4 à 7 | À faire |
+| 4. Synchro zip | Réalisé : paquet PC → téléphone (plans, locaux, repères), retour téléphone → PC (photos), fusion et rangement sur le serveur |
+| 5 à 7 | À faire |
 
 ## Utiliser l'application
 
@@ -22,6 +23,14 @@ Adresse : **https://baptistelaloggia.github.io/application-releve-photo/** (mise
 - **Sur téléphone Android** : ouvrir l'adresse dans Chrome, puis menu ⋮ et « Ajouter à l'écran d'accueil » (ou « Installer l'application »).
 
 L'application installée fonctionne ensuite hors ligne. Les plans et les photos restent sur l'appareil ou sur le serveur : rien ne passe par GitHub.
+
+### Déroulé d'une visite
+
+1. **Au bureau, sur le PC** : ouvrir le projet du serveur, puis « Préparer le paquet pour le téléphone », puis « Télécharger ». Copier le fichier `…_pour-telephone_….zip` sur le téléphone (câble USB ou OneDrive).
+2. **Sur le téléphone** : accueil, « Importer un paquet .zip… » ; le projet est créé ou mis à jour, puis « Importer et ranger ».
+3. **Sur le terrain** : photos, hors ligne.
+4. **Au retour, sur le téléphone** : « Exporter la visite pour le serveur », puis « Partager… » (OneDrive) ou « Télécharger » (le fichier est dans Téléchargements, à récupérer par câble USB).
+5. **Sur le PC** : « Importer un paquet du téléphone… », vérifier l'aperçu, puis « Importer et ranger ». Les photos sont rangées sur le serveur.
 
 ## Tester l'application sur un PC sans connexion (fichier unique)
 
