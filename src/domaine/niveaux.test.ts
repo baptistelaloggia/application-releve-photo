@@ -54,12 +54,21 @@ describe('codes de niveau', () => {
     expect(devinerNiveauPage('PLAN DE NIVEAU - ENTRESOL')).toBe('ES');
     expect(devinerNiveauPage('PLAN DE NIVEAU - SS1')).toBe('SS1');
     expect(devinerNiveauPage('CARNET DE PLANS DE NIVEAUX Phase Emetteur Lot Niveau Zone')).toBeNull();
+    // Titre en bas à gauche et cartouche : « PLAN - R+2 MARCHE », « PLAN R02 ».
+    expect(devinerNiveauPage('Terrasse R+5 PLAN - R+2 MARCHE NIVEAU échelle PLAN R02')).toBe('R+2');
+    expect(devinerNiveauPage('PLAN RDC PLAN - RDC MARCHE')).toBe('RDC');
+    expect(devinerNiveauPage('PLAN SS1 PLAN - SS1 MARCHE')).toBe('SS1');
+    expect(devinerNiveauPage('Terrasse R+6 Toiture R+8 PLAN TOITURE PLAN - Toiture MARCHE')).toBe('TT');
+    expect(devinerNiveauPage('PLAN R06M PLAN - R+6M MARCHE')).toBe('R+6M');
+    expect(devinerNiveauPage('PLAN R05')).toBe('R+5');
   });
 
   it('accepte les niveaux intermédiaires à code libre', () => {
     expect(normaliserCodeNiveau('R+4 mezzanine')).toBe('R+4-MEZZANINE');
     expect(normaliserCodeNiveau('Mezzanine Hall')).toBe('MEZZANINE-HALL');
     expect(normaliserCodeNiveau('ss')).toBe('SS1');
+    expect(normaliserCodeNiveau('R06M')).toBe('R+6M');
+    expect(trierNiveaux(['TT', 'R+6M', 'R+6', 'R+7'])).toEqual(['R+6', 'R+6M', 'R+7', 'TT']);
     expect(trierNiveaux(['TT', 'R+4-MEZZANINE', 'R+5', 'R+4'])).toEqual(['R+4', 'R+4-MEZZANINE', 'R+5', 'TT']);
     expect(trierNiveaux(['TT', 'COMBLES', 'R+5'])).toEqual(['R+5', 'COMBLES', 'TT']);
   });
