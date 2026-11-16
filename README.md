@@ -13,7 +13,8 @@ Application, sur téléphone Android et PC Windows, qui sert à localiser des ph
 | 2. Plans et locaux | Réalisé : affichage fluide des plans (zoom, tuiles), détection et correction des locaux, recherche |
 | 3. Terrain | Réalisé : repères, photo en 2 appuis avec l'appareil photo de l'appli, rafale, panier à classer, compression (EXIF conservé), hors ligne |
 | 4. Synchro zip | Réalisé : paquet PC → téléphone (plans, locaux, repères), retour téléphone → PC (photos), fusion et rangement sur le serveur |
-| 5 à 7 | À faire |
+| 5. SharePoint transit | Développé : publication de la copie de travail, dépôt des visites, collecte et purge. En attente de la DSI (voir `docs/NOTE_DSI.md`) |
+| 6 et 7 | À faire |
 
 ## Utiliser l'application
 

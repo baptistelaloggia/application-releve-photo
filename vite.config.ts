@@ -30,7 +30,16 @@ export default defineConfig(({ mode }) => {
       : {},
     build: fichierUnique
       ? { outDir: 'dist-test', assetsInlineLimit: 100_000_000 }
-      : { outDir: 'dist' },
+      : {
+          outDir: 'dist',
+          // Deux pages : l'appli, et la page de retour de la connexion Microsoft (transit SharePoint).
+          rollupOptions: {
+            input: {
+              appli: fileURLToPath(new URL('./index.html', import.meta.url)),
+              retour: fileURLToPath(new URL('./msal-retour.html', import.meta.url)),
+            },
+          },
+        },
     plugins: [
       react(),
       fichierUnique

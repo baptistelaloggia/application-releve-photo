@@ -8,6 +8,7 @@ import { dateLisible, Journal, Message, tailleLisible, texteErreur } from './com
 import { ImportPlans } from './ImportPlans';
 import { DetectionGlobale } from './DetectionGlobale';
 import { Echanges } from './Echanges';
+import { TransitProjet } from './TransitProjet';
 import { choixDeDossierDisponible } from '../stockage/acces';
 import { preparerMiniature } from '../photo/compression';
 
@@ -120,6 +121,14 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
         surPC={choixDeDossierDisponible()}
         paquetInitial={paquet}
         surPaquetLu={() => setPaquet(null)}
+        surJournal={(lignes) => setJournal((j) => [...lignes, ...j])}
+        surModifie={() => setVersion((v) => v + 1)}
+      />
+
+      <TransitProjet
+        espace={espace}
+        auteur={auteur}
+        surPC={choixDeDossierDisponible()}
         surJournal={(lignes) => setJournal((j) => [...lignes, ...j])}
         surModifie={() => setVersion((v) => v + 1)}
       />

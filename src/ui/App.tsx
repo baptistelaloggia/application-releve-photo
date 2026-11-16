@@ -7,11 +7,13 @@ import { Accueil } from './Accueil';
 import { NouveauProjet } from './NouveauProjet';
 import { EcranProjet } from './EcranProjet';
 import { Diagnostic } from './Diagnostic';
+import { ReglagesTransit } from './ReglagesTransit';
 
 type Ecran =
   | { type: 'accueil' }
   | { type: 'nouveau' }
   | { type: 'diagnostic' }
+  | { type: 'transit' }
   | { type: 'projet'; espace: EspaceProjet; connu: ProjetConnu; paquet?: File | null };
 
 export function App() {
@@ -69,12 +71,15 @@ export function App() {
           <Accueil
             surNouveau={() => setEcran({ type: 'nouveau' })}
             surDiagnostic={() => setEcran({ type: 'diagnostic' })}
+            surReglagesTransit={() => setEcran({ type: 'transit' })}
             surOuvert={ouvert}
           />
         ) : ecran.type === 'nouveau' ? (
           <NouveauProjet auteur={auteur} surAnnuler={accueil} surCree={ouvert} />
         ) : ecran.type === 'diagnostic' ? (
           <Diagnostic surRetour={accueil} />
+        ) : ecran.type === 'transit' ? (
+          <ReglagesTransit surRetour={accueil} />
         ) : (
           <EcranProjet
             key={ecran.connu.id}
