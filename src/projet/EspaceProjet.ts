@@ -788,6 +788,12 @@ export class EspaceProjet {
     return existant ?? this.creerRepere(local.planId, local.x, local.y, auteur, localId, { surEtiquette: true });
   }
 
+  /** Photos d'un plan (tous ses repères, étiquettes de locaux comprises). */
+  photosDuPlan(planId: string): Photo[] {
+    const ids = new Set(this.reperes.filter((r) => r.planId === planId).map((r) => r.id));
+    return this.photos.filter((p) => p.repereId && ids.has(p.repereId));
+  }
+
   /** Photos d'un local (tous ses repères), de la plus ancienne à la plus récente. */
   photosDuLocal(localId: string): Photo[] {
     const ids = new Set(this.reperes.filter((r) => r.localId === localId).map((r) => r.id));

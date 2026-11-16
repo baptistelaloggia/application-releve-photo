@@ -135,6 +135,7 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
                 <th>Plan courant</th>
                 <th>Indice</th>
                 <th>Locaux</th>
+                <th>Photos</th>
                 <th>Ordre</th>
                 <th></th>
               </tr>
@@ -186,6 +187,7 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
                       ) : null}
                     </td>
                     <td>{plan ? espace.locauxDuPlan(plan.id).length : ''}</td>
+                    <td>{plan ? espace.photosDuPlan(plan.id).length : ''}</td>
                     <td className="actions-ligne">
                       <button
                         className="petit"

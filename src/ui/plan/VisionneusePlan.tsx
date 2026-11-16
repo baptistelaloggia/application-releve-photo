@@ -43,10 +43,29 @@ interface Props {
   surAppuiMarqueur?: (id: string) => void;
   /** Appui long (0,5 s) sur un marqueur : par ex. photo directe sur l'étiquette d'un local. */
   surAppuiLongMarqueur?: (id: string) => void;
+  /**
+   * Double appui sur un marqueur (photos du repère ou du local). Quand il est fourni, le simple
+   * appui n'est traité qu'après un court délai, le temps de vérifier qu'aucun second appui ne suit.
+   */
+  surDoubleAppuiMarqueur?: (id: string) => void;
 }
 
+/** Délai (ms) pour reconnaître un double appui ; le simple appui est traité au-delà. */
+const DELAI_DOUBLE_APPUI = 280;
+
 export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function VisionneusePlan(
-  { cle, fichier, marqueurs, focus, modePlacement, surAppuiPlan, surAppuiLongPlan, surAppuiMarqueur, surAppuiLongMarqueur },
+  {
+    cle,
+    fichier,
+    marqueurs,
+    focus,
+    modePlacement,
+    surAppuiPlan,
+    surAppuiLongPlan,
+    surAppuiMarqueur,
+    surAppuiLongMarqueur,
+    surDoubleAppuiMarqueur,
+  },
   ref,
 ) {
   const conteneur = useRef<HTMLDivElement>(null);
@@ -60,6 +79,8 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
   const [zoom, setZoom] = useState(100);
   // Appui long sur un marqueur : minuterie, et clic qui suit ignoré.
   const appuiLongMarqueur = useRef<{ minuterie: number; declenche: boolean; x: number; y: number } | null>(null);
+  // Distinction simple appui / double appui sur un marqueur.
+  const dernierAppui = useRef<{ id: string; minuterie: number } | null>(null);
   const annulerAppuiLong = () => {
     if (appuiLongMarqueur.current) window.clearTimeout(appuiLongMarqueur.current.minuterie);
   };
@@ -135,7 +156,25 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
                   appuiLongMarqueur.current = null;
                   return;
                 }
-                surAppuiMarqueur?.(m.id);
+                if (!surDoubleAppuiMarqueur) {
+                  surAppuiMarqueur?.(m.id);
+                  return;
+                }
+                const precedent = dernierAppui.current;
+                if (precedent?.id === m.id) {
+                  window.clearTimeout(precedent.minuterie);
+                  dernierAppui.current = null;
+                  surDoubleAppuiMarqueur(m.id);
+                  return;
+                }
+                if (precedent) window.clearTimeout(precedent.minuterie);
+                dernierAppui.current = {
+                  id: m.id,
+                  minuterie: window.setTimeout(() => {
+                    dernierAppui.current = null;
+                    surAppuiMarqueur?.(m.id);
+                  }, DELAI_DOUBLE_APPUI),
+                };
               }}
             >
               <span className="marqueur-point" />

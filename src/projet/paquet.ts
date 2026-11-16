@@ -288,23 +288,11 @@ export async function lirePhotos(
   if (erreur) throw erreur;
 }
 
-/** Propose le paquet : partage (téléphone : OneDrive, e-mail…) ou téléchargement. */
-export async function partagerPaquet(fichier: File): Promise<'partage' | 'annule'> {
-  const n = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (!n.canShare?.({ files: [fichier] })) throw new Error('Partage impossible sur cet appareil : utilisez « Télécharger ».');
-  try {
-    await navigator.share({ files: [fichier], title: fichier.name });
-    return 'partage';
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') return 'annule';
-    throw e;
-  }
-}
-
-export function partageDisponible(fichier: File): boolean {
-  const n = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  return !!n.canShare?.({ files: [fichier] });
-}
+/*
+ * Pas de bouton « Partager » : Chrome et Edge refusent de partager un fichier .zip
+ * (« NotAllowedError », constaté le 16/11/2026 sur PC et sur Android ; le partage de
+ * fichiers est limité aux images, vidéos, PDF et textes). Le paquet est téléchargé.
+ */
 
 export function telechargerPaquet(fichier: File, nom: string) {
   const url = URL.createObjectURL(fichier);

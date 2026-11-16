@@ -322,6 +322,25 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
     }
   }
 
+  /** Double appui sur un repère ou sur l'étiquette d'un local : ses photos, la plus récente d'abord affichée. */
+  function surDoubleAppuiMarqueur(id: string) {
+    if (mode.type !== 'consultation') return;
+    const repereId = id.startsWith(PREFIXE_REPERE) ? id.slice(PREFIXE_REPERE.length) : null;
+    const photos = repereId ? espace.photosDuRepere(repereId) : espace.photosDuLocal(id);
+    if (repereId) {
+      setSelection(null);
+      setRepereSel(repereId);
+    } else {
+      setRepereSel(null);
+      setSelection(id);
+    }
+    if (photos.length === 0) {
+      setInfo('Aucune photo pour l’instant.');
+      return;
+    }
+    setPhotoOuverte({ photos, index: photos.length - 1 });
+  }
+
   /** Appui long sur une étiquette de local ou un repère : l'action inverse du simple appui. */
   function surAppuiLongMarqueur(id: string) {
     if (mode.type !== 'consultation') return;
@@ -479,6 +498,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               surAppuiPlan={surAppuiPlan}
               surAppuiLongPlan={surAppuiLongPlan}
               surAppuiLongMarqueur={surAppuiLongMarqueur}
+              surDoubleAppuiMarqueur={surDoubleAppuiMarqueur}
               surAppuiMarqueur={surAppuiMarqueur}
             />
           ) : (
