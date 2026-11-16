@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react';
-import { fusionner, type ResultatFusion } from '../domaine/fusion';
 import type { EspaceProjet } from '../projet/EspaceProjet';
-import {
-  exporterPaquet,
-  lireEnTete,
-  lirePhotos,
-  telechargerPaquet,
-  type EnTetePaquet,
-} from '../projet/paquet';
+import { exporterPaquet, telechargerPaquet } from '../projet/paquet';
+import { ErreurImport, executerImport, preparerImport as preparer, type ImportPrepare } from '../projet/importPaquet';
 import { marquerPhotosExportees, photosExportees } from '../stockage/registre';
 import { Message, tailleLisible, texteErreur } from './commun';
 
@@ -24,9 +18,7 @@ interface Props {
   surModifie: () => void;
 }
 
-type Import =
-  | { etape: 'apercu'; fichier: File; entete: EnTetePaquet; fusion: ResultatFusion }
-  | { etape: 'encours'; progression: string };
+type Import = ({ etape: 'apercu'; fichier: File } & ImportPrepare) | { etape: 'encours'; progression: string };
 
 /**
  * Échanges par paquet .zip (lot 4) :
@@ -85,51 +77,22 @@ export function Echanges({ espace, auteur, surPC, paquetInitial, surPaquetLu, su
     setErreur(null);
     setImp({ etape: 'encours', progression: 'Lecture du paquet…' });
     try {
-      const entete = await lireEnTete(fichier);
-      if (entete.manifeste.projet.id !== espace.projet.id) {
-        throw new Error(
-          `Ce paquet concerne un autre projet : « ${entete.manifeste.projet.nom} » (${entete.manifeste.projet.dossier}).`,
-        );
-      }
-      setImp({ etape: 'apercu', fichier, entete, fusion: fusionner(espace.donnees(), entete.donnees) });
+      setImp({ etape: 'apercu', fichier, ...(await preparer(espace, fichier)) });
     } catch (e) {
       setImp(null);
       setErreur(texteErreur(e));
     }
   }
 
-  async function importer(fichier: File, entete: EnTetePaquet, fusion: ResultatFusion) {
+  async function importer(fichier: File, prepare: ImportPrepare) {
     setErreur(null);
-    const compteRendu: string[] = [];
     try {
-      setImp({ etape: 'encours', progression: 'Mise à jour des plans, locaux et repères…' });
-      compteRendu.push(...(await espace.appliquerFusion(fusion, (id) => entete.pdfs.get(id), auteur)));
-      const voulues = new Map(fusion.photosNouvelles.map((p) => [p.id, p]));
-      let faites = 0;
-      const debut = performance.now();
-      if (voulues.size) {
-        await lirePhotos(fichier, new Set(voulues.keys()), async (id, jpeg, miniature) => {
-          await espace.ajouterPhotoImportee(voulues.get(id)!, jpeg, miniature);
-          voulues.delete(id);
-          faites++;
-          setImp({ etape: 'encours', progression: `Photos rangées : ${faites}/${fusion.photosNouvelles.length}` });
-        });
-      }
-      if (faites) {
-        compteRendu.unshift(
-          `${faites} photo${faites > 1 ? 's' : ''} rangée${faites > 1 ? 's' : ''} en ${((performance.now() - debut) / 1000).toFixed(0)} s`,
-        );
-      }
-      if (voulues.size) {
-        compteRendu.push(
-          `Attention : ${voulues.size} photo(s) décrite(s) dans le paquet sans leur fichier (déjà transmises dans un paquet précédent non importé ?). Sur le téléphone, réexportez en cochant « inclure aussi les photos déjà exportées ».`,
-        );
-      }
-      compteRendu.unshift(`Paquet importé : ${fichier.name}`);
-      surJournal(compteRendu);
+      surJournal(
+        await executerImport(espace, fichier, fichier.name, prepare, auteur, (t) => setImp({ etape: 'encours', progression: t })),
+      );
     } catch (e) {
       setErreur(`Import interrompu : ${texteErreur(e)}. Ce qui a été rangé est conservé ; relancez l'import pour terminer.`);
-      surJournal(compteRendu);
+      if (e instanceof ErreurImport) surJournal(e.compteRendu);
     } finally {
       setImp(null);
       surModifie();
@@ -206,7 +169,7 @@ export function Echanges({ espace, auteur, surPC, paquetInitial, surPaquetLu, su
         <ApercuImport
           imp={imp}
           surAnnuler={() => setImp(null)}
-          surImporter={() => void importer(imp.fichier, imp.entete, imp.fusion)}
+          surImporter={() => void importer(imp.fichier, imp)}
         />
       )}
       {erreur && <Message type="erreur">{erreur}</Message>}

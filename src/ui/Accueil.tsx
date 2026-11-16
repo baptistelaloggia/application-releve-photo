@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { ErreurPasUnProjet, type EspaceProjet } from '../projet/EspaceProjet';
 import { creerProjetDepuisPaquet, ouvrirProjet } from '../projet/ouverture';
 import { lireEnTete } from '../projet/paquet';
+import { lireConfigTransit } from '../transit/config';
+import { listerProjetsTransit, telechargerCopie, type VersionCopie } from '../transit/protocole';
+import { TransitGraph } from '../transit/TransitGraph';
 import { avecDelai, choisirDossier, choixDeDossierDisponible, dossierAppareil, dossierProjetAppareil, verifierPermission } from '../stockage/acces';
 import { listerProjetsConnus, oublierProjet, type ProjetConnu } from '../stockage/registre';
 import { dateLisible, Message, texteErreur } from './commun';
@@ -9,10 +12,16 @@ import { dateLisible, Message, texteErreur } from './commun';
 interface Props {
   surNouveau: () => void;
   surDiagnostic: () => void;
+  surReglagesTransit: () => void;
   surOuvert: (espace: EspaceProjet, connu: ProjetConnu, paquet?: File | null) => void;
 }
 
-export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
+export function Accueil({ surNouveau, surDiagnostic, surReglagesTransit, surOuvert }: Props) {
+  const [transit, setTransit] = useState<TransitGraph | null>(null);
+  const [projetsTransit, setProjetsTransit] = useState<VersionCopie[] | null>(null);
+  useEffect(() => {
+    void lireConfigTransit().then((c) => setTransit(c ? new TransitGraph(c) : null));
+  }, []);
   const [recents, setRecents] = useState<ProjetConnu[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
@@ -159,6 +168,71 @@ export function Accueil({ surNouveau, surDiagnostic, surOuvert }: Props) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="carte">
+        <h2>Transit SharePoint</h2>
+        {transit ? (
+          <>
+            <p className="discret">
+              Projets dont une copie de travail est publiée sur le transit : un appui la récupère sur cet appareil (projet
+              créé ou mis à jour).
+            </p>
+            <div className="boutons">
+              <button
+                disabled={occupe}
+                onClick={() =>
+                  void executer(async () => {
+                    setEtape('Connexion à SharePoint…');
+                    setProjetsTransit(await listerProjetsTransit(transit));
+                  })
+                }
+              >
+                Projets disponibles sur le transit…
+              </button>
+              <button className="petit" onClick={surReglagesTransit}>
+                Réglages SharePoint
+              </button>
+            </div>
+            {projetsTransit && projetsTransit.length === 0 && <p className="discret">Aucun projet publié sur le transit.</p>}
+            {projetsTransit && projetsTransit.length > 0 && (
+              <ul className="liste-projets">
+                {projetsTransit.map((v) => (
+                  <li key={v.projet.id}>
+                    <button
+                      className="projet"
+                      disabled={occupe}
+                      onClick={() =>
+                        void executer(async () => {
+                          setEtape(`Téléchargement de la copie de travail de « ${v.projet.nom} »…`);
+                          const fichier = await telechargerCopie(transit, v.projet);
+                          await importerPaquet(fichier);
+                        })
+                      }
+                    >
+                      <strong>{v.projet.nom}</strong>
+                      <span className="discret">
+                        {v.projet.dossier} · publié le {dateLisible(v.publieLe)} par {v.publiePar}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="discret">
+              Non configuré. Le transit SharePoint remplace le câble USB pour les échanges entre téléphone et serveur ; il
+              demande des valeurs fournies par la DSI.
+            </p>
+            <div className="boutons">
+              <button className="petit" onClick={surReglagesTransit}>
+                Réglages SharePoint
+              </button>
+            </div>
+          </>
         )}
       </section>
 

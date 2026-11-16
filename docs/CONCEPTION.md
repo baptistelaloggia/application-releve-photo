@@ -189,6 +189,18 @@ Règles issues du lot 1 (04/11/2026) :
 - **Limites connues** [À TRAITER au lot 5] : les **suppressions ne sont pas transmises**. Un local supprimé sur le PC revient au prochain retour du téléphone s'il y existe encore. Les photos exportées restent sur le téléphone : la libération de place est à prévoir.
 - **Validation** (test automatique `synchro-lot4.mjs`, deux appareils simulés) : PC → téléphone, visite de 300 photos sur le téléphone, retour → PC, rangement conforme, second import sans effet. [À VÉRIFIER sur appareils réels : durée de l'export et du transfert d'environ 350 Mo pour 300 photos de 1,2 Mo.]
 
+## A.6 sexies Transit SharePoint (lot 5, 16/11/2026)
+
+- **Principe** : SharePoint ne fait que **transporter les paquets .zip du lot 4**. Le serveur partagé reste la seule référence (A.4-2 et A.4-3). Une bibliothèque unique, avec un dossier par projet, `{dossier du projet}__{8 premiers caractères de l'identifiant}/` :
+  - `copie-de-travail/travail.zip` et `version.json` : publiés par le PC (option A, A.4-9), récupérés par les téléphones, supprimés à la clôture ;
+  - `depots/{paquet de retour}.zip` : déposés par les téléphones, **supprimés par le PC une fois tout rangé** sur le serveur.
+- **PC** (carte « Transit SharePoint » de l'écran projet) : « Publier la copie de travail » ; « Collecter et ranger les visites », qui télécharge chaque dépôt, l'importe (fusion du lot 4), puis le supprime du transit ; « Clôture : supprimer du transit ».
+- **Téléphone** : à l'accueil, « Projets disponibles sur le transit », qui crée le projet sur l'appareil ; dans le projet, « Mettre à jour la copie de travail », qui signale une nouvelle version, et « Envoyer la visite ». Les photos ne sont comptées comme transmises qu'une fois le dépôt terminé.
+- **Connexion** : MSAL.js (version 5), application monopage, code d'autorisation + PKCE, sans secret. Permission Graph déléguée `Sites.Selected`. Fenêtre de connexion Microsoft à la première utilisation, puis renouvellement silencieux. Page de retour `msal-retour.html`. La bibliothèque MSAL n'est chargée qu'à la première utilisation.
+- **Envoi** : un fichier de moins de 4 Mo part en un seul envoi ; au-delà, il passe par une session d'envoi, en morceaux de 9,4 Mo (un multiple de 320 Kio, comme l'exige Graph). Les appels sont retentés automatiquement sur les erreurs 429, 503 et 504, et en cas de coupure réseau passagère.
+- **Réglages** (écran « Réglages SharePoint » de l'accueil) : identifiant du locataire, identifiant de l'application, adresse du site, nom de la bibliothèque. Ils sont saisis ou importés depuis un fichier `.json` fourni par la DSI, et **gardés sur l'appareil, jamais dans le dépôt** (qui est public).
+- **Validation** (test automatique `transit-lot5.mjs`, contre une imitation de Microsoft Graph) : publication, récupération par le téléphone, visite, dépôt de 12 Mo en 2 morceaux, collecte, rangement et purge du dépôt, mise à jour de la copie après une modification sur le PC, clôture. **La connexion Microsoft réelle n'est pas testée** : elle attend la DSI (demandes 1 à 3 de `docs/NOTE_DSI.md`). [À VÉRIFIER alors : fenêtre de connexion dans l'appli installée sur Android ; prise en charge de `Sites.Selected` en délégué.]
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
@@ -223,7 +235,7 @@ Règles issues du lot 1 (04/11/2026) :
 | 2. Plans et locaux | Affichage par tuiles, détection et correction des locaux, recherche | « Je tape TGBT, je trouve le local » (**réalisé le 05/11/2026**, vérifié sur un vrai carnet : le TGBT du SS1 est trouvé) |
 | 3. Terrain | Repères, photo en 2 appuis, panier à classer, hors ligne, compression | Visite de 300 photos en mode avion (**réalisé le 10/11/2026**, validé en test automatique ; essai sur téléphone à faire) |
 | 4. Synchro zip | Export et import `.zip`, rangement, contrôle des doublons | **Première version utilisable de bout en bout** (**réalisé le 13/11/2026**, validé en test automatique ; essai réel à faire) |
-| 5. SharePoint transit | MSAL, envoi depuis le téléphone, collecte par le PC puis purge | Deux personnes sur un même projet |
+| 5. SharePoint transit | MSAL, envoi depuis le téléphone, collecte par le PC puis purge | Deux personnes sur un même projet (**développé le 16/11/2026**, testé contre une imitation de Graph ; **en attente de la DSI** pour l'essai réel) |
 | 6. Suivi dans le temps | Transparence, frise, avant/après, direction | Même cadrage à 2 dates |
 | 7. Exports | Rapport PDF, liste Excel | Livrable d'audit |
 
@@ -239,7 +251,7 @@ Les lots 1 à 4 ne dépendent pas de la DSI.
    - 04/11/2026 : un premier carnet reçu (11 pages, A1, une page par niveau, texte vectoriel), utilisé hors dépôt. Les 10 niveaux ont été reconnus automatiquement. Les noms de locaux sont présents en texte (« BUREAUX », « COUR CENTRALE », « SANIT. F », « LOCAL VELOS »…), ce qui est favorable au lot 2. [À VÉRIFIER au lot 2 : présence de numéros de locaux, et lecture correcte des étiquettes sur plusieurs lignes.]
 4. ~~**Écriture sur un lecteur réseau mappé**~~ **VALIDÉ le 05/11/2026** par l'utilisateur sur le serveur réel, avec l'écran « Tester l'écriture sur le serveur » : toutes les étapes réussies (écriture de 1 Mo en 0,5 s, renommage de dossier en 0,6 s).
 5. ~~**« Une appli par projet »**~~ **TRANCHÉ le 04/11/2026** : un espace isolé par projet dans une seule application.
-6. **Note à la DSI** : une première version a été rédigée, mais elle décrit **l'ancienne architecture** (SharePoint comme stockage définitif, un site par projet). **Elle est à refaire** selon A.4 :
+6. **Note à la DSI** : **réécrite le 16/11/2026** selon l'architecture actuelle, dans `docs/NOTE_DSI.md` (à transmettre). Elle remplace une première version, qui décrivait **l'ancienne architecture** (SharePoint comme stockage définitif, un site par projet). **Elle est à refaire** selon A.4 :
    - stockage définitif sur le serveur partagé ;
    - **une seule bibliothèque SharePoint de transit**, avec permission Sites.Selected limitée à elle ;
    - durée de séjour courte, purge après collecte ;

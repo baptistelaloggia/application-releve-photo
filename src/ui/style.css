@@ -282,3 +282,5 @@ button.projet .discret { font-size: 0.85rem; }
 .resultat-export, .apercu-import { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--fond); }
 .apercu-import h3 { font-size: 1rem; margin: 0 0 8px; }
 .alertes-import { color: var(--erreur); margin: 8px 0; padding-left: 20px; }
+.etat-transit { margin: 8px 0; padding-left: 20px; }
+.petit-bouton { min-height: 40px; font-size: 0.9rem; margin-top: 8px; }

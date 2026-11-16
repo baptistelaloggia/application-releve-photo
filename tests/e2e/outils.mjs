@@ -85,3 +85,116 @@ export async function arborescenceOpfs(page, chemin) {
     return lignes;
   }, chemin.split('/'));
 }
+
+/**
+ * Imitation de Microsoft Graph (bibliothèque SharePoint « Transit ») pour les tests du lot 5.
+ * Reproduit les seules opérations utilisées par l'appli, avec les règles de Graph qui comptent :
+ * jeton exigé (sauf sur l'adresse de session d'envoi, où il est interdit), envoi simple limité à 4 Mo,
+ * envoi en morceaux multiples de 320 Kio par session.
+ */
+export function grapheFictif() {
+  const fichiers = new Map(); // chemin → { contenu: Buffer, modifieLe }
+  const sessions = new Map(); // jeton de session → { chemin, morceaux: Buffer[], recu, total }
+  const etat = { sessions: 0, morceaux: 0, plusGrosEnvoi: 0 };
+  const LECTEUR = 'lecteur-transit';
+
+  const json = (res, statut, corps) => res.writeHead(statut, { 'content-type': 'application/json' }).end(JSON.stringify(corps));
+  const lireCorps = (req) =>
+    new Promise((ok) => {
+      const morceaux = [];
+      req.on('data', (m) => morceaux.push(m));
+      req.on('end', () => ok(Buffer.concat(morceaux)));
+    });
+  const enfants = (dossier) => {
+    const prefixe = dossier ? `${dossier}/` : '';
+    const vus = new Map();
+    for (const [chemin, f] of fichiers) {
+      if (!chemin.startsWith(prefixe)) continue;
+      const reste = chemin.slice(prefixe.length);
+      const [nom, ...suite] = reste.split('/');
+      if (suite.length) vus.set(nom, { name: nom, folder: { childCount: 1 }, size: 0, lastModifiedDateTime: f.modifieLe });
+      else vus.set(nom, { name: nom, file: {}, size: f.contenu.length, lastModifiedDateTime: f.modifieLe });
+    }
+    return [...vus.values()];
+  };
+  const existeDossier = (dossier) => !dossier || [...fichiers.keys()].some((c) => c.startsWith(`${dossier}/`));
+
+  async function traiter(req, res, url) {
+    const p = url.pathname.slice('/graph'.length);
+    if (p === '/etat') return json(res, 200, { ...etat, fichiers: [...fichiers.keys()].sort() });
+    const session = /^\/session\/([\w-]+)$/.exec(p);
+    if (session) {
+      if (req.headers.authorization) return json(res, 401, { error: { message: 'Pas de jeton sur une session d’envoi' } });
+      const s = sessions.get(session[1]);
+      if (!s) return json(res, 404, { error: { message: 'session inconnue' } });
+      const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(req.headers['content-range'] ?? '');
+      const corps = await lireCorps(req);
+      if (!m || +m[1] !== s.recu || corps.length !== +m[2] - +m[1] + 1) return json(res, 416, { error: { message: 'plage incorrecte' } });
+      if (+m[2] + 1 < +m[3] && corps.length % (320 * 1024) !== 0) return json(res, 400, { error: { message: 'morceau non multiple de 320 Kio' } });
+      s.morceaux.push(corps);
+      s.recu += corps.length;
+      etat.morceaux++;
+      if (s.recu < +m[3]) return json(res, 202, { nextExpectedRanges: [`${s.recu}-`] });
+      fichiers.set(s.chemin, { contenu: Buffer.concat(s.morceaux), modifieLe: new Date().toISOString() });
+      etat.plusGrosEnvoi = Math.max(etat.plusGrosEnvoi, s.recu);
+      sessions.delete(session[1]);
+      return json(res, 201, { name: s.chemin.split('/').pop(), size: s.recu });
+    }
+    if (req.headers.authorization !== 'Bearer jeton-test') return json(res, 401, { error: { message: 'jeton absent' } });
+    if (/^\/sites\/[^/]+:\/sites\/[^/]+$/.test(p) && req.method === 'GET') return json(res, 200, { id: 'site-transit' });
+    if (p === '/sites/site-transit/drives') return json(res, 200, { value: [{ id: 'docs', name: 'Documents' }, { id: LECTEUR, name: 'Transit' }] });
+    if (p === `/drives/${LECTEUR}/root/children`) return json(res, 200, { value: enfants('') });
+    const m = new RegExp(`^/drives/${LECTEUR}/root:/(.+?)(?::(/children|/content|/createUploadSession))?$`).exec(p);
+    if (!m) return json(res, 404, { error: { message: `route inconnue ${p}` } });
+    if (m[1].endsWith(':')) return json(res, 400, { error: { message: 'chemin terminé par « : » sans action' } });
+    const chemin = m[1].split('/').map(decodeURIComponent).join('/');
+    const action = m[2] ?? '';
+    if (action === '/children' && req.method === 'GET') {
+      return existeDossier(chemin) ? json(res, 200, { value: enfants(chemin) }) : json(res, 404, { error: { message: 'introuvable' } });
+    }
+    if (action === '/content' && req.method === 'GET') {
+      const f = fichiers.get(chemin);
+      return f ? res.writeHead(200, { 'content-type': 'application/octet-stream' }).end(f.contenu) : json(res, 404, { error: { message: 'introuvable' } });
+    }
+    if (action === '/content' && req.method === 'PUT') {
+      const corps = await lireCorps(req);
+      if (corps.length > 4 * 1000 * 1000) return json(res, 413, { error: { message: 'envoi simple limité à 4 Mo' } });
+      fichiers.set(chemin, { contenu: corps, modifieLe: new Date().toISOString() });
+      etat.plusGrosEnvoi = Math.max(etat.plusGrosEnvoi, corps.length);
+      return json(res, 201, { name: chemin.split('/').pop(), size: corps.length });
+    }
+    if (action === '/createUploadSession' && req.method === 'POST') {
+      await lireCorps(req);
+      const jeton = Math.random().toString(36).slice(2);
+      sessions.set(jeton, { chemin, morceaux: [], recu: 0 });
+      etat.sessions++;
+      return json(res, 200, { uploadUrl: `${url.origin}/graph/session/${jeton}` });
+    }
+    if (!action && req.method === 'DELETE') {
+      for (const c of [...fichiers.keys()]) if (c === chemin || c.startsWith(`${chemin}/`)) fichiers.delete(c);
+      return res.writeHead(204).end();
+    }
+    return json(res, 405, { error: { message: 'méthode' } });
+  }
+  return { traiter, etat, fichiers };
+}
+
+/** Serveur de l'appli avec, sous /graph, l'imitation de Microsoft Graph. */
+export function servirAvecGraphe(dossier) {
+  const graphe = grapheFictif();
+  return new Promise((ok) => {
+    const serveur = createServer(async (req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      if (url.pathname.startsWith('/graph')) return void graphe.traiter(req, res, url).catch((e) => res.writeHead(500).end(String(e)));
+      let chemin = decodeURIComponent(url.pathname);
+      if (chemin.endsWith('/')) chemin += 'index.html';
+      try {
+        const contenu = await readFile(join(dossier, chemin));
+        res.writeHead(200, { 'content-type': types[extname(chemin)] ?? 'application/octet-stream' });
+        res.end(contenu);
+      } catch {
+        res.writeHead(404).end();
+      }
+    }).listen(0, () => ok({ serveur, graphe }));
+  });
+}
