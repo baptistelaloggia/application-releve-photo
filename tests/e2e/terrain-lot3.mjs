@@ -275,6 +275,20 @@ try {
   assert.ok(arbo.includes(`01_R+1/R+1.LT002_LOCAL-CTA/T03_R+1.LT002_P002_${jour}_02.jpg`), 'photos de P002 déplacées');
   assert.ok(!arbo.some((l) => l.startsWith('01_R+1/R+1.R1-01_BUREAUX')), 'dossier des bureaux vidé et supprimé');
 
+  // Double appui sur l'étiquette du local LT002 : ses photos s'ouvrent (la plus récente affichée).
+  await page.getByRole('button', { name: 'Fermer' }).first().click();
+  await page.getByRole('button', { name: 'Plan entier' }).click();
+  await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT002' }).dblclick();
+  await page.locator('.voile-photo').waitFor();
+  assert.match(await page.locator('.voile-photo').innerText(), /\d+\/\d+/);
+  await page.locator('.voile-photo').getByRole('button', { name: 'Fermer' }).click();
+  assert.equal(await page.locator('.camera').count(), 0, 'le double appui ne doit pas ouvrir l’appareil photo');
+  // Double appui sur le repère P001 : ses photos.
+  await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P001' }).dblclick();
+  await page.locator('.voile-photo').waitFor();
+  await page.locator('.voile-photo').getByRole('button', { name: 'Fermer' }).click();
+  assert.equal(await page.locator('.camera').count(), 0);
+
   // 8. Réglage « Appui : photo » : un appui sur l'étiquette du TGBT ouvre l'appareil photo ;
   //    l'appui long ouvre sa fiche.
   await page.getByRole('button', { name: 'Fermer' }).first().click();

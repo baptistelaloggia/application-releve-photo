@@ -29,7 +29,7 @@ L'application installée fonctionne ensuite hors ligne. Les plans et les photos 
 1. **Au bureau, sur le PC** : ouvrir le projet du serveur, puis « Préparer le paquet pour le téléphone », puis « Télécharger ». Copier le fichier `…_pour-telephone_….zip` sur le téléphone (câble USB ou OneDrive).
 2. **Sur le téléphone** : accueil, « Importer un paquet .zip… » ; le projet est créé ou mis à jour, puis « Importer et ranger ».
 3. **Sur le terrain** : photos, hors ligne.
-4. **Au retour, sur le téléphone** : « Exporter la visite pour le serveur », puis « Partager… » (OneDrive) ou « Télécharger » (le fichier est dans Téléchargements, à récupérer par câble USB).
+4. **Au retour, sur le téléphone** : « Exporter la visite pour le serveur », puis « Télécharger ». Le fichier est dans Téléchargements : l'envoyer au PC par l'application OneDrive (bouton +, Importer) ou par câble USB.
 5. **Sur le PC** : « Importer un paquet du téléphone… », vérifier l'aperçu, puis « Importer et ranger ». Les photos sont rangées sur le serveur.
 
 ## Tester l'application sur un PC sans connexion (fichier unique)

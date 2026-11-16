@@ -36,7 +36,7 @@ export function Message({ type, children }: { type: 'erreur' | 'info' | 'succes'
 
 export function texteErreur(e: unknown): string {
   if (e instanceof DOMException && e.name === 'NotAllowedError') {
-    return "Accès refusé par le navigateur. Recommencez et acceptez l'autorisation d'accès au dossier.";
+    return `Le navigateur a refusé l'opération (${e.message}). S'il s'agit de l'accès à un dossier, recommencez et acceptez l'autorisation « Modifier les fichiers ».`;
   }
   if (e instanceof DOMException && e.name === 'SecurityError') {
     return "Le navigateur interdit l'accès à cet emplacement (dossier système ?). Choisissez un autre dossier.";

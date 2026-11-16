@@ -5,8 +5,6 @@ import {
   exporterPaquet,
   lireEnTete,
   lirePhotos,
-  partageDisponible,
-  partagerPaquet,
   telechargerPaquet,
   type EnTetePaquet,
 } from '../projet/paquet';
@@ -191,16 +189,15 @@ export function Echanges({ espace, auteur, surPC, paquetInitial, surPaquetLu, su
             Paquet prêt : <span className="mono">{exporte.nom}</span> ({tailleLisible(exporte.fichier.size)})
           </div>
           <div className="boutons">
-            {partageDisponible(exporte.fichier) && (
-              <button
-                className="principal"
-                onClick={() => void partagerPaquet(exporte.fichier).catch((e) => setErreur(texteErreur(e)))}
-              >
-                Partager… (OneDrive, e-mail…)
-              </button>
-            )}
-            <button onClick={() => telechargerPaquet(exporte.fichier, exporte.nom)}>Télécharger</button>
+            <button className="principal" onClick={() => telechargerPaquet(exporte.fichier, exporte.nom)}>
+              Télécharger
+            </button>
           </div>
+          <p className="discret petit-texte">
+            {surPC
+              ? 'Le fichier est dans « Téléchargements ». Copiez-le sur le téléphone : câble USB, ou dépôt dans OneDrive puis ouverture depuis l’application OneDrive du téléphone.'
+              : 'Le fichier est dans « Téléchargements ». Envoyez-le au PC : depuis l’application OneDrive (bouton +, Importer) ou Fichiers (Partager), ou par câble USB.'}
+          </p>
         </div>
       )}
 

@@ -43,7 +43,7 @@ export function PanneauTerrain({
         </div>
         <div>
           <strong>Appui</strong> sur un repère ou l'étiquette d'un local : {appuiPhoto ? 'photo' : 'fiche'} ;{' '}
-          <strong>appui long</strong> : {appuiPhoto ? 'fiche' : 'photo'}.
+          <strong>appui long</strong> : {appuiPhoto ? 'fiche' : 'photo'} ; <strong>double appui</strong> : voir ses photos.
         </div>
       </div>
       <div className="boutons">

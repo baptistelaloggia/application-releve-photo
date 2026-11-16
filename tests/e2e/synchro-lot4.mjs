@@ -164,6 +164,11 @@ try {
   const tgbt = jpg.filter((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/'));
   assert.ok(tgbt.length >= 1 && tgbt.length <= NB);
   assert.equal(tgbt[0], `01_R+1/R+1.LT001_TGBT/T04_R+1.LT001_P001_${jour}_01.jpg`);
+  // Colonne « Photos » du tableau des niveaux : les photos rangées sur le plan du R+1.
+  assert.equal(
+    await p.locator('tr:has(.lien-niveau:has-text("R+1")) td').nth(5).innerText(),
+    String(tgbt.length),
+  );
   assert.equal(jpg.filter((l) => l.startsWith('_A-CLASSER/')).length, 1);
 
   // Un second import du même paquet ne change rien.
