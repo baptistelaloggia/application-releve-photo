@@ -201,3 +201,48 @@ export function fusionner(cible: DonneesProjet, paquet: DonneesProjet): Resultat
   if (r.photosModifiees.length) cr.push(`${r.photosModifiees.length} photo(s) reclassée(s) ou commentée(s) sur l'autre appareil.`);
   return r;
 }
+
+// ------------------------------------------------------------------ contrôle des données reçues
+
+const ID = /^[A-Za-z0-9-]{1,64}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const NUMERO_REPERE = /^P\d{3,6}$/;
+const NUMERO_LOCAL = /^[A-Za-z0-9.+-]{1,20}$/;
+const dansLaPage = (v: unknown) => typeof v === 'number' && v >= 0 && v <= 1;
+const texte = (v: unknown, max: number) => typeof v === 'string' && v.length <= max;
+
+/**
+ * Contrôle les données d'un paquet reçu d'un autre appareil, avant toute écriture.
+ * Un paquet abîmé ou fabriqué ne doit pas pouvoir écrire hors des dossiers prévus
+ * ni produire des noms de fichiers anormaux. Renvoie la liste des problèmes (vide si tout va bien).
+ * (Les chemins sont de toute façon recalculés par l'appareil qui importe ; ce contrôle est une
+ * seconde barrière.)
+ */
+export function controlerDonnees(d: DonneesProjet, codeAutorise: (code: string) => boolean): string[] {
+  const p: string[] = [];
+  const verifier = (ok: boolean, quoi: string) => {
+    if (!ok && p.length < 20) p.push(quoi);
+  };
+  if (![d.niveaux, d.plans, d.locaux, d.reperes, d.photos].every(Array.isArray)) return ['Structure du paquet incorrecte.'];
+  for (const n of d.niveaux) verifier(ID.test(n.id) && codeAutorise(n.code), `niveau « ${String(n.code).slice(0, 30)} »`);
+  for (const x of d.plans) verifier(ID.test(x.id) && ID.test(x.niveauId) && texte(x.indice, 8), `plan ${String(x.id).slice(0, 40)}`);
+  for (const l of d.locaux) {
+    verifier(
+      ID.test(l.id) && ID.test(l.planId) && texte(l.nom, 120) && (l.numero === null || NUMERO_LOCAL.test(l.numero)) && dansLaPage(l.x) && dansLaPage(l.y),
+      `local « ${String(l.nom).slice(0, 40)} »`,
+    );
+  }
+  for (const r of d.reperes) {
+    verifier(
+      ID.test(r.id) && ID.test(r.planId) && (r.localId === null || ID.test(r.localId)) && NUMERO_REPERE.test(r.numero) && texte(r.libelle, 120) && dansLaPage(r.x) && dansLaPage(r.y),
+      `repère ${String(r.numero).slice(0, 20)}`,
+    );
+  }
+  for (const ph of d.photos) {
+    verifier(
+      ID.test(ph.id) && (ph.repereId === null || ID.test(ph.repereId)) && DATE.test(ph.date) && Number.isInteger(ph.rang) && ph.rang >= 0 && ph.rang < 10000 && texte(ph.commentaire, 2000) && /^[0-9a-f]{64}$/.test(ph.empreinte),
+      `photo ${String(ph.id).slice(0, 40)}`,
+    );
+  }
+  return p;
+}

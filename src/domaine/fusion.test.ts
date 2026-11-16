@@ -106,3 +106,27 @@ describe('fusion de deux exemplaires d’un projet', () => {
     expect(r.compteRendu[0]).toMatch(/plan RDC différent.*indice B.*conservé \(indice A\)/);
   });
 });
+
+import { controlerDonnees } from './fusion';
+import { estCodeNiveauAutorise } from './niveaux';
+
+describe('contrôle des paquets reçus', () => {
+  /** Données du serveur, avec des empreintes SHA-256 réalistes (64 caractères hexadécimaux). */
+  const reelles = () => {
+    const d = serveur();
+    d.photos = d.photos.map((x) => ({ ...x, empreinte: 'ab'.repeat(32) }));
+    return d;
+  };
+  it('accepte des données normales', () => {
+    expect(controlerDonnees(reelles(), estCodeNiveauAutorise)).toEqual([]);
+  });
+  it('refuse les codes, numéros, dates et positions anormaux', () => {
+    const d = reelles();
+    d.niveaux.push(niveau('n-x', '../../Windows'));
+    d.locaux.push(local('l-x', 'p-rdc', 'LT/../../x', 'Piège', 0.5, 0.5));
+    d.reperes.push(repere('r-x', 'p-rdc', 'P001/../x', null));
+    d.photos.push({ ...photo('ph-x', 'r1', 'a'.repeat(64)), date: '2026-11-13/../../x' });
+    d.locaux.push(local('l-y', 'p-rdc', 'LT9', 'Hors page', 1.5, 0.5));
+    expect(controlerDonnees(d, estCodeNiveauAutorise)).toHaveLength(5);
+  });
+});

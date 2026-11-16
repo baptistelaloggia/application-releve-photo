@@ -2,7 +2,8 @@
  * Import d'un paquet .zip dans un projet : contrôle, fusion, rangement des photos.
  * Partagé par l'import manuel (écran Échanges) et la collecte du transit SharePoint (lot 5).
  */
-import { fusionner, type ResultatFusion } from '../domaine/fusion';
+import { controlerDonnees, fusionner, type ResultatFusion } from '../domaine/fusion';
+import { estCodeNiveauAutorise } from '../domaine/niveaux';
 import type { EspaceProjet } from './EspaceProjet';
 import { lireEnTete, lirePhotos, type EnTetePaquet } from './paquet';
 
@@ -29,6 +30,10 @@ export async function preparerImport(espace: EspaceProjet, paquet: Blob): Promis
   const entete = await lireEnTete(paquet);
   if (entete.manifeste.projet.id !== espace.projet.id) {
     throw new Error(`Ce paquet concerne un autre projet : « ${entete.manifeste.projet.nom} » (${entete.manifeste.projet.dossier}).`);
+  }
+  const problemes = controlerDonnees(entete.donnees, estCodeNiveauAutorise);
+  if (problemes.length) {
+    throw new Error(`Paquet refusé : données non conformes (${problemes.slice(0, 5).join(' ; ')}${problemes.length > 5 ? '…' : ''}). Rien n'a été importé.`);
   }
   const fusion = fusionner(espace.donnees(), entete.donnees);
   const rien =
