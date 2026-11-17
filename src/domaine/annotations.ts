@@ -1,6 +1,7 @@
 /**
- * Annotations dessinées sur une photo (CONCEPTION §A.6 octies) : V vert, X rouge, texte, bulle,
- * cercle, trait à main levée. Un seul dessin, en SVG, sert à l'affichage dans l'appli et à la
+ * Annotations dessinées sur une photo (CONCEPTION §A.6 octies) : V vert, X rouge, bulle (texte
+ * encadré), cercle, trait à main levée. Le type « texte » (texte sans cadre) n'est plus proposé
+ * depuis le 17/11/2026 mais reste dessiné pour les photos déjà annotées. Un seul dessin, en SVG, sert à l'affichage dans l'appli et à la
  * fabrication de la copie annotée (JPEG rangé à côté de la photo).
  * Toutes les tailles sont proportionnelles au petit côté de l'image : le rendu est le même
  * quelle que soit la résolution.
@@ -33,11 +34,69 @@ export function couperLignes(texte: string, largeur = 28): string[] {
   return lignes.length ? lignes : [''];
 }
 
-/** Position proposée pour une bulle pointant sur (px, py) : au-dessus du point, ou dessous près du haut. */
-export function positionBulle(px: number, py: number, largeur: number, hauteur: number): { x: number; y: number } {
+/** Bulle : texte encadré centré sur (x, y), sans pointe (17/11/2026), gardé entier dans l'image. */
+export function geometrieBulle(a: { x: number; y: number; texte: string }, largeur: number, hauteur: number) {
   const u = Math.min(largeur, hauteur) / 100;
-  const decalage = (16 * u) / hauteur;
-  return { x: px, y: py > 0.3 ? py - decalage : py + decalage };
+  const taille = 3.6 * u;
+  const lignes = couperLignes(a.texte);
+  const larg = Math.max(...lignes.map((l) => l.length), 3) * taille * 0.58 + 3 * u;
+  const haut = lignes.length * taille * 1.2 + 2 * u;
+  const cx = Math.min(Math.max(a.x * largeur, larg / 2 + u), largeur - larg / 2 - u);
+  const cy = Math.min(Math.max(a.y * hauteur, haut / 2 + u), hauteur - haut / 2 - u);
+  return { u, taille, lignes, larg, haut, cx, cy };
+}
+
+/**
+ * Annotation touchée au point (x, y) (relatif à l'image), pour la déplacer ; la plus haute
+ * (la dernière dessinée) en priorité. Renvoie son rang, ou -1.
+ */
+export function annotationTouchee(annotations: Annotation[], x: number, y: number, largeur: number, hauteur: number): number {
+  const u = Math.min(largeur, hauteur) / 100;
+  const px = x * largeur;
+  const py = y * hauteur;
+  const pres = (ax: number, ay: number, rayon: number) => Math.hypot(ax * largeur - px, ay * hauteur - py) <= rayon;
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const a = annotations[i];
+    switch (a.type) {
+      case 'ok':
+      case 'nok':
+        if (pres(a.x, a.y, 9 * u)) return i;
+        break;
+      case 'texte':
+        if (Math.abs(a.x * largeur - px) <= Math.max(a.texte.length, 4) * 1.4 * u && Math.abs(a.y * hauteur - py) <= 6 * u) return i;
+        break;
+      case 'bulle': {
+        const g = geometrieBulle(a, largeur, hauteur);
+        if (Math.abs(g.cx - px) <= g.larg / 2 + 2 * u && Math.abs(g.cy - py) <= g.haut / 2 + 2 * u) return i;
+        break;
+      }
+      case 'cercle': {
+        // À l'intérieur de l'ellipse (un peu élargie).
+        const rx = a.rx * largeur + 4 * u;
+        const ry = a.ry * hauteur + 4 * u;
+        if (((px - a.x * largeur) / rx) ** 2 + ((py - a.y * hauteur) / ry) ** 2 <= 1) return i;
+        break;
+      }
+      case 'trait':
+        if (a.points.some(([tx, ty]) => pres(tx, ty, 5 * u))) return i;
+        break;
+    }
+  }
+  return -1;
+}
+
+/** Déplace une annotation de (dx, dy) (relatifs à l'image), sans la faire sortir de l'image. */
+export function deplacerAnnotation(a: Annotation, dx: number, dy: number): Annotation {
+  const borne = (v: number) => Math.min(1, Math.max(0, v));
+  if (a.type === 'trait') {
+    const xs = a.points.map((p) => p[0]);
+    const ys = a.points.map((p) => p[1]);
+    const ddx = Math.min(Math.max(dx, -Math.min(...xs)), 1 - Math.max(...xs));
+    const ddy = Math.min(Math.max(dy, -Math.min(...ys)), 1 - Math.max(...ys));
+    return { ...a, points: a.points.map(([x, y]) => [x + ddx, y + ddy] as [number, number]) };
+  }
+  if (a.type === 'bulle') return { ...a, x: borne(a.x + dx), y: borne(a.y + dy), px: borne(a.px + dx), py: borne(a.py + dy) };
+  return { ...a, x: borne(a.x + dx), y: borne(a.y + dy) };
 }
 
 /** Éléments SVG des annotations, en pixels de l'image (largeur × hauteur). */
@@ -80,25 +139,11 @@ export function elementsSvg(annotations: Annotation[], largeur: number, hauteur:
         break;
       }
       case 'bulle': {
-        const taille = 3.6 * u;
-        const lignes = couperLignes(a.texte);
-        const larg = Math.max(...lignes.map((l) => l.length), 3) * taille * 0.58 + 3 * u;
-        const haut = lignes.length * taille * 1.2 + 2 * u;
-        // La bulle reste entière dans l'image.
-        const cx = Math.min(Math.max(a.x * largeur, larg / 2 + u), largeur - larg / 2 - u);
-        const cy = Math.min(Math.max(a.y * hauteur, haut / 2 + u), hauteur - haut / 2 - u);
-        const base = Math.min(larg, haut) / 3;
-        const px = a.px * largeur;
-        const py = a.py * hauteur;
-        // Pointe dessinée sous la bulle : sa base est cachée par le cadre.
-        const vertical = Math.abs(py - cy) * larg >= Math.abs(px - cx) * haut;
-        const pointe = vertical
-          ? `${n(cx - base / 2)},${n(cy)} ${n(cx + base / 2)},${n(cy)} ${n(px)},${n(py)}`
-          : `${n(cx)},${n(cy - base / 2)} ${n(cx)},${n(cy + base / 2)} ${n(px)},${n(py)}`;
+        // Texte encadré, sans pointe ; px, py (ancienne pointe) ne servent plus au dessin.
+        const { taille, lignes, larg, haut, cx, cy } = geometrieBulle(a, largeur, hauteur);
         const debut = cy - ((lignes.length - 1) * taille * 1.2) / 2;
         const tspans = lignes.map((l, i) => `<tspan x="${n(cx)}" y="${n(debut + i * taille * 1.2)}">${echapper(l)}</tspan>`).join('');
         morceaux.push(
-          `<polygon points="${pointe}" fill="#fff" stroke="#000" stroke-width="${n(0.4 * u)}" stroke-linejoin="round"/>`,
           `<rect x="${n(cx - larg / 2)}" y="${n(cy - haut / 2)}" width="${n(larg)}" height="${n(haut)}" rx="${n(1.5 * u)}" fill="#fff" stroke="#000" stroke-width="${n(0.4 * u)}"/>`,
           `<text ${police} font-size="${n(taille)}" text-anchor="middle" dominant-baseline="middle" fill="#000">${tspans}</text>`,
         );

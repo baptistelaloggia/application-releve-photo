@@ -241,14 +241,14 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   assert.equal(await page.getByLabel('Numéro').inputValue(), 'R1-01'); // numéro automatique proposé
   await page.getByLabel('Numéro').fill('lt003');
   await page.getByRole('button', { name: 'Enregistrer' }).click();
-  await page.locator('.marqueur-selection').filter({ hasText: 'LT003' }).waitFor({ state: 'attached' });
+  await page.locator('.marqueur-selection').filter({ hasText: 'Local CTA' }).waitFor({ state: 'attached' });
   await page.getByRole('button', { name: 'Fermer' }).click();
 
   // « Je tape TGBT, je trouve le local » depuis l'écran projet.
   await page.getByRole('button', { name: '← Projet' }).click();
   await page.getByLabel('Rechercher un local').fill('tgbt');
   await page.locator('.resultats button').first().click();
-  await page.locator('.marqueur-selection').filter({ hasText: 'LT001' }).waitFor({ state: 'attached' });
+  await page.locator('.marqueur-selection').filter({ hasText: 'TGBT' }).waitFor({ state: 'attached' });
   assert.equal(await page.getByLabel('Nom').inputValue(), 'TGBT');
   await capture('4-tgbt');
   await page.getByRole('button', { name: '← Projet' }).click();
@@ -261,7 +261,7 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   await page.getByRole('button', { name: 'Enregistrer 2 locaux' }).click();
   await page.getByText(/2 locaux enregistrés sur le plan T01_RDC\.pdf/).waitFor();
   await page.getByLabel('Rechercher un local').fill('archives');
-  await page.locator('.resultats button').filter({ hasText: 'AR001' }).waitFor();
+  await page.locator('.resultats button').filter({ hasText: 'ARCHIVES' }).waitFor();
   await page.getByLabel('Rechercher un local').fill('');
 
   const arbo = await arborescence(page, telephone ? 'projets' : 'simule-parent-projets', dossierProjet);

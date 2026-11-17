@@ -105,8 +105,8 @@ try {
   await p.locator('.lien-niveau', { hasText: 'R+1' }).click();
   await p.locator('.visionneuse[data-fond-pret]').waitFor();
   // Appui sur l'étiquette du TGBT : photo du local, rafale de NB photos.
-  await p.locator('.marqueur .marqueur-libelle', { hasText: 'LT001' }).click();
-  await p.getByText('R+1 · LT001 TGBT · photo du local').waitFor();
+  await p.locator('.marqueur .marqueur-libelle', { hasText: 'TGBT' }).click();
+  await p.getByText('R+1 · TGBT · photo du local').waitFor();
   await p.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
   for (let i = 0; i < NB; i++) await p.getByRole('button', { name: 'Prendre la photo' }).click();
   await p.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 600_000 });
@@ -161,9 +161,9 @@ try {
   const jpg = arbo.filter((l) => l.endsWith('.jpg'));
   if (NB <= 5) console.log(jpg.join('\n'));
   // Rafale de la fausse caméra : images souvent identiques, écartées comme doublons à l'import.
-  const tgbt = jpg.filter((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/'));
+  const tgbt = jpg.filter((l) => l.startsWith('01_R+1/R+1.R1-01_TGBT/'));
   assert.ok(tgbt.length >= 1 && tgbt.length <= NB);
-  assert.equal(tgbt[0], `01_R+1/R+1.LT001_TGBT/T04_R+1.LT001_P001_${jour}_01.jpg`);
+  assert.equal(tgbt[0], `01_R+1/R+1.R1-01_TGBT/T04_R+1.R1-01_P001_${jour}_01.jpg`);
   // Colonne « Photos » du tableau des niveaux : les photos rangées sur le plan du R+1.
   assert.equal(
     await p.locator('tr:has(.lien-niveau:has-text("R+1")) td').nth(5).innerText(),

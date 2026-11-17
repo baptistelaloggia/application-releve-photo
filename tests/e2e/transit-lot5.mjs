@@ -94,7 +94,7 @@ try {
   await p.getByText(/Paquet importé/).waitFor();
   await p.locator('.lien-niveau', { hasText: 'R+1' }).click();
   await p.locator('.visionneuse[data-fond-pret]').waitFor();
-  await p.locator('.marqueur .marqueur-libelle', { hasText: 'LT001' }).click();
+  await p.locator('.marqueur .marqueur-libelle', { hasText: 'TGBT' }).click();
   await p.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
   for (let i = 0; i < 3; i++) await p.getByRole('button', { name: 'Prendre la photo' }).click();
   await p.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 60_000 });
@@ -110,10 +110,18 @@ try {
   await toucherZone(0.3, 0.5);
   await p.getByRole('button', { name: 'X rouge : travaux non conformes' }).click();
   await toucherZone(0.7, 0.5);
-  await p.getByRole('button', { name: 'Bulle : texte relié à un point' }).click();
+  await p.getByRole('button', { name: 'Bulle : texte encadré' }).click();
   await toucherZone(0.5, 0.7);
   await p.getByLabel('Texte de la bulle').fill('Calorifuge manquant');
   await p.getByRole('button', { name: 'OK', exact: true }).click();
+  // Appui long sur le V, puis glisser : il se déplace (pas de nouveau V).
+  await p.mouse.move(b.x + b.width * 0.3, b.y + b.height * 0.5);
+  await p.mouse.down();
+  await p.waitForTimeout(700);
+  await p.locator('.annot-svg.deplacement').waitFor();
+  await p.mouse.move(b.x + b.width * 0.25, b.y + b.height * 0.3, { steps: 5 });
+  await p.mouse.up();
+  await p.locator('.annot-svg.deplacement').waitFor({ state: 'detached' });
   await p.getByRole('dialog', { name: 'Annoter la photo' }).getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await p.locator('.editeur-annotations').waitFor({ state: 'detached' });
   await tel.capture('2a-annotee');
@@ -132,13 +140,18 @@ try {
   await p.getByRole('button', { name: '✕ Retour au plan' }).click();
   // Visionneuse : flèches de part et d'autre, photo annotée, vidéo.
   await p.locator('.camera').waitFor({ state: 'detached' });
-  await p.locator('.marqueur .marqueur-libelle', { hasText: 'LT001' }).dblclick();
+  await tel.capture('2c-fiche-local'); // photos du local juste sous son nom
+  await p.locator('.marqueur .marqueur-libelle', { hasText: 'TGBT' }).dblclick();
   const voile = p.locator('.voile-photo');
   await voile.locator('video.photo-media').waitFor(); // la plus récente : la vidéo
   assert.equal(await voile.getByRole('button', { name: 'Photo suivante' }).count(), 0);
   await voile.getByRole('button', { name: 'Photo précédente' }).click();
   await voile.locator('.photo-annotations').waitFor();
   assert.match(await voile.innerText(), /Annotations : 1 V, 1 X, 1 bulle/);
+  // Le V a bien été déplacé vers le haut (il était à mi-hauteur).
+  const vY = await voile.locator('.photo-annotations path').first().evaluate((e) => Number(/M[\d.]+ ([\d.]+)/.exec(e.getAttribute('d'))[1]));
+  const hImage = await voile.locator('.photo-annotations').evaluate((e) => e.viewBox.baseVal.height);
+  assert.ok(vY / hImage < 0.42, `V déplacé (y relatif ${(vY / hImage).toFixed(2)})`);
   await voile.locator('audio').waitFor();
   await tel.capture('2b-visionneuse');
   await voile.getByRole('button', { name: 'Fermer' }).click();
@@ -184,10 +197,10 @@ try {
   await pc.capture('3-collecte');
   const arbo = await arborescenceOpfs(p, `simule-parent-projets/${dossier}/01_PHOTOS`);
   const jpg = arbo.filter((l) => l.endsWith('.jpg'));
-  assert.ok(jpg.some((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/T05_R+1.LT001_P001_')), 'photos du TGBT rangées');
-  const tgbt = arbo.filter((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/')).map((l) => l.split('/').pop().replace(/^T05_R\+1\.LT001_P001_\d{4}-\d{2}-\d{2}_/, ''));
+  assert.ok(jpg.some((l) => l.startsWith('01_R+1/R+1.R1-01_TGBT/T05_R+1.R1-01_P001_')), 'photos du TGBT rangées');
+  const tgbt = arbo.filter((l) => l.startsWith('01_R+1/R+1.R1-01_TGBT/')).map((l) => l.split('/').pop().replace(/^T05_R\+1\.R1-01_P001_\d{4}-\d{2}-\d{2}_/, ''));
   console.log(`Local TGBT : ${tgbt.join(', ')}`);
-  assert.deepEqual(tgbt.filter((n) => n && !/^0[1-3]\.jpg$/.test(n)).map((n) => n.replace(/\.(m4a|webm|ogg|mp4)$/, '.son-ou-video')).sort(), [
+  assert.deepEqual(tgbt.filter((n) => n && !/^0[1-3]\.jpg$/.test(n)).map((n) => n.replace(/\.(wav|m4a|webm|ogg|mp4)$/, '.son-ou-video')).sort(), [
     '03_annote.jpg',
     '03_note.son-ou-video',
     '04.son-ou-video',
@@ -209,7 +222,7 @@ try {
   await p.getByRole('button', { name: "Actualiser l'état" }).click();
   await p.getByText('· nouvelle version disponible').waitFor();
   await p.getByRole('button', { name: 'Mettre à jour la copie de travail' }).click();
-  await p.getByText(/Local mis à jour \(modification plus récente\) : LT001 TGBT principal/).waitFor({ timeout: 60_000 });
+  await p.getByText(/Local mis à jour \(modification plus récente\) : R1-01 TGBT principal/).waitFor({ timeout: 60_000 });
   await p.getByLabel('Rechercher un local').fill('principal');
   await p.locator('.resultats button', { hasText: 'TGBT principal' }).waitFor();
 

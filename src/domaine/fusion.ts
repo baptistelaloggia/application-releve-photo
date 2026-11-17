@@ -261,7 +261,7 @@ export function controlerDonnees(d: DonneesProjet, codeAutorise: (code: string) 
         (ph.extension === undefined || (ph.type === 'video' && (ph.extension === 'mp4' || ph.extension === 'webm'))) &&
         (ph.duree === undefined || (typeof ph.duree === 'number' && ph.duree >= 0 && ph.duree < 36000)) &&
         (ph.annotations === undefined || (Array.isArray(ph.annotations) && ph.annotations.length <= ANNOTATIONS_MAX && ph.annotations.every(annotationValide))) &&
-        (nv === undefined || (['m4a', 'webm', 'ogg'].includes(nv.extension) && typeof nv.duree === 'number' && nv.duree >= 0 && nv.duree < 36000 && texte(nv.enregistreLe, 40) && texte(nv.enregistrePar, 60))),
+        (nv === undefined || (['wav', 'm4a', 'webm', 'ogg'].includes(nv.extension) && typeof nv.duree === 'number' && nv.duree >= 0 && nv.duree < 36000 && texte(nv.enregistreLe, 40) && texte(nv.enregistrePar, 60))),
       `photo ${String(ph.id).slice(0, 40)}`,
     );
   }

@@ -25,7 +25,7 @@ import {
   normaliserIndice,
 } from '../domaine/nommage';
 import { VERSION_SCHEMA, type Annotation, type Local, type NoteVocale, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
-import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
+import { nomDeBase, numeroterNomsEnDouble, proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
 import type { DonneesProjet, ResultatFusion } from '../domaine/fusion';
 import { ecrireJson, enParallele, lireJson, type Stockage } from '../stockage/Stockage';
@@ -685,7 +685,7 @@ export class EspaceProjet {
       (l) =>
         (numero && l.numero === numero) ||
         (l.planId === planId &&
-          l.nom.toUpperCase() === d.nom.trim().toUpperCase() &&
+          nomDeBase(l.nom).toUpperCase() === nomDeBase(d.nom).toUpperCase() &&
           Math.hypot(l.x - d.x, l.y - d.y) < DISTANCE_DOUBLON),
     );
   }
@@ -695,13 +695,17 @@ export class EspaceProjet {
     const compteRendu: string[] = [];
     // 1. Contrôles, un local après l'autre (doublons de numéro compris), en mémoire.
     const nouveaux: Local[] = [];
+    const aCreer: LocalDetecte[] = [];
     for (const d of retenus) {
-      if (this.dejaPresent(planId, d)) {
-        compteRendu.push(`Déjà présent, ignoré : ${d.numero ?? ''} ${d.nom}`.replace('  ', ' '));
-        continue;
-      }
+      if (this.dejaPresent(planId, d)) compteRendu.push(`Déjà présent, ignoré : ${d.nom}`);
+      else aCreer.push(d);
+    }
+    // Seul le nom est gardé (17/11/2026) : ni numéro ni surface. Les noms en double sur le plan
+    // sont numérotés (« LT 01 », « LT 02 »).
+    const nommes = numeroterNomsEnDouble(aCreer, this.locauxDuPlan(planId).map((l) => l.nom));
+    for (const d of nommes) {
       try {
-        const l = this.construireLocal(planId, { nom: d.nom, numero: d.numero, surface: d.surface, x: d.x, y: d.y }, auteur, 'auto');
+        const l = this.construireLocal(planId, { nom: d.nom, numero: null, surface: null, x: d.x, y: d.y }, auteur, 'auto');
         this.locaux = [...this.locaux, l];
         nouveaux.push(l);
       } catch (e) {

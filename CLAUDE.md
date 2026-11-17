@@ -88,7 +88,7 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   (visée, miniatures, visionneuse) ; panneaux terrain : `src/ui/plan/PanneauxTerrain.tsx`.
   Vidéos et notes vocales : `src/photo/enregistrement.ts` (MediaRecorder) ; annotations dessinées : règles et dessin
   SVG `src/domaine/annotations.ts`, copie annotée `src/photo/annotation.ts`, éditeur `src/ui/photo/EditeurAnnotations.tsx`.
-  Fichiers rangés à côté d'une photo (`_annote.jpg`, `_note.m4a`) : CONCEPTION §A.6 octies.
+  Fichiers rangés à côté d'une photo (`_annote.jpg`, `_note.wav`) : CONCEPTION §A.6 octies.
   Synchronisation (lot 4) : règles de fusion `src/domaine/fusion.ts` (pures, testées), paquet .zip
   `src/projet/paquet.ts` (fflate, lecture et écriture en continu), écran `src/ui/Echanges.tsx`, import partagé
   `src/projet/importPaquet.ts`. Transit SharePoint (lot 5) : `src/transit/` (réglages, connexion MSAL, client

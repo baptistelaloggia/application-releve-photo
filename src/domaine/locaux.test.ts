@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { detecterLocaux, type TextePlace } from './locaux';
+import { nomDeBase, numeroterNomsEnDouble } from './locaux';
 
 /** Étiquette fictive centrée en (cx, y), lignes de hauteur h espacées de h. */
 function etiquette(cx: number, y: number, lignes: string[], h = 6.6): TextePlace[] {
@@ -130,5 +131,22 @@ describe('numéro automatique', () => {
     expect(proposerNumeroLocal('R+2', ['R2-01', 'r2-02', 'SF202'])).toBe('R2-03');
     expect(proposerNumeroLocal('RDC', ['R2-01'])).toBe('RDC-01');
     expect(proposerNumeroLocal('R+4-MEZZANINE', [])).toBe('R4-MEZ-01');
+  });
+});
+
+describe('noms des locaux détectés (17/11/2026)', () => {
+  const d = (nom: string, x: number, y: number) => ({ nom, x, y });
+  it('numérote les noms en double, de haut en bas puis de gauche à droite', () => {
+    const r = numeroterNomsEnDouble([d('LT', 0.8, 0.2), d('TGBT', 0.5, 0.5), d('LT', 0.2, 0.2), d('LT', 0.5, 0.7)], []);
+    expect(r.map((x) => x.nom)).toEqual(['LT 02', 'TGBT', 'LT 01', 'LT 03']);
+  });
+  it('tient compte des locaux déjà enregistrés sur le plan, sans les renommer', () => {
+    expect(numeroterNomsEnDouble([d('LT', 0.1, 0.1)], ['LT 01', 'Bureau']).map((x) => x.nom)).toEqual(['LT 02']);
+    expect(numeroterNomsEnDouble([d('Bureau', 0.1, 0.1)], ['BUREAU']).map((x) => x.nom)).toEqual(['Bureau 01']);
+    expect(numeroterNomsEnDouble([d('Sanitaires', 0.1, 0.1)], ['LT 01']).map((x) => x.nom)).toEqual(['Sanitaires']);
+  });
+  it('reconnaît le nom de base', () => {
+    expect(nomDeBase('LT 02')).toBe('LT');
+    expect(nomDeBase('  Local   CTA ')).toBe('Local CTA');
   });
 });

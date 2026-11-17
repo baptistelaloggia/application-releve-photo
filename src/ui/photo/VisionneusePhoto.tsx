@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { elementsSvg, resumeAnnotations } from '../../domaine/annotations';
 import type { Photo } from '../../domaine/types';
 import type { EspaceProjet } from '../../projet/EspaceProjet';
-import { dureeLisible } from '../../photo/enregistrement';
+import { dureeLisible, mimeNote } from '../../photo/enregistrement';
 import { retirerPhotosExportees } from '../../stockage/registre';
 import { tailleLisible, texteErreur } from '../commun';
 import { EditeurAnnotations } from './EditeurAnnotations';
@@ -72,11 +72,17 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
     if (!photo?.noteVocale) return;
     let url: string | null = null;
     let annule = false;
-    void espace.lireNoteVocale(photo).then((b) => {
-      if (annule || !b) return;
-      url = URL.createObjectURL(b);
-      setAudio(url);
-    });
+    const extension = photo.noteVocale.extension;
+    void espace
+      .lireNoteVocale(photo)
+      .then((b) => {
+        if (annule) return;
+        if (!b) return setAudio('absente');
+        // Type précisé d'après l'extension : un fichier lu sur le serveur n'en porte pas toujours.
+        url = URL.createObjectURL(new Blob([b], { type: mimeNote(extension) }));
+        setAudio(url);
+      })
+      .catch(() => !annule && setAudio('absente'));
     return () => {
       annule = true;
       if (url) URL.revokeObjectURL(url);
@@ -216,7 +222,22 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
         {!video && !!photo.annotations?.length && <p className="discret petit-texte">Annotations : {resumeAnnotations(photo.annotations)}</p>}
         {photo.noteVocale && (
           <div className="note-vocale">
-            {audio ? <audio src={audio} controls preload="metadata" /> : <span className="discret">Note vocale introuvable sur ce support.</span>}
+            {audio === 'absente' ? (
+              <span className="texte-erreur">
+                Fichier de la note vocale absent ({photo.fichier.split('/').pop()?.replace(/\.[^.]+$/, '')}_note.{photo.noteVocale.extension}) : la
+                note n'a pas été transmise. Sur le téléphone, renvoyez la visite (la photo repart avec sa note).
+              </span>
+            ) : audio ? (
+              <audio
+                key={audio}
+                src={audio}
+                controls
+                preload="metadata"
+                onError={() => setErreur(`Note vocale illisible par ce navigateur (format ${photo.noteVocale?.extension}).`)}
+              />
+            ) : (
+              <span className="discret">Chargement de la note…</span>
+            )}
             <button
               className="petit discret"
               onClick={() => confirm('Supprimer la note vocale ?') && void agir(() => espace.enregistrerNoteVocale(photo.id, null, auteur ?? photo.prisPar))}
