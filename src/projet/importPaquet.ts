@@ -2,7 +2,8 @@
  * Import d'un paquet .zip dans un projet : contrôle, fusion, rangement des photos.
  * Partagé par l'import manuel (écran Échanges) et la collecte du transit SharePoint (lot 5).
  */
-import { fusionner, type ResultatFusion } from '../domaine/fusion';
+import { controlerDonnees, fusionner, type ResultatFusion } from '../domaine/fusion';
+import { estCodeNiveauAutorise } from '../domaine/niveaux';
 import type { EspaceProjet } from './EspaceProjet';
 import { lireEnTete, lirePhotos, type EnTetePaquet } from './paquet';
 
@@ -30,6 +31,10 @@ export async function preparerImport(espace: EspaceProjet, paquet: Blob): Promis
   if (entete.manifeste.projet.id !== espace.projet.id) {
     throw new Error(`Ce paquet concerne un autre projet : « ${entete.manifeste.projet.nom} » (${entete.manifeste.projet.dossier}).`);
   }
+  const problemes = controlerDonnees(entete.donnees, estCodeNiveauAutorise);
+  if (problemes.length) {
+    throw new Error(`Paquet refusé : données non conformes (${problemes.slice(0, 5).join(' ; ')}${problemes.length > 5 ? '…' : ''}). Rien n'a été importé.`);
+  }
   const fusion = fusionner(espace.donnees(), entete.donnees);
   const rien =
     fusion.niveaux.length + fusion.plans.length + fusion.locaux.length + fusion.reperes.length +
@@ -52,11 +57,18 @@ export async function executerImport(
     progression('Mise à jour des plans, locaux et repères…');
     compteRendu.push(...(await espace.appliquerFusion(fusion, (id) => entete.pdfs.get(id), auteur)));
     const voulues = new Map(fusion.photosNouvelles.map((p) => [p.id, p]));
+    // Photos déjà connues, annotées ou dotées d'une note vocale sur l'autre appareil : seuls
+    // leurs fichiers annexes sont repris du paquet.
+    const annexes = new Set(fusion.photosModifiees.filter((p) => p.annotations?.length || p.noteVocale).map((p) => p.id));
     let faites = 0;
     const debut = performance.now();
-    if (voulues.size) {
-      await lirePhotos(paquet, new Set(voulues.keys()), async (id, jpeg, miniature) => {
-        await espace.ajouterPhotoImportee(voulues.get(id)!, jpeg, miniature);
+    if (voulues.size || annexes.size) {
+      await lirePhotos(paquet, new Set([...voulues.keys(), ...annexes]), async (id, fichier, miniature, recues) => {
+        if (annexes.has(id)) {
+          await espace.ecrireAnnexesImportees(id, recues);
+          return;
+        }
+        await espace.ajouterPhotoImportee(voulues.get(id)!, fichier, miniature, recues);
         voulues.delete(id);
         faites++;
         progression(`Photos rangées : ${faites}/${fusion.photosNouvelles.length}`);

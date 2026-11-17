@@ -5,8 +5,10 @@
  *   manifeste.json            projet, sens, auteur, date
  *   donnees.json              niveaux, plans, locaux, repères (+ photos pour un retour de terrain)
  *   plans/{id}.pdf            plan courant de chaque niveau
- *   miniatures/{id}.jpg       pour chaque photo transmise, sa miniature…
- *   photos/{id}.jpg           …puis la photo elle-même
+ *   miniatures/{id}.jpg       pour chaque photo transmise, sa miniature,
+ *   annotees/{id}.jpg         sa copie annotée (s'il y a des annotations),
+ *   notes/{id}.m4a|webm|ogg   sa note vocale (s'il y en a une)…
+ *   photos/{id}.jpg|mp4|webm  …puis la photo ou la vidéo elle-même
  *
  * Le paquet est écrit au fil de l'eau dans le stockage interne du navigateur, puis proposé
  * au téléchargement ou au partage : 300 photos (environ 400 Mo) ne passent jamais en mémoire.
@@ -15,7 +17,7 @@ import { Unzip, UnzipInflate, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { dateLocale } from '../domaine/nommage';
 import type { DonneesProjet } from '../domaine/fusion';
 import type { Photo, Projet } from '../domaine/types';
-import type { EspaceProjet } from './EspaceProjet';
+import { extensionPhoto, type AnnexesRecues, type EspaceProjet } from './EspaceProjet';
 
 export const FORMAT_PAQUET = 'releve-photo-paquet';
 export const VERSION_PAQUET = 1;
@@ -167,7 +169,11 @@ async function construirePaquet(
         progression(`Photos : ${i + 1}/${photosATransmettre.length}`);
         const miniature = await espace.lireMiniature(photo).catch(() => null);
         if (miniature) await ajouter(`miniatures/${photo.id}.jpg`, new Uint8Array(await miniature.arrayBuffer()), false);
-        await ajouter(`photos/${photo.id}.jpg`, new Uint8Array(await (await espace.lirePhoto(photo)).arrayBuffer()), false);
+        const annotee = await espace.lireAnnotee(photo).catch(() => null);
+        if (annotee) await ajouter(`annotees/${photo.id}.jpg`, new Uint8Array(await annotee.arrayBuffer()), false);
+        const note = await espace.lireNoteVocale(photo).catch(() => null);
+        if (note && photo.noteVocale) await ajouter(`notes/${photo.id}.${photo.noteVocale.extension}`, new Uint8Array(await note.arrayBuffer()), false);
+        await ajouter(`photos/${photo.id}.${extensionPhoto(photo)}`, new Uint8Array(await (await espace.lirePhoto(photo)).arrayBuffer()), false);
       }
     }
     zip.end();
@@ -238,7 +244,7 @@ export async function lireEnTete(paquet: Blob): Promise<EnTetePaquet> {
       else if (nom === 'donnees.json') donnees = JSON.parse(await contenu.text());
       else if (nom.startsWith('plans/')) pdfs.set(nom.slice(6, -4), new Blob([contenu], { type: 'application/pdf' }));
     },
-    (nom) => !nom.startsWith('miniatures/') && !nom.startsWith('photos/'),
+    (nom) => !/^(miniatures|annotees|notes|photos)\//.test(nom),
   );
   const m = manifeste as Manifeste | null;
   if (!m || m.format !== FORMAT_PAQUET || !donnees) {
@@ -250,34 +256,40 @@ export async function lireEnTete(paquet: Blob): Promise<EnTetePaquet> {
   return { manifeste: m, donnees, pdfs };
 }
 
+/** Identifiant d'un fichier du paquet : « photos/{id}.jpg » → id (les identifiants n'ont pas de point). */
+const idFichier = (nom: string) => nom.slice(nom.indexOf('/') + 1).split('.')[0];
+
 /**
- * Lit les photos du paquet et appelle surPhoto pour chaque photo voulue (avec sa miniature),
- * avec au plus `simultanees` enregistrements en cours.
+ * Lit les photos du paquet et appelle surPhoto pour chaque photo voulue (avec sa miniature et
+ * ses fichiers annexes), avec au plus `simultanees` enregistrements en cours.
  */
 export async function lirePhotos(
   paquet: Blob,
   voulues: Set<string>,
-  surPhoto: (id: string, jpeg: Blob, miniature: Blob | null) => Promise<void>,
+  surPhoto: (id: string, fichier: Blob, miniature: Blob | null, annexes: AnnexesRecues) => Promise<void>,
   simultanees = 4,
 ): Promise<void> {
-  const miniatures = new Map<string, Blob>();
+  const avant = new Map<string, { miniature?: Blob; annotee?: Blob; note?: Blob }>();
   const enCours = new Set<Promise<void>>();
   let erreur: unknown = null;
   await parcourir(paquet, async (nom, contenu) => {
-    if (nom.startsWith('miniatures/')) {
-      const id = nom.slice(11, -4);
-      if (voulues.has(id)) miniatures.set(id, new Blob([contenu], { type: 'image/jpeg' }));
+    const dossier = nom.split('/')[0];
+    const id = idFichier(nom);
+    if (!voulues.has(id)) return;
+    if (dossier === 'miniatures' || dossier === 'annotees' || dossier === 'notes') {
+      const cle = dossier === 'miniatures' ? 'miniature' : dossier === 'annotees' ? 'annotee' : 'note';
+      const type = dossier === 'notes' ? '' : 'image/jpeg';
+      avant.set(id, { ...avant.get(id), [cle]: new Blob([contenu], { type }) });
       return;
     }
-    if (!nom.startsWith('photos/')) return;
-    const id = nom.slice(7, -4);
-    if (!voulues.has(id)) return;
-    const tache = surPhoto(id, new Blob([contenu], { type: 'image/jpeg' }), miniatures.get(id) ?? null)
+    if (dossier !== 'photos') return;
+    const a = avant.get(id) ?? {};
+    const tache = surPhoto(id, new Blob([contenu]), a.miniature ?? null, { annotee: a.annotee ?? null, note: a.note ?? null })
       .catch((e) => {
         erreur ??= e;
       })
       .finally(() => {
-        miniatures.delete(id);
+        avant.delete(id);
         enCours.delete(tache);
       });
     enCours.add(tache);

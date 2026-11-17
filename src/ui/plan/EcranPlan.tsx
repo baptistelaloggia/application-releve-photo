@@ -3,6 +3,7 @@ import type { LocalDetecte } from '../../domaine/locaux';
 import type { Local, Photo } from '../../domaine/types';
 import { dateLocale } from '../../domaine/nommage';
 import { compresserPhoto } from '../../photo/compression';
+import { extensionVideo, miniatureVideo } from '../../photo/enregistrement';
 import { CameraTerrain } from '../photo/CameraTerrain';
 import { VisionneusePhoto } from '../photo/VisionneusePhoto';
 import { FicheRepere, PanneauPanier, PanneauTerrain, PhotosDuLocal } from './PanneauxTerrain';
@@ -85,12 +86,12 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   // se fait en arrière-plan, pour pouvoir enchaîner les prises de vue sans attendre.
   const file = useRef<Promise<void>>(Promise.resolve());
   const [enAttente, setEnAttente] = useState(0);
-  function enregistrerPhoto(original: Blob, source: Photo['source'], prisLe: Date, repereId: string | null, nomOrigine?: string) {
+  function enregistrerPhoto(original: Blob, source: Photo['source'], prisLe: Date, repereId: string | null, nomOrigine?: string): Promise<Photo | null> {
     setEnAttente((n) => n + 1);
-    file.current = file.current.then(async () => {
+    const tache = file.current.then(async () => {
       try {
         const c = await compresserPhoto(original);
-        await espace.ajouterPhoto(
+        return await espace.ajouterPhoto(
           {
             repereId,
             jpeg: c.jpeg,
@@ -105,11 +106,47 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         );
       } catch (e) {
         setErreur(`Photo non enregistrée : ${texteErreur(e)}`);
+        return null;
       } finally {
         setEnAttente((n) => n - 1);
         setVersion((v) => v + 1);
       }
     });
+    file.current = tache.then(() => undefined);
+    return tache;
+  }
+
+  /** Vidéo : pas de recompression (le fichier est gardé tel quel) ; miniature tirée de la vidéo. */
+  function enregistrerVideo(fichier: Blob, source: Photo['source'], prisLe: Date, repereId: string | null, nomOrigine?: string): Promise<Photo | null> {
+    setEnAttente((n) => n + 1);
+    const tache = file.current.then(async () => {
+      try {
+        const extension = extensionVideo(fichier as File) ?? (fichier.type.includes('mp4') ? 'mp4' : 'webm');
+        const m = await miniatureVideo(fichier);
+        return await espace.ajouterPhoto(
+          {
+            repereId,
+            jpeg: fichier,
+            miniature: m.miniature,
+            largeur: m.largeur,
+            hauteur: m.hauteur,
+            source,
+            prisLe,
+            nomOrigine,
+            video: { extension, duree: m.duree },
+          },
+          auteur,
+        );
+      } catch (e) {
+        setErreur(`Vidéo non enregistrée : ${texteErreur(e)}`);
+        return null;
+      } finally {
+        setEnAttente((n) => n - 1);
+        setVersion((v) => v + 1);
+      }
+    });
+    file.current = tache.then(() => undefined);
+    return tache;
   }
   // Ne pas quitter la page tant que des photos sont en cours d'enregistrement.
   useEffect(() => {
@@ -650,7 +687,11 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 occupe={occupe}
                 surPhotoSansRepere={() => ouvrirCamera(null)}
                 surImporter={(fichiers) => {
-                  for (const f of fichiers) enregistrerPhoto(f, 'import', new Date(f.lastModified || Date.now()), null, f.name);
+                  for (const f of fichiers) {
+                    const prisLe = new Date(f.lastModified || Date.now());
+                    if (f.type.startsWith('video/') || extensionVideo(f)) void enregistrerVideo(f, 'import', prisLe, null, f.name);
+                    else void enregistrerPhoto(f, 'import', prisLe, null, f.name);
+                  }
                 }}
                 surPlacer={(photos) => setMode({ type: 'classement', photoIds: photos.map((p) => p.id) })}
                 surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
@@ -679,9 +720,12 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
 
       {camera && (
         <CameraTerrain
+          espace={espace}
+          auteur={auteur}
           titre={titreCamera(camera.repereId)}
           enAttente={enAttente}
           surCapture={(photo, source, prisLe) => enregistrerPhoto(photo, source, prisLe, camera.repereId)}
+          surVideo={(fichier, source, prisLe, nom) => enregistrerVideo(fichier, source, prisLe, camera.repereId, nom)}
           surFermer={() => setCamera(null)}
         />
       )}
@@ -690,6 +734,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
           espace={espace}
           photos={photoOuverte.photos}
           indexInitial={photoOuverte.index}
+          auteur={auteur}
           surFermer={() => setPhotoOuverte(null)}
           surModifie={() => setVersion((v) => v + 1)}
         />

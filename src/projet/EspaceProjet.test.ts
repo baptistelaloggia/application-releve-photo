@@ -226,6 +226,47 @@ describe('repères et photos', () => {
     expect(await s.existe('01_PHOTOS/01_R+1/R+1.012_Local-TGBT')).toBe(false);
   });
 
+  it('range une vidéo, une copie annotée et une note vocale à côté de la photo, et les déplace avec elle', async () => {
+    const { s, e, planId } = await projet();
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    const v = await e.ajouterPhoto({ ...entree(r.id, 'v'), video: { extension: 'webm', duree: 12.34 } }, 'BL');
+    expect(v.fichier).toBe('01_PHOTOS/01_R+1/R+1.012_Local-TGBT/XXX_R+1.012_P001_2026-10-30_01.webm');
+    expect(v.duree).toBe(12.3);
+    const p = await e.ajouterPhoto(entree(null, 'x'), 'BL');
+    expect(p.fichier).toMatch(/\.jpg$/);
+    await e.annoterPhoto(p.id, [{ type: 'ok', x: 0.2, y: 0.3 }], jpeg('annotee'));
+    await e.enregistrerNoteVocale(p.id, { audio: new Blob(['son']), extension: 'm4a', duree: 3 }, 'BL');
+    const base = e.photos.find((x) => x.id === p.id)!.fichier.replace(/\.jpg$/, '');
+    expect(await s.existe(`${base}_annote.jpg`)).toBe(true);
+    expect(await s.existe(`${base}_note.m4a`)).toBe(true);
+
+    // Classement : la photo et ses fichiers annexes changent de nom ensemble.
+    await e.classerPhoto(p.id, r.id, 'BL');
+    const dossier = '01_PHOTOS/01_R+1/R+1.012_Local-TGBT';
+    expect((await s.lister(dossier)).map((x) => x.nom).sort()).toEqual([
+      'XXX_R+1.012_P001_2026-10-30_01.webm',
+      'XXX_R+1.012_P001_2026-10-30_02.jpg',
+      'XXX_R+1.012_P001_2026-10-30_02_annote.jpg',
+      'XXX_R+1.012_P001_2026-10-30_02_note.m4a',
+    ]);
+    const classee = e.photos.find((x) => x.id === p.id)!;
+    expect(await (await e.lireAnnotee(classee))!.text()).toContain('annotee');
+    expect(await (await e.lireNoteVocale(classee))!.text()).toBe('son');
+
+    // Sans annotation, la copie annotée disparaît ; la suppression de la photo emporte la note.
+    await e.annoterPhoto(p.id, [], null);
+    expect(await s.existe(`${dossier}/XXX_R+1.012_P001_2026-10-30_02_annote.jpg`)).toBe(false);
+    await e.supprimerPhoto(p.id);
+    expect((await s.lister(dossier)).map((x) => x.nom)).toEqual(['XXX_R+1.012_P001_2026-10-30_01.webm']);
+
+    // La réparation ne prend pas une copie annotée pour une photo perdue.
+    const q = await e.ajouterPhoto(entree(r.id, 'q'), 'BL');
+    await e.annoterPhoto(q.id, [{ type: 'nok', x: 0.5, y: 0.5 }], jpeg('a2'));
+    expect(await e.reparer('BL', async () => ({ miniature: jpeg('m'), largeur: 1, hauteur: 1 }))).toEqual([
+      'Rien à réparer : toutes les photos sont connues de l’application.',
+    ]);
+  });
+
   it('renomme les photos quand le local change de numéro ou de nom, ou le niveau de place', async () => {
     const { s, e, planId, tgbt } = await projet();
     const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');

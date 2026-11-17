@@ -194,7 +194,7 @@ function ApercuImport({
     ['Locaux ajoutés ou mis à jour', f.locaux.length],
     ['Repères ajoutés ou mis à jour', f.reperes.length],
     ['Photos nouvelles', f.photosNouvelles.length],
-    ['Photos reclassées ou commentées', f.photosModifiees.length],
+    ['Photos reclassées, commentées ou annotées', f.photosModifiees.length],
   ];
   const alertes = f.compteRendu.filter((l) => l.startsWith('Attention') || /renuméroté/.test(l));
   const rien = lignes.every(([, n]) => n === 0);

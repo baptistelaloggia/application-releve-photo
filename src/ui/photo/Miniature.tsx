@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Photo } from '../../domaine/types';
 import type { EspaceProjet } from '../../projet/EspaceProjet';
+import { dureeLisible } from '../../photo/enregistrement';
 
 /** Adresses des miniatures déjà lues (gardées pour la session, pour un défilement fluide). */
 const cache = new Map<string, Promise<string>>();
@@ -30,6 +31,13 @@ export function Miniature({ espace, photo, taille = 96 }: { espace: EspaceProjet
   return (
     <span className="miniature" style={{ width: taille, height: taille }}>
       {src ? <img src={src} alt="" loading="lazy" /> : null}
+      {(photo.type === 'video' || photo.annotations?.length || photo.noteVocale) && (
+        <span className="miniature-marques">
+          {photo.type === 'video' && <span title="Vidéo">▶ {dureeLisible(photo.duree ?? 0)}</span>}
+          {!!photo.annotations?.length && <span title="Annotée">✏️</span>}
+          {photo.noteVocale && <span title="Note vocale">🎤</span>}
+        </span>
+      )}
     </span>
   );
 }

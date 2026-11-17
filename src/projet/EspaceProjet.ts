@@ -17,11 +17,14 @@ import {
   nomDossierLocal,
   nomFichierPhoto,
   nomFichierPhotoAClasser,
+  cheminAnnotee,
+  cheminNoteVocale,
+  estFichierAnnexe,
   numeroRepere,
   normaliserCodeAffaire,
   normaliserIndice,
 } from '../domaine/nommage';
-import { VERSION_SCHEMA, type Local, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
+import { VERSION_SCHEMA, type Annotation, type Local, type NoteVocale, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
 import { proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
 import type { DonneesProjet, ResultatFusion } from '../domaine/fusion';
@@ -35,6 +38,23 @@ const DOSSIER_REPERES = `${DOSSIERS.donnees}/reperes`;
 const DOSSIER_PHOTOS = `${DOSSIERS.donnees}/photos`;
 const DOSSIER_MINIATURES = `${DOSSIERS.donnees}/miniatures`;
 const DOSSIER_A_CLASSER = `${DOSSIERS.photos}/${DOSSIERS.aClasser}`;
+
+/** Extension du fichier d'une prise de vue. */
+export const extensionPhoto = (p: Pick<Photo, 'type' | 'extension'>) => (p.type === 'video' ? (p.extension ?? 'mp4') : 'jpg');
+
+/** Fichiers rangés à côté d'une prise de vue (copie annotée, note vocale), d'après son état. */
+export function annexesPhoto(p: Photo): Map<string, string> {
+  const m = new Map<string, string>();
+  if (p.annotations?.length) m.set('annotee', cheminAnnotee(p.fichier));
+  if (p.noteVocale) m.set(`note.${p.noteVocale.extension}`, cheminNoteVocale(p.fichier, p.noteVocale.extension));
+  return m;
+}
+
+/** Fichiers annexes reçus avec une prise de vue (paquet .zip). */
+export interface AnnexesRecues {
+  annotee?: Blob | null;
+  note?: Blob | null;
+}
 /** Distance (relative à la page) au-delà de laquelle un repère n'est rattaché à aucun local. */
 const DISTANCE_RATTACHEMENT = 0.06;
 /** Écart entre deux niveaux dans le champ « ordre ». */
@@ -838,7 +858,7 @@ export class EspaceProjet {
       // Photo du panier : son nom ne dépend de rien d'autre, il ne change pas.
       return photo.fichier.startsWith(`${DOSSIER_A_CLASSER}/`)
         ? photo.fichier
-        : `${DOSSIER_A_CLASSER}/${nomFichierPhotoAClasser(this.projet.codeAffaire, new Date(photo.prisLe), photo.id)}`;
+        : `${DOSSIER_A_CLASSER}/${nomFichierPhotoAClasser(this.projet.codeAffaire, new Date(photo.prisLe), photo.id, extensionPhoto(photo))}`;
     }
     const plan = this.planParId(repere.planId);
     if (!plan) throw new Error(`Plan introuvable pour le repère ${repere.numero}`);
@@ -847,7 +867,7 @@ export class EspaceProjet {
     return [
       this.dossierNiveau(niveau.code),
       nomDossierLocal(niveau.code, local),
-      nomFichierPhoto(this.projet.codeAffaire, niveau.code, local?.numero ?? null, repere.numero, photo.date, photo.rang),
+      nomFichierPhoto(this.projet.codeAffaire, niveau.code, local?.numero ?? null, repere.numero, photo.date, photo.rang, extensionPhoto(photo)),
     ].join('/');
   }
 
@@ -883,6 +903,8 @@ export class EspaceProjet {
       prisLe?: Date;
       nomOrigine?: string;
       commentaire?: string;
+      /** Vidéo : extension du fichier et durée en secondes. */
+      video?: { extension: 'mp4' | 'webm'; duree: number };
     },
     auteur: string,
   ): Promise<Photo> {
@@ -908,6 +930,7 @@ export class EspaceProjet {
       commentaire: entree.commentaire?.trim() ?? '',
       source: entree.source,
       ...(entree.nomOrigine ? { nomOrigine: entree.nomOrigine } : {}),
+      ...(entree.video ? { type: 'video' as const, extension: entree.video.extension, duree: Math.round(entree.video.duree * 10) / 10 } : {}),
     };
     photo.fichier = this.cheminAttendu(photo);
     if (await this.stockage.existe(photo.fichier)) throw new Error(`Le fichier ${photo.fichier} existe déjà.`);
@@ -954,6 +977,7 @@ export class EspaceProjet {
     const photo = this.photos.find((p) => p.id === photoId);
     if (!photo) return;
     await this.stockage.supprimer(photo.fichier);
+    for (const annexe of annexesPhoto(photo).values()) await this.stockage.supprimer(annexe);
     await this.stockage.supprimer(photo.miniature);
     await this.stockage.supprimer(`${DOSSIER_PHOTOS}/${photo.id}.json`);
     this.photos = this.photos.filter((p) => p.id !== photoId);
@@ -965,6 +989,93 @@ export class EspaceProjet {
 
   async lireMiniature(photo: Photo): Promise<Blob> {
     return this.stockage.lireFichier(photo.miniature);
+  }
+
+  /** Copie annotée de la photo (JPEG), si elle a des annotations. */
+  async lireAnnotee(photo: Photo): Promise<Blob | null> {
+    const chemin = annexesPhoto(photo).get('annotee');
+    return chemin && (await this.stockage.existe(chemin)) ? this.stockage.lireFichier(chemin) : null;
+  }
+
+  async lireNoteVocale(photo: Photo): Promise<Blob | null> {
+    if (!photo.noteVocale) return null;
+    const chemin = cheminNoteVocale(photo.fichier, photo.noteVocale.extension);
+    return (await this.stockage.existe(chemin)) ? this.stockage.lireFichier(chemin) : null;
+  }
+
+  /**
+   * Enregistre les annotations d'une photo et sa copie annotée (JPEG rangé à côté de l'original,
+   * qui reste intact). Sans annotation, la copie annotée est supprimée.
+   */
+  async annoterPhoto(photoId: string, annotations: Annotation[], copieAnnotee: Blob | null): Promise<Photo> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (!photo) throw new Error('Photo introuvable.');
+    if (photo.type === 'video') throw new Error('Les vidéos ne s’annotent pas.');
+    const chemin = cheminAnnotee(photo.fichier);
+    const maj: Photo = { ...photo, modifieLe: maintenant() };
+    delete maj.annotations;
+    if (annotations.length) {
+      if (!copieAnnotee) throw new Error('Copie annotée manquante.');
+      await this.stockage.ecrireFichier(chemin, copieAnnotee);
+      maj.annotations = annotations;
+    } else if (await this.stockage.existe(chemin)) {
+      await this.stockage.supprimer(chemin);
+    }
+    await this.ecrirePhoto(maj);
+    return maj;
+  }
+
+  /** Enregistre (ou supprime, avec null) la note vocale d'une prise de vue. */
+  async enregistrerNoteVocale(
+    photoId: string,
+    note: { audio: Blob; extension: NoteVocale['extension']; duree: number } | null,
+    auteur: string,
+  ): Promise<Photo> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (!photo) throw new Error('Photo introuvable.');
+    if (photo.noteVocale) {
+      const ancien = cheminNoteVocale(photo.fichier, photo.noteVocale.extension);
+      if (await this.stockage.existe(ancien)) await this.stockage.supprimer(ancien);
+    }
+    const maj: Photo = { ...photo, modifieLe: maintenant() };
+    delete maj.noteVocale;
+    if (note) {
+      await this.stockage.ecrireFichier(cheminNoteVocale(photo.fichier, note.extension), note.audio);
+      maj.noteVocale = { extension: note.extension, duree: Math.round(note.duree * 10) / 10, enregistreLe: maintenant(), enregistrePar: auteur };
+    }
+    await this.ecrirePhoto(maj);
+    return maj;
+  }
+
+  /**
+   * Déplace ou supprime les fichiers annexes (copie annotée, note vocale) quand une prise de vue
+   * change de nom ou d'état. Ceux qui manquent sont simplement ignorés.
+   */
+  private async deplacerAnnexes(avant: Photo, apres: Photo) {
+    const nouvelles = annexesPhoto(apres);
+    for (const [cle, ancien] of annexesPhoto(avant)) {
+      const cible = nouvelles.get(cle);
+      if (cible === ancien || !(await this.stockage.existe(ancien))) continue;
+      if (cible) {
+        if (await this.stockage.existe(cible)) await this.stockage.supprimer(cible);
+        await this.stockage.deplacer(ancien, cible);
+      } else await this.stockage.supprimer(ancien);
+    }
+  }
+
+  /** Écrit les fichiers annexes reçus dans un paquet. */
+  private async ecrireAnnexes(photo: Photo, annexes: AnnexesRecues) {
+    const chemins = annexesPhoto(photo);
+    const annotee = chemins.get('annotee');
+    if (annotee && annexes.annotee) await this.stockage.ecrireFichier(annotee, annexes.annotee);
+    const note = photo.noteVocale && chemins.get(`note.${photo.noteVocale.extension}`);
+    if (note && annexes.note) await this.stockage.ecrireFichier(note, annexes.note);
+  }
+
+  /** Après une fusion : fichiers annexes d'une photo déjà connue, annotée ou commentée sur l'autre appareil. */
+  async ecrireAnnexesImportees(photoId: string, annexes: AnnexesRecues): Promise<void> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (photo) await this.ecrireAnnexes(photo, annexes);
   }
 
   /** Déplace le JPEG à son nouveau chemin, puis enregistre le JSON (dans cet ordre : jamais de JSON vers un fichier absent). */
@@ -982,8 +1093,11 @@ export class EspaceProjet {
         apres = { ...apres, rang };
       }
       await this.stockage.deplacer(avant.fichier, cible);
-      await this.supprimerDossierSiVide(avant.fichier.split('/').slice(0, -1).join('/'));
       apres = { ...apres, fichier: cible };
+      await this.deplacerAnnexes(avant, apres);
+      await this.supprimerDossierSiVide(avant.fichier.split('/').slice(0, -1).join('/'));
+    } else {
+      await this.deplacerAnnexes(avant, { ...apres, fichier: avant.fichier });
     }
     await this.ecrirePhoto(apres);
   }
@@ -1072,7 +1186,7 @@ export class EspaceProjet {
    * Ajoute une photo reçue par paquet (identifiant, date et auteur d'origine conservés) :
    * rang et chemin recalculés ici. Peut être appelée plusieurs fois en parallèle.
    */
-  async ajouterPhotoImportee(meta: Photo, jpeg: Blob, miniature: Blob | null): Promise<Photo> {
+  async ajouterPhotoImportee(meta: Photo, jpeg: Blob, miniature: Blob | null, annexes: AnnexesRecues = {}): Promise<Photo> {
     if (this.photos.some((p) => p.id === meta.id)) return this.photos.find((p) => p.id === meta.id)!;
     const repereId = meta.repereId && this.reperes.some((r) => r.id === meta.repereId) ? meta.repereId : null;
     // Réservation immédiate du rang et du chemin, avant toute écriture.
@@ -1094,6 +1208,7 @@ export class EspaceProjet {
       }
       await this.stockage.ecrireFichier(photo.fichier, jpeg);
       if (miniature) await this.stockage.ecrireFichier(photo.miniature, miniature);
+      await this.ecrireAnnexes(photo, annexes);
       await ecrireJson(this.stockage, `${DOSSIER_PHOTOS}/${photo.id}.json`, photo);
       return photo;
     } catch (e) {
@@ -1139,7 +1254,8 @@ export class EspaceProjet {
     this.avertissements = this.avertissements.filter((a) => !a.startsWith('Fichier de données illisible'));
 
     const connus = new Set(this.photos.map((p) => p.fichier));
-    const orphelines = (await this.listerRecursif(DOSSIERS.photos)).filter((c) => /\.jpe?g$/i.test(c) && !connus.has(c));
+    // Les copies annotées et les notes vocales suivent leur photo : ce ne sont pas des photos perdues.
+    const orphelines = (await this.listerRecursif(DOSSIERS.photos)).filter((c) => /\.jpe?g$/i.test(c) && !connus.has(c) && !estFichierAnnexe(c));
     const motif = /_(P\d{3,})_(\d{4}-\d{2}-\d{2})_(\d{2,})\.jpe?g$/i;
     const motifPanier = /_A-CLASSER_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})_/;
     for (const chemin of orphelines) {

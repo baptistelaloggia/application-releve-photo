@@ -191,7 +191,7 @@ try {
   console.log(`Photo importée : ${(original.length / 1024 / 1024).toFixed(1)} Mo`);
   await page.getByRole('tab', { name: 'Panier (0)' }).click();
   await page.getByText('Le panier est vide.').waitFor();
-  await page.locator('input[type=file][accept="image/*"][multiple]').setInputFiles({
+  await page.locator('input[type=file][accept="image/*,video/*"][multiple]').setInputFiles({
     name: 'IMG_20261030_140509.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(original),
   });
   await page.getByRole('tab', { name: 'Panier (1)' }).waitFor({ timeout: 60_000 });
@@ -225,7 +225,7 @@ try {
     const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9));
     return [...new Uint8Array(await b.arrayBuffer())];
   });
-  await page.locator('input[type=file][accept="image/*"][multiple]').setInputFiles([
+  await page.locator('input[type=file][accept="image/*,video/*"][multiple]').setInputFiles([
     { name: 'IMG_a.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
     { name: 'IMG_b.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
   ]);
@@ -248,7 +248,7 @@ try {
   assert.match(await page.locator('.marqueur .marqueur-libelle', { hasText: 'LT002' }).textContent(), /LT0023/);
 
   // Sélection avec la touche MAJ : 1re et 3e photo cochées avec MAJ → les 3 sont choisies.
-  await page.locator('input[type=file][accept="image/*"][multiple]').setInputFiles([
+  await page.locator('input[type=file][accept="image/*,video/*"][multiple]').setInputFiles([
     { name: 'IMG_c.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
     { name: 'IMG_d.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },
     { name: 'IMG_e.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(petite) },

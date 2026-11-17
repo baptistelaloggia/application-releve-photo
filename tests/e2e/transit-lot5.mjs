@@ -24,7 +24,7 @@ const reglages = {
 };
 
 async function appareil(nom, options) {
-  const contexte = await navigateur.newContext({ ...options, permissions: ['camera'] });
+  const contexte = await navigateur.newContext({ ...options, permissions: ['camera', 'microphone'] });
   if (nom === 'pc') {
     await contexte.addInitScript(() => {
       window.showDirectoryPicker = async ({ id } = {}) =>
@@ -98,7 +98,50 @@ try {
   await p.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
   for (let i = 0; i < 3; i++) await p.getByRole('button', { name: 'Prendre la photo' }).click();
   await p.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 60_000 });
+
+  // Annotations sur la dernière photo : V vert, X rouge, bulle.
+  const derniere = p.locator('.camera-derniere');
+  await derniere.getByRole('button', { name: '✏️ Annoter' }).click();
+  const zone = p.locator('.annot-svg');
+  await zone.waitFor();
+  const b = await zone.boundingBox();
+  const toucherZone = (fx, fy) => p.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
+  await p.getByRole('button', { name: 'V vert : travaux conformes' }).click();
+  await toucherZone(0.3, 0.5);
+  await p.getByRole('button', { name: 'X rouge : travaux non conformes' }).click();
+  await toucherZone(0.7, 0.5);
+  await p.getByRole('button', { name: 'Bulle : texte relié à un point' }).click();
+  await toucherZone(0.5, 0.7);
+  await p.getByLabel('Texte de la bulle').fill('Calorifuge manquant');
+  await p.getByRole('button', { name: 'OK', exact: true }).click();
+  await p.getByRole('dialog', { name: 'Annoter la photo' }).getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await p.locator('.editeur-annotations').waitFor({ state: 'detached' });
+  await tel.capture('2a-annotee');
+  // Note vocale sur la même photo (micro factice de Chromium).
+  await derniere.getByRole('button', { name: '🎤 Note vocale' }).click();
+  await p.waitForTimeout(1500);
+  await derniere.getByRole('button', { name: /Arrêter/ }).click();
+  await derniere.getByRole('button', { name: '🎤 Note ✓' }).waitFor({ timeout: 10_000 });
+  // Vidéo de 2 secondes.
+  await p.getByRole('radio', { name: 'Vidéo' }).click();
+  await p.getByRole('button', { name: 'Filmer' }).click();
+  await p.locator('.camera-tournage').waitFor();
+  await p.waitForTimeout(2000);
+  await p.getByRole('button', { name: 'Arrêter la vidéo' }).click();
+  await p.locator('.camera-derniere', { hasText: 'Dernière vidéo' }).waitFor({ timeout: 30_000 });
   await p.getByRole('button', { name: '✕ Retour au plan' }).click();
+  // Visionneuse : flèches de part et d'autre, photo annotée, vidéo.
+  await p.locator('.camera').waitFor({ state: 'detached' });
+  await p.locator('.marqueur .marqueur-libelle', { hasText: 'LT001' }).dblclick();
+  const voile = p.locator('.voile-photo');
+  await voile.locator('video.photo-media').waitFor(); // la plus récente : la vidéo
+  assert.equal(await voile.getByRole('button', { name: 'Photo suivante' }).count(), 0);
+  await voile.getByRole('button', { name: 'Photo précédente' }).click();
+  await voile.locator('.photo-annotations').waitFor();
+  assert.match(await voile.innerText(), /Annotations : 1 V, 1 X, 1 bulle/);
+  await voile.locator('audio').waitFor();
+  await tel.capture('2b-visionneuse');
+  await voile.getByRole('button', { name: 'Fermer' }).click();
   // Photos importées volumineuses (bruit, environ 1,3 Mo chacune) : le paquet dépasse 9,4 Mo,
   // ce qui impose l'envoi en plusieurs morceaux.
   await p.getByRole('button', { name: 'Fermer' }).first().click();
@@ -118,7 +161,7 @@ try {
     }
     return liste;
   });
-  await p.locator('input[type=file][accept="image/*"][multiple]').setInputFiles(
+  await p.locator('input[type=file][accept="image/*,video/*"][multiple]').setInputFiles(
     images.map((o, k) => ({ name: `IMG_${k}.jpg`, mimeType: 'image/jpeg', buffer: Buffer.from(o) })),
   );
   await p.getByRole('tab', { name: 'Panier (8)' }).waitFor({ timeout: 120_000 });
@@ -142,6 +185,13 @@ try {
   const arbo = await arborescenceOpfs(p, `simule-parent-projets/${dossier}/01_PHOTOS`);
   const jpg = arbo.filter((l) => l.endsWith('.jpg'));
   assert.ok(jpg.some((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/T05_R+1.LT001_P001_')), 'photos du TGBT rangées');
+  const tgbt = arbo.filter((l) => l.startsWith('01_R+1/R+1.LT001_TGBT/')).map((l) => l.split('/').pop().replace(/^T05_R\+1\.LT001_P001_\d{4}-\d{2}-\d{2}_/, ''));
+  console.log(`Local TGBT : ${tgbt.join(', ')}`);
+  assert.deepEqual(tgbt.filter((n) => n && !/^0[1-3]\.jpg$/.test(n)).map((n) => n.replace(/\.(m4a|webm|ogg|mp4)$/, '.son-ou-video')).sort(), [
+    '03_annote.jpg',
+    '03_note.son-ou-video',
+    '04.son-ou-video',
+  ]);
   assert.equal(jpg.filter((l) => l.startsWith('_A-CLASSER/')).length, 8);
   g = await etatGraphe();
   assert.equal(g.fichiers.filter((f) => f.includes('/depots/')).length, 0, 'dépôt purgé après collecte');

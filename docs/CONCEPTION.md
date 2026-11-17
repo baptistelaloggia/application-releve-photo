@@ -201,6 +201,46 @@ Règles issues du lot 1 (04/11/2026) :
 - **Réglages** (écran « Réglages SharePoint » de l'accueil) : identifiant du locataire, identifiant de l'application, adresse du site, nom de la bibliothèque. Ils sont saisis ou importés depuis un fichier `.json` fourni par la DSI, et **gardés sur l'appareil, jamais dans le dépôt** (qui est public).
 - **Validation** (test automatique `transit-lot5.mjs`, contre une imitation de Microsoft Graph) : publication, récupération par le téléphone, visite, dépôt de 12 Mo en 2 morceaux, collecte, rangement et purge du dépôt, mise à jour de la copie après une modification sur le PC, clôture. **La connexion Microsoft réelle n'est pas testée** : elle attend la DSI (demandes 1 à 3 de `docs/NOTE_DSI.md`). [À VÉRIFIER alors : fenêtre de connexion dans l'appli installée sur Android ; prise en charge de `Sites.Selected` en délégué.]
 
+## A.6 septies Sécurité du dépôt public et de l'appli publiée (16/11/2026)
+
+- **Ce qui est public** : le code, les tests, la documentation, la note à la DSI (rédigée sans nom d'entreprise ni de projet), l'historique, et l'adresse e-mail de l'auteur des fusions. **Ce qui ne l'est jamais** : plans, photos, données de projet, réglages SharePoint (ils restent sur les appareils), mots de passe et jetons. Le code de l'appli ne contient aucun secret : une appli monopage n'en a pas (PKCE), et l'identifiant d'application Entra ID n'est pas un secret.
+- **Risque principal** : la **chaîne de publication**. L'appli exécutée par les postes est celle que publie GitHub Pages à chaque fusion dans `main`. Une prise de contrôle du compte GitHub permettrait de publier une version piégée. Celle-ci aurait les accès que l'utilisateur a donnés à l'appli : dossiers du serveur autorisés dans Edge, et bibliothèque de transit par `Sites.Selected`. Ce risque est **le même avec un dépôt privé**. Mesures : double authentification du compte GitHub ; protection de la branche `main` (fusion par pull request seulement) ; pas d'autre collaborateur sans besoin ; à terme, hébergement interne ou Azure, la publication étant faite par la DSI (A.6, demande 4 de la note).
+- **Données reçues** : un PDF ou un paquet `.zip` piégé est la seconde voie d'attaque. pdf.js (version 6.5) lit les PDF dans un worker isolé et n'exécute plus de code tiré d'un PDF (la faille de 2024 venait de là). Depuis le 16/11/2026, **toutes les données d'un paquet reçu sont contrôlées avant écriture** (identifiants, codes de niveau, numéros, dates, positions, empreintes) : un paquet non conforme est refusé en entier. Les chemins des fichiers sont de toute façon recalculés par l'appareil qui importe, et tout chemin contenant `..` est refusé (`decouperChemin`).
+- **Revenir à un dépôt privé** est possible à tout moment (Settings › General › Danger Zone › Change visibility). Mais GitHub Pages ne publie un dépôt privé qu'avec une offre payante (GitHub Pro, pour un compte personnel) [À VÉRIFIER : tarif]. Sans cela, l'adresse de l'appli cesse de fonctionner. Les applis déjà installées continuent de fonctionner hors ligne, mais ne se mettent plus à jour, et la connexion SharePoint échoue, car son adresse de retour est sur github.io. Conditions pour repasser en privé : l'hébergement de l'appli est déplacé (serveur interne, ou Azure Static Web Apps, qui publie aussi depuis un dépôt privé), **l'URI de redirection est mise à jour par la DSI**, et les utilisateurs réinstallent l'appli depuis la nouvelle adresse. Ou bien : prendre GitHub Pro et ne rien changer d'autre.
+
+## A.6 octies Vidéos, annotations dessinées et notes vocales (17/11/2026)
+
+- **Vidéos.** Une vidéo est une prise de vue comme une photo : même repère, même date, même rang, même nommage, avec une autre extension. Exemple : `XXX_R+1.012_P001_2026-11-17_04.mp4`. Dans `_data/photos/{id}.json`, elle porte `type: "video"`, `extension` (`mp4` ou `webm`) et `duree` en secondes.
+  - **Prise de vue :** bouton **Photo / Vidéo** dans la visée. En mode vidéo, la définition passe en 720p avec le son, à environ 2,5 Mbit/s, soit environ 20 Mo par minute [À VÉRIFIER sur téléphone].
+  - **Durée :** 3 minutes au plus par vidéo.
+  - **Format :** l'appli enregistre en MP4 quand le navigateur le sait, sinon en WebM.
+  - **Fichiers importés :** les vidéos importées, ou filmées par l'appareil du téléphone, sont gardées telles quelles, sans recompression ; elles peuvent donc être lourdes.
+  - **Miniature :** elle est tirée de la vidéo.
+  - **Limite :** les vidéos ne s'annotent pas.
+- **Annotations dessinées** sur une photo. Elles servent au suivi de chantier et à l'audit, pour repérer les bons et les mauvais travaux.
+  - **Outils :** V vert (conforme), X rouge (non conforme), bulle (texte relié à un point), texte libre, cercle (on glisse pour entourer), trait à main levée ; Annuler, Tout effacer.
+  - **Stockage :** les annotations sont enregistrées en **vecteurs** (`annotations` dans le JSON de la photo), en coordonnées relatives 0 à 1, comme les repères.
+  - **Original intact :** la photo d'origine n'est jamais modifiée et garde son EXIF.
+  - **Copie annotée :** une **copie annotée** JPEG est rangée à côté, `…_01_annote.jpg`, pour rester lisible sans l'appli.
+  - **Dans l'appli :** les annotations s'affichent par-dessus la photo, avec un bouton « Voir l'original ».
+- **Note vocale** : un enregistrement du micro attaché à une photo ou à une vidéo, rangé à côté d'elle (`…_01_note.m4a`, ou `.webm` / `.ogg` selon le navigateur).
+  - **Données :** `noteVocale` dans le JSON (extension, durée, date, auteur).
+  - **Durée :** 2 minutes au plus.
+  - **Réenregistrement :** une nouvelle note remplace la précédente.
+  - **Dictée :** la dictée par le clavier (texte) reste disponible dans le commentaire.
+- **Accès :**
+  - **dans la visée**, après chaque prise de vue, deux raccourcis sur la dernière : « ✏️ Annoter » et « 🎤 Note vocale ». Ils sont facultatifs, ce qui préserve la règle des 2 appuis par photo ;
+  - **dans la visionneuse**, les boutons « Annoter », « Note vocale » et le lecteur de la note.
+- **Rangement :** les fichiers rangés à côté de la photo **suivent la photo** (reclassement, renumérotation d'un local, suppression). Triés par nom, ils viennent juste après elle (`_01.jpg`, `_01_annote.jpg`, `_01_note.m4a`, `_02.jpg`). La réparation ne les prend pas pour des photos perdues.
+- **Synchronisation :** les paquets `.zip` portent `annotees/{id}.jpg` et `notes/{id}.{ext}` avant le fichier de la prise de vue (`photos/{id}.jpg|mp4|webm`).
+  - **Fusion :** les annotations et la note les plus récentes l'emportent (`modifieLe`).
+  - **Renvoi :** une photo annotée ou dotée d'une note après son envoi repart au prochain envoi avec ses fichiers annexes.
+  - **Contrôle :** les données reçues sont contrôlées : types, positions dans l'image, longueur des textes, extensions.
+- **Visionneuse :**
+  - **Navigation :** le passage d'une photo à l'autre se fait par des **flèches sur les côtés gauche et droit de la photo**, par un balayage du doigt, ou par les touches ← → (Échap ferme).
+  - **Position :** elle est affichée en haut (« 3/4 »).
+- **RGPD :** les notes vocales et le son des vidéos enregistrent aussi les voix alentour. À utiliser pour décrire l'installation, sans enregistrer de conversation.
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
