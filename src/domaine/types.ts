@@ -137,9 +137,12 @@ export type Annotation =
   | { type: 'cercle'; x: number; y: number; rx: number; ry: number }
   | { type: 'trait'; points: Array<[number, number]> };
 
-/** Note vocale d'une photo, enregistrée à côté d'elle : « …_01_note.m4a ». */
+/**
+ * Note vocale d'une photo, enregistrée à côté d'elle : « …_01_note.wav ». Depuis le 17/11/2026,
+ * toujours en WAV (lisible partout sous Windows) ; m4a, webm, ogg : notes plus anciennes.
+ */
 export interface NoteVocale {
-  extension: 'm4a' | 'webm' | 'ogg';
+  extension: 'wav' | 'm4a' | 'webm' | 'ogg';
   /** Durée en secondes. */
   duree: number;
   enregistreLe: string;

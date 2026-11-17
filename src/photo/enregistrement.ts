@@ -7,6 +7,66 @@
 export type FormatVideo = { mime: string; extension: 'mp4' | 'webm' };
 export type FormatAudio = { mime: string; extension: 'm4a' | 'webm' | 'ogg' };
 
+/** Fréquence d'échantillonnage des notes vocales en WAV : suffisante pour la voix (environ 1,9 Mo par minute). */
+const FREQUENCE_NOTE = 16_000;
+
+/**
+ * Convertit une note vocale en WAV (PCM 16 bits, mono, 16 kHz).
+ * Le format enregistré par le téléphone (Opus dans un conteneur .m4a ou .webm) n'est pas lu par
+ * tous les lecteurs Windows ; le WAV l'est partout (Explorateur, Lecteur multimédia, Edge, VLC).
+ * Renvoie null si le navigateur ne sait pas décoder l'enregistrement : il est alors gardé tel quel.
+ */
+export async function versWav(audio: Blob): Promise<Blob | null> {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    let decode: AudioBuffer;
+    try {
+      decode = await ctx.decodeAudioData(await audio.arrayBuffer());
+    } finally {
+      void ctx.close();
+    }
+    const longueur = Math.max(1, Math.ceil(decode.duration * FREQUENCE_NOTE));
+    const hors = new OfflineAudioContext(1, longueur, FREQUENCE_NOTE);
+    const source = hors.createBufferSource();
+    source.buffer = decode;
+    source.connect(hors.destination);
+    source.start();
+    const mono = (await hors.startRendering()).getChannelData(0);
+    return encoderWav(mono, FREQUENCE_NOTE);
+  } catch {
+    return null;
+  }
+}
+
+/** En-tête RIFF/WAVE et échantillons PCM 16 bits. */
+export function encoderWav(echantillons: Float32Array, frequence: number): Blob {
+  const octets = new DataView(new ArrayBuffer(44 + echantillons.length * 2));
+  const texte = (pos: number, t: string) => [...t].forEach((c, i) => octets.setUint8(pos + i, c.charCodeAt(0)));
+  texte(0, 'RIFF');
+  octets.setUint32(4, 36 + echantillons.length * 2, true);
+  texte(8, 'WAVE');
+  texte(12, 'fmt ');
+  octets.setUint32(16, 16, true);
+  octets.setUint16(20, 1, true); // PCM
+  octets.setUint16(22, 1, true); // mono
+  octets.setUint32(24, frequence, true);
+  octets.setUint32(28, frequence * 2, true);
+  octets.setUint16(32, 2, true);
+  octets.setUint16(34, 16, true);
+  texte(36, 'data');
+  octets.setUint32(40, echantillons.length * 2, true);
+  for (let i = 0; i < echantillons.length; i++) {
+    const v = Math.max(-1, Math.min(1, echantillons[i]));
+    octets.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+  }
+  return new Blob([octets.buffer], { type: 'audio/wav' });
+}
+
+/** Type MIME d'une note vocale, d'après son extension (pour la lecture dans l'appli). */
+export const mimeNote = (extension: string) =>
+  ({ wav: 'audio/wav', m4a: 'audio/mp4', webm: 'audio/webm', ogg: 'audio/ogg' })[extension] ?? 'application/octet-stream';
+
 const prisEnCharge = (mime: string) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime);
 
 export function enregistrementDisponible(): boolean {

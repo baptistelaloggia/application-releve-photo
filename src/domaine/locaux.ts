@@ -214,6 +214,47 @@ function arrondir(v: number) {
   return Math.round(v * 100000) / 100000;
 }
 
+/** Nom sans son numéro d'ordre final (« LT 02 » → « LT ») : sert à reconnaître un local déjà enregistré. */
+export const nomDeBase = (nom: string) => nom.trim().replace(/\s+/g, ' ').replace(/ \d{2,3}$/, '');
+
+/**
+ * Noms des locaux détectés sur un plan (17/11/2026) : seul le nom est gardé. Un nom porté par
+ * plusieurs locaux du plan reçoit un numéro d'ordre : « LT 01 », « LT 02 »… (de haut en bas, puis
+ * de gauche à droite). Les numéros déjà pris sur le plan sont sautés ; un local déjà enregistré
+ * n'est jamais renommé.
+ */
+export function numeroterNomsEnDouble<T extends { nom: string; x: number; y: number }>(detectes: T[], nomsExistants: string[]): T[] {
+  const cle = (n: string) => n.trim().replace(/\s+/g, ' ').toUpperCase();
+  const existants = nomsExistants.map(cle);
+  const groupes = new Map<string, T[]>();
+  for (const d of detectes) {
+    const k = cle(d.nom);
+    groupes.set(k, [...(groupes.get(k) ?? []), d]);
+  }
+  const renommes = new Map<T, string>();
+  for (const [k, groupe] of groupes) {
+    const pris = new Set<number>();
+    let dejaSurLePlan = false;
+    for (const e of existants) {
+      if (e === k) dejaSurLePlan = true;
+      const m = e.startsWith(`${k} `) ? /^ (\d{2,3})$/.exec(e.slice(k.length)) : null;
+      if (m) {
+        pris.add(Number(m[1]));
+        dejaSurLePlan = true;
+      }
+    }
+    if (groupe.length === 1 && !dejaSurLePlan) continue;
+    const tries = [...groupe].sort((a, b) => Math.round((a.y - b.y) * 50) || a.x - b.x);
+    let rang = 1;
+    for (const d of tries) {
+      while (pris.has(rang)) rang++;
+      pris.add(rang);
+      renommes.set(d, `${d.nom.trim().replace(/\s+/g, ' ')} ${String(rang).padStart(2, '0')}`);
+    }
+  }
+  return detectes.map((d) => (renommes.has(d) ? { ...d, nom: renommes.get(d)! } : d));
+}
+
 /**
  * Numéro automatique d'un local, unique dans le projet : préfixe du niveau, puis
  * rang à 2 chiffres (3 au-delà de 99). Exemples : R+2 → « R2-01 », RDC → « RDC-03 »,

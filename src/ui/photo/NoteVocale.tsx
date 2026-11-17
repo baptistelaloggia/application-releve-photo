@@ -9,12 +9,13 @@ import {
   ouvrirMicro,
   type Enregistreur,
   type FormatAudio,
+  versWav,
 } from '../../photo/enregistrement';
 import { texteErreur } from '../commun';
 
 interface Props {
   /** Appelé à la fin de l'enregistrement. */
-  surEnregistre: (note: { audio: Blob; extension: FormatAudio['extension']; duree: number }) => Promise<void> | void;
+  surEnregistre: (note: { audio: Blob; extension: FormatAudio['extension'] | 'wav'; duree: number }) => Promise<void> | void;
   libelle?: string;
   className?: string;
   desactive?: boolean;
@@ -74,7 +75,10 @@ export function BoutonNoteVocale({ surEnregistre, libelle = '🎤 Note vocale', 
     try {
       const { fichier, duree } = await r.enregistreur.arreter();
       liberer();
-      if (fichier.size) await surEnregistre({ audio: fichier, extension: r.format.extension, duree });
+      if (!fichier.size) return;
+      // WAV lisible partout sous Windows ; à défaut, le format d'origine.
+      const wav = await versWav(fichier);
+      await surEnregistre(wav ? { audio: wav, extension: 'wav', duree } : { audio: fichier, extension: r.format.extension, duree });
     } catch (e) {
       liberer();
       setErreur(texteErreur(e));

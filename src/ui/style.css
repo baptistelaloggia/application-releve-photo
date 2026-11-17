@@ -286,7 +286,9 @@ button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
 .annot-outil.actif { border-color: #fff; background: #3d3d3d; }
 .annot-ok { color: #3ccf5c; } .annot-nok { color: #ff5a4f; } .annot-cercle, .annot-trait { color: #ff5a4f; }
 .annot-zone { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
-.annot-svg { width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.annot-svg { width: 100%; height: 100%; touch-action: none; cursor: crosshair; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; }
+.annot-svg.deplacement { cursor: grabbing; outline: 3px dashed #ffd54f; outline-offset: -3px; }
 .annot-saisie { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; padding: 8px; background: #1d1d1d; }
 .annot-saisie label { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 4px; }
 .annot-saisie input { font: inherit; font-size: 16px; padding: 8px; border-radius: 8px; border: 1px solid #555; }

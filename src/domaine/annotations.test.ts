@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { annotationValide, couperLignes, positionBulle, resumeAnnotations, svgAnnotations } from './annotations';
+import { annotationTouchee, annotationValide, couperLignes, deplacerAnnotation, resumeAnnotations, svgAnnotations } from './annotations';
 import { cheminAnnotee, cheminNoteVocale, estFichierAnnexe } from './nommage';
 import type { Annotation } from './types';
 
@@ -24,14 +24,24 @@ describe('annotations', () => {
     expect((svg.match(/<rect /g) ?? []).length).toBe(1);
   });
 
-  it('coupe les textes longs et place la bulle au-dessus du point, ou dessous près du haut', () => {
+  it('coupe les textes longs ; la bulle n’a pas de pointe', () => {
     expect(couperLignes('Absence de calorifuge sur le réseau eau glacée du local CTA', 28)).toEqual([
       'Absence de calorifuge sur le',
       'réseau eau glacée du local',
       'CTA',
     ]);
-    expect(positionBulle(0.5, 0.6, 4000, 3000).y).toBeLessThan(0.6);
-    expect(positionBulle(0.5, 0.1, 4000, 3000).y).toBeGreaterThan(0.1);
+    expect(svgAnnotations(toutes, 4000, 3000)).not.toContain('<polygon');
+  });
+
+  it('trouve l’annotation touchée (la plus haute d’abord) et la déplace sans la faire sortir de l’image', () => {
+    // Le cercle (rang 4) et la bulle (rang 3) se chevauchent au centre : le cercle, dessiné après, l’emporte.
+    expect(annotationTouchee(toutes, 0.5, 0.5, 4000, 3000)).toBe(4);
+    expect(annotationTouchee(toutes, 0.21, 0.21, 4000, 3000)).toBe(0);
+    expect(annotationTouchee(toutes, 0.5, 0.3, 4000, 3000)).toBe(3);
+    expect(annotationTouchee(toutes, 0.95, 0.95, 4000, 3000)).toBe(-1);
+    expect(deplacerAnnotation(toutes[0], 0.1, -0.5)).toEqual({ type: 'ok', x: 0.30000000000000004, y: 0 });
+    const trait = deplacerAnnotation(toutes[5], -0.5, 0) as { points: Array<[number, number]> };
+    expect(trait.points).toEqual([[0, 0.1], [0.1, 0.3]]);
   });
 
   it('contrôle les annotations reçues', () => {

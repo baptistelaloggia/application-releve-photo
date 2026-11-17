@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { LocalDetecte } from '../../domaine/locaux';
 import type { Local, Photo } from '../../domaine/types';
 import { dateLocale } from '../../domaine/nommage';
@@ -186,7 +186,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   );
 
   // Texte des étiquettes sur le plan : numéro du local (par défaut) ou nom. Mémorisé sur l'appareil.
-  const [etiquettes, setEtiquettes] = useState<'numero' | 'nom'>('numero');
+  // Le nom par défaut : depuis le 17/11/2026, la détection ne garde plus le numéro des locaux.
+  const [etiquettes, setEtiquettes] = useState<'numero' | 'nom'>('nom');
   useEffect(() => {
     void lireReglage<'numero' | 'nom'>('etiquettes').then((v) => v && setEtiquettes(v));
   }, []);
@@ -622,8 +623,25 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
           ) : selectionne ? (
             <FicheLocal
               key={selectionne.id + selectionne.modifieLe}
-              titre={`Local ${niveau.code}`}
+              titre={`${selectionne.nom} · ${niveau.code}`}
               local={selectionne}
+              photos={
+                !repereSelectionne ? (
+                  <PhotosDuLocal
+                    key={`photos-${selectionne.id}`}
+                    espace={espace}
+                    localId={selectionne.id}
+                    occupe={occupe}
+                    surPhoto={() =>
+                      void executer(async () => {
+                        const r = await espace.repereEtiquette(selectionne.id, auteur);
+                        ouvrirCamera(r.id);
+                      })
+                    }
+                    surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
+                  />
+                ) : undefined
+              }
               initial={selectionne}
               numeroPropose={selectionne.numero ? undefined : espace.proposerNumero(planId)}
               occupe={occupe}
@@ -639,21 +657,6 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               }}
             />
           ) : null}
-          {selectionne && mode.type !== 'detection' && mode.type !== 'brouillon' && !repereSelectionne && (
-            <PhotosDuLocal
-              key={`photos-${selectionne.id}`}
-              espace={espace}
-              localId={selectionne.id}
-              occupe={occupe}
-              surPhoto={() =>
-                void executer(async () => {
-                  const r = await espace.repereEtiquette(selectionne.id, auteur);
-                  ouvrirCamera(r.id);
-                })
-              }
-              surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
-            />
-          )}
           {mode.type !== 'detection' && mode.type !== 'brouillon' && !repereSelectionne && !selectionne && (
             <>
             <div className="onglets" role="tablist">
@@ -788,9 +791,8 @@ function ListeLocaux({
           {locaux.map((l) => (
             <li key={l.id}>
               <button onClick={() => surChoix(l)}>
-                <span className="mono">{l.numero ?? '—'}</span>
                 <span>{l.nom}</span>
-                {l.surface !== null && <span className="discret">{String(l.surface).replace('.', ',')} m²</span>}
+                {l.numero && <span className="mono discret">{l.numero}</span>}
               </button>
             </li>
           ))}
@@ -863,7 +865,6 @@ function PanneauDetection({
                   onChange={() => surBasculer(c.cle)}
                 />
                 <button onClick={() => surVoir(c)}>
-                  <span className="mono">{c.numero ?? '—'}</span>
                   <span>{c.nom}</span>
                   {c.confiance === 'moyenne' && <span className="discret" title="Nom seul, sans numéro ni surface">à vérifier</span>}
                 </button>
@@ -887,8 +888,11 @@ function FicheLocal({
   surSupprimer,
   numeroAutomatique,
   numeroPropose,
+  photos,
 }: {
   titre: string;
+  /** Photos du local : affichées juste sous son nom, sans avoir à faire défiler (17/11/2026). */
+  photos?: ReactNode;
   local?: Local;
   initial: SaisieLocal;
   /** Le numéro initial a été proposé automatiquement (nouveau local). */
@@ -903,19 +907,18 @@ function FicheLocal({
 }) {
   const [nom, setNom] = useState(initial.nom);
   const [numero, setNumero] = useState(initial.numero ?? '');
-  const [surface, setSurface] = useState(initial.surface === null ? '' : String(initial.surface).replace('.', ','));
-  const surfaceNombre = surface.trim() ? Number(surface.replace(',', '.').replace(/\s/g, '')) : null;
-  const surfaceValide = surfaceNombre === null || (Number.isFinite(surfaceNombre) && surfaceNombre > 0);
 
   return (
     <form
       className="fiche-local"
       onSubmit={(e) => {
         e.preventDefault();
-        surEnregistrer({ ...initial, nom, numero: numero.trim() || null, surface: surfaceNombre });
+        // Surface : plus saisie (17/11/2026) ; une valeur déjà enregistrée est conservée.
+        surEnregistrer({ ...initial, nom, numero: numero.trim() || null });
       }}
     >
       <h2>{titre}</h2>
+      {photos}
       <label>
         Nom
         <input value={nom} autoFocus={!local} maxLength={60} onChange={(e) => setNom(e.target.value)} />
@@ -930,15 +933,10 @@ function FicheLocal({
             </button>
           )}
         </label>
-        <label>
-          Surface (m²)
-          <input value={surface} inputMode="decimal" placeholder="facultatif" onChange={(e) => setSurface(e.target.value)} />
-        </label>
       </div>
       {numeroAutomatique && numero === initial.numero && (
         <p className="discret">Numéro attribué automatiquement : vous pouvez le modifier ou l'effacer.</p>
       )}
-      {!surfaceValide && <p className="texte-erreur">Surface non valable.</p>}
       {local && (
         <p className="discret">
           {local.origine === 'auto' ? 'Détecté sur le plan' : 'Placé à la main'} · modifié par {local.modifiePar} le{' '}
@@ -946,7 +944,7 @@ function FicheLocal({
         </p>
       )}
       <div className="boutons">
-        <button className="principal" disabled={!nom.trim() || !surfaceValide || occupe}>
+        <button className="principal" disabled={!nom.trim() || occupe}>
           Enregistrer
         </button>
         <button type="button" onClick={surAnnuler}>

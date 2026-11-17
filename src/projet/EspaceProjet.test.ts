@@ -134,6 +134,21 @@ describe('locaux', () => {
     expect(rouvert.locauxDuPlan(planId).map((l) => l.nom)).toEqual(['BUREAUX', 'TGBT']);
   });
 
+  it('ne garde que le nom des locaux détectés et numérote les noms en double', async () => {
+    const { e, planId } = await projetAvecPlan();
+    const lt = (x: number, y: number) => ({ nom: 'LT', numero: 'LT00' + x * 10, surface: 6, x, y, confiance: 'forte' as const, lignes: [] });
+    await e.enregistrerDetection(planId, [lt(0.6, 0.2), lt(0.2, 0.2), { ...lt(0.4, 0.6), nom: 'TGBT' }], 'BL');
+    expect(e.locauxDuPlan(planId).map((l) => [l.nom, l.numero, l.surface])).toEqual([
+      ['LT 01', null, null],
+      ['LT 02', null, null],
+      ['TGBT', null, null],
+    ]);
+    // Nouvelle détection : rien n'est recréé ; un LT de plus prend le numéro suivant.
+    const cr = await e.enregistrerDetection(planId, [lt(0.6, 0.2), lt(0.2, 0.2), lt(0.8, 0.9)], 'BL');
+    expect(cr[0]).toMatch(/^1 local/);
+    expect(e.locauxDuPlan(planId).map((l) => l.nom)).toContain('LT 03');
+  });
+
   it('trouve le TGBT par la recherche', async () => {
     const { e, planId } = await projetAvecPlan();
     await e.creerLocal(planId, { nom: 'TGBT', numero: 'lt1105', surface: null, x: 0.5, y: 0.5 }, 'BL');

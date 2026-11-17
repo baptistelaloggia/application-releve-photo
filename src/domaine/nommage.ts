@@ -123,7 +123,7 @@ export function cheminNoteVocale(fichierPhoto: string, extension: string): strin
 
 /** Vrai pour un fichier rangé à côté d'une prise de vue (copie annotée, note vocale). */
 export function estFichierAnnexe(chemin: string): boolean {
-  return /_(annote\.jpg|note\.(m4a|webm|ogg))$/i.test(chemin);
+  return /_(annote\.jpg|note\.(wav|m4a|webm|ogg))$/i.test(chemin);
 }
 
 /** Date locale au format AAAA-MM-JJ. */

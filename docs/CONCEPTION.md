@@ -143,6 +143,13 @@ Règles issues du lot 1 (04/11/2026) :
   - **pas de local en dessous de 4 m²** (gaines techniques, placards) ;
   - une étiquette nettement plus petite que les étiquettes avec surface est écartée (étiquettes de portes « RDC-P34 / 1UP / PF30 », annotations).
   - Résultat : sur le second carnet, la « Salle de réunion SDR-RDC-42 » et l'« ERP Espace Coupole » sont trouvées, sans gaines ni portes. Sur le premier carnet, seules des annotations ont disparu.
+- **Le nom seul** (décision du 17/11/2026, **modifie** la règle précédente qui gardait aussi le numéro et la surface lus sur le plan) :
+  - **Lecture du plan :** le numéro et la surface servent encore à **reconnaître** une étiquette sur le plan, mais ne sont plus enregistrés. Seul le nom l'est.
+  - **Doublons :** un nom porté par plusieurs locaux d'un même plan reçoit un numéro d'ordre : « LT 01 », « LT 02 »… Ils sont numérotés de haut en bas, puis de gauche à droite, en sautant les numéros déjà pris sur le plan. Un local déjà enregistré n'est jamais renommé.
+  - **Nouvelle détection :** elle reconnaît « LT 02 » comme « LT » à la même place et ne le recrée pas.
+  - **Surface :** elle n'est plus saisie dans la fiche du local. Une valeur déjà enregistrée est conservée dans `_data/`.
+  - **Étiquettes sur le plan :** elles affichent le nom par défaut.
+  - **Numéro dans les noms de fichiers :** il reste nécessaire, car il garantit des chemins uniques et stables. À la première photo d'un local sans numéro, l'appli lui attribue un **numéro automatique** (`R1-01`, `R1-02`…, §A.6 quater), ce qui donne par exemple `R+1.R1-03_LT-02/XXX_R+1.R1-03_P004_…jpg`. [À VÉRIFIER avec l'utilisateur : faut-il retirer ce numéro des noms de dossiers et de fichiers, et ne garder que le nom ? Ce serait une modification de §A.6.]
 - **Numéro unique** dans le projet ; nom obligatoire.
 - **Numéro automatique** (10/11/2026) : à la création d'un local, l'appli propose le premier numéro libre du niveau, sous la forme `{niveau sans +}-{rang}` (`R2-01`, `RDC-03`, `SS1-12`, `R4-MEZ-01`), modifiable ou effaçable. Un local sans numéro peut en recevoir un d'un clic.
 - **Étiquettes sur le plan** : placées au-dessus de l'étiquette du local dessinée sur le plan, pour la laisser lisible. Elles affichent au choix le numéro ou le nom (choix mémorisé sur l'appareil).
@@ -218,12 +225,21 @@ Règles issues du lot 1 (04/11/2026) :
   - **Miniature :** elle est tirée de la vidéo.
   - **Limite :** les vidéos ne s'annotent pas.
 - **Annotations dessinées** sur une photo. Elles servent au suivi de chantier et à l'audit, pour repérer les bons et les mauvais travaux.
-  - **Outils :** V vert (conforme), X rouge (non conforme), bulle (texte relié à un point), texte libre, cercle (on glisse pour entourer), trait à main levée ; Annuler, Tout effacer.
+  - **Outils :** V vert (conforme), X rouge (non conforme), bulle (texte encadré), cercle (on glisse pour entourer), trait à main levée ; Annuler, Tout effacer.
+  - **Changements du 17/11/2026 :**
+    - l'outil « texte libre » est supprimé, car il faisait double emploi avec la bulle ;
+    - la bulle n'a plus de pointe ;
+    - **appui long sur une annotation, puis glisser : elle se déplace** (V, X, bulle, cercle, trait).
+    - Les textes libres et les pointes des photos annotées avant ce changement restent lisibles (type `texte`, champs `px`, `py`).
   - **Stockage :** les annotations sont enregistrées en **vecteurs** (`annotations` dans le JSON de la photo), en coordonnées relatives 0 à 1, comme les repères.
   - **Original intact :** la photo d'origine n'est jamais modifiée et garde son EXIF.
   - **Copie annotée :** une **copie annotée** JPEG est rangée à côté, `…_01_annote.jpg`, pour rester lisible sans l'appli.
   - **Dans l'appli :** les annotations s'affichent par-dessus la photo, avec un bouton « Voir l'original ».
-- **Note vocale** : un enregistrement du micro attaché à une photo ou à une vidéo, rangé à côté d'elle (`…_01_note.m4a`, ou `.webm` / `.ogg` selon le navigateur).
+- **Note vocale** : un enregistrement du micro attaché à une photo ou à une vidéo, rangé à côté d'elle : `…_01_note.wav`.
+  - **Format WAV (17/11/2026) :** la note est convertie sur le téléphone en WAV, PCM 16 bits, mono, 16 kHz, environ 1,9 Mo par minute.
+  - **Pourquoi :** une note enregistrée sur téléphone n'était pas lue sur le PC après transfert. Le format d'origine (Opus dans un `.m4a` ou un `.webm`) n'est pas lu par tous les lecteurs Windows [À VÉRIFIER : cause exacte]. Le WAV est lu partout.
+  - **Repli :** si la conversion échoue, le format d'origine est gardé.
+  - **Fichier absent :** si le fichier d'une note manque sur le PC, la visionneuse le dit et indique de renvoyer la visite.
   - **Données :** `noteVocale` dans le JSON (extension, durée, date, auteur).
   - **Durée :** 2 minutes au plus.
   - **Réenregistrement :** une nouvelle note remplace la précédente.
@@ -231,11 +247,12 @@ Règles issues du lot 1 (04/11/2026) :
 - **Accès :**
   - **dans la visée**, après chaque prise de vue, deux raccourcis sur la dernière : « ✏️ Annoter » et « 🎤 Note vocale ». Ils sont facultatifs, ce qui préserve la règle des 2 appuis par photo ;
   - **dans la visionneuse**, les boutons « Annoter », « Note vocale » et le lecteur de la note.
-- **Rangement :** les fichiers rangés à côté de la photo **suivent la photo** (reclassement, renumérotation d'un local, suppression). Triés par nom, ils viennent juste après elle (`_01.jpg`, `_01_annote.jpg`, `_01_note.m4a`, `_02.jpg`). La réparation ne les prend pas pour des photos perdues.
+- **Rangement :** les fichiers rangés à côté de la photo **suivent la photo** (reclassement, renumérotation d'un local, suppression). Triés par nom, ils viennent juste après elle (`_01.jpg`, `_01_annote.jpg`, `_01_note.wav`, `_02.jpg`). La réparation ne les prend pas pour des photos perdues.
 - **Synchronisation :** les paquets `.zip` portent `annotees/{id}.jpg` et `notes/{id}.{ext}` avant le fichier de la prise de vue (`photos/{id}.jpg|mp4|webm`).
   - **Fusion :** les annotations et la note les plus récentes l'emportent (`modifieLe`).
   - **Renvoi :** une photo annotée ou dotée d'une note après son envoi repart au prochain envoi avec ses fichiers annexes.
   - **Contrôle :** les données reçues sont contrôlées : types, positions dans l'image, longueur des textes, extensions.
+- **Disposition sur téléphone (17/11/2026) :** dans la fiche d'un local, et dans celle d'un repère, les photos viennent juste sous le titre (le nom). Elles se voient donc sans faire défiler ; les champs de modification sont en dessous.
 - **Visionneuse :**
   - **Navigation :** le passage d'une photo à l'autre se fait par des **flèches sur les côtés gauche et droit de la photo**, par un balayage du doigt, ou par les touches ← → (Échap ferme).
   - **Position :** elle est affichée en haut (« 3/4 »).

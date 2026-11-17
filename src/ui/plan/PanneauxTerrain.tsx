@@ -126,6 +126,22 @@ export function FicheRepere({
           📷 Prendre une photo
         </button>
       </div>
+      <h2>
+        Photos <span className="discret">({photos.length})</span>
+      </h2>
+      {photos.length === 0 && <p className="discret">Aucune photo.</p>}
+      {parJour(photos).map(([jour, liste]) => (
+        <div key={jour} className="groupe-photos">
+          <div className="discret">{dateLongue(jour)}</div>
+          <div className="grille-photos">
+            {liste.map((p) => (
+              <button key={p.id} className="vignette" onClick={() => surOuvrirPhoto(photos, photos.indexOf(p))} title={p.commentaire || p.fichier}>
+                <Miniature espace={espace} photo={p} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
       <div className="rattachement">
         <div>
           Local : <strong>{localActuel ? `${localActuel.numero ?? ''} ${localActuel.nom}`.trim() : 'hors local'}</strong>
@@ -170,22 +186,6 @@ export function FicheRepere({
           onBlur={() => libelle.trim() !== repere.libelle && surModifier({ libelle })}
         />
       </label>
-      <h2>
-        Photos <span className="discret">({photos.length})</span>
-      </h2>
-      {photos.length === 0 && <p className="discret">Aucune photo.</p>}
-      {parJour(photos).map(([jour, liste]) => (
-        <div key={jour} className="groupe-photos">
-          <div className="discret">{dateLongue(jour)}</div>
-          <div className="grille-photos">
-            {liste.map((p) => (
-              <button key={p.id} className="vignette" onClick={() => surOuvrirPhoto(photos, photos.indexOf(p))} title={p.commentaire || p.fichier}>
-                <Miniature espace={espace} photo={p} />
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
       <div className="boutons">
         <button className="petit" onClick={surDeplacer} disabled={occupe}>
           Déplacer le repère
@@ -318,20 +318,19 @@ export function PhotosDuLocal({
   return (
     <div className="photos-local">
       <div className="boutons">
-        <button className="principal" onClick={surPhoto} disabled={occupe}>
+        <button type="button" className="principal" onClick={surPhoto} disabled={occupe}>
           📷 Photo du local
         </button>
+        <span className="discret petit-texte">
+          {photos.length} photo{photos.length > 1 ? 's' : ''} · raccourci : appui long sur l'étiquette du local
+        </span>
       </div>
-      <p className="discret petit-texte">Raccourci : appui long sur l'étiquette du local, sur le plan.</p>
-      <h2>
-        Photos du local <span className="discret">({photos.length})</span>
-      </h2>
       {parJour(photos).map(([jour, liste]) => (
         <div key={jour} className="groupe-photos">
           <div className="discret">{dateLongue(jour)}</div>
           <div className="grille-photos">
             {liste.map((p) => (
-              <button key={p.id} className="vignette" onClick={() => surOuvrirPhoto(photos, photos.indexOf(p))}>
+              <button type="button" key={p.id} className="vignette" onClick={() => surOuvrirPhoto(photos, photos.indexOf(p))}>
                 <Miniature espace={espace} photo={p} />
               </button>
             ))}
