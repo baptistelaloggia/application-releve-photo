@@ -97,6 +97,18 @@ describe('fusion de deux exemplaires d’un projet', () => {
     expect(r.compteRendu).toContain('1 photo déjà présente (même contenu), ignorée.');
   });
 
+  it('reprend les annotations et la note vocale plus récentes', () => {
+    const cible = serveur();
+    const paquet = serveur();
+    const note = { extension: 'm4a' as const, duree: 4, enregistreLe: t(8), enregistrePar: 'BL' };
+    paquet.photos[0] = { ...paquet.photos[0], annotations: [{ type: 'nok', x: 0.5, y: 0.5 }], noteVocale: note, modifieLe: t(8) };
+    const r = fusionner(cible, paquet);
+    expect(r.photosModifiees).toHaveLength(1);
+    expect(r.photosModifiees[0].annotations).toEqual([{ type: 'nok', x: 0.5, y: 0.5 }]);
+    expect(r.photosModifiees[0].noteVocale).toEqual(note);
+    expect(fusionner(paquet, paquet).photosModifiees).toEqual([]);
+  });
+
   it('garde le plan de la cible si l’autre appareil a un autre indice', () => {
     const cible = serveur();
     const paquet = serveur();
@@ -128,5 +140,14 @@ describe('contrôle des paquets reçus', () => {
     d.photos.push({ ...photo('ph-x', 'r1', 'a'.repeat(64)), date: '2026-11-13/../../x' });
     d.locaux.push(local('l-y', 'p-rdc', 'LT9', 'Hors page', 1.5, 0.5));
     expect(controlerDonnees(d, estCodeNiveauAutorise)).toHaveLength(5);
+  });
+  it('accepte vidéos, annotations et notes vocales conformes ; refuse les autres', () => {
+    const d = reelles();
+    d.photos[0] = { ...d.photos[0], type: 'video', extension: 'mp4', duree: 12, annotations: [{ type: 'ok', x: 0.1, y: 0.1 }] };
+    d.photos[1] = { ...d.photos[0], id: 'ph2', type: undefined, extension: undefined, duree: undefined, annotations: undefined, noteVocale: { extension: 'webm', duree: 3, enregistreLe: t(1), enregistrePar: 'BL' } };
+    expect(controlerDonnees(d, estCodeNiveauAutorise)).toEqual([]);
+    d.photos[0] = { ...d.photos[0], extension: 'exe' as 'mp4' };
+    d.photos[1] = { ...d.photos[1], annotations: [{ type: 'ok', x: 5, y: 0 }] };
+    expect(controlerDonnees(d, estCodeNiveauAutorise)).toHaveLength(2);
   });
 });

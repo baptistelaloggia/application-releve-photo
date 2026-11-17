@@ -124,7 +124,7 @@ try {
     const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9));
     return [...new Uint8Array(await b.arrayBuffer())];
   });
-  await p.locator('input[type=file][accept="image/*"][multiple]').setInputFiles({ name: 'IMG_panier.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(image) });
+  await p.locator('input[type=file][accept="image/*,video/*"][multiple]').setInputFiles({ name: 'IMG_panier.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(image) });
   await p.getByRole('tab', { name: 'Panier (1)' }).waitFor({ timeout: 30_000 });
   await p.getByRole('button', { name: '← Projet' }).click();
 

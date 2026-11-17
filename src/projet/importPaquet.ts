@@ -57,11 +57,18 @@ export async function executerImport(
     progression('Mise à jour des plans, locaux et repères…');
     compteRendu.push(...(await espace.appliquerFusion(fusion, (id) => entete.pdfs.get(id), auteur)));
     const voulues = new Map(fusion.photosNouvelles.map((p) => [p.id, p]));
+    // Photos déjà connues, annotées ou dotées d'une note vocale sur l'autre appareil : seuls
+    // leurs fichiers annexes sont repris du paquet.
+    const annexes = new Set(fusion.photosModifiees.filter((p) => p.annotations?.length || p.noteVocale).map((p) => p.id));
     let faites = 0;
     const debut = performance.now();
-    if (voulues.size) {
-      await lirePhotos(paquet, new Set(voulues.keys()), async (id, jpeg, miniature) => {
-        await espace.ajouterPhotoImportee(voulues.get(id)!, jpeg, miniature);
+    if (voulues.size || annexes.size) {
+      await lirePhotos(paquet, new Set([...voulues.keys(), ...annexes]), async (id, fichier, miniature, recues) => {
+        if (annexes.has(id)) {
+          await espace.ecrireAnnexesImportees(id, recues);
+          return;
+        }
+        await espace.ajouterPhotoImportee(voulues.get(id)!, fichier, miniature, recues);
         voulues.delete(id);
         faites++;
         progression(`Photos rangées : ${faites}/${fusion.photosNouvelles.length}`);

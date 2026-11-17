@@ -15,6 +15,7 @@
  *   commentaire s'ils sont plus récents ;
  * - les suppressions ne sont pas transmises (limite connue, voir CONCEPTION).
  */
+import { ANNOTATIONS_MAX, annotationValide } from './annotations';
 import { proposerNumeroLocal } from './locaux';
 import { numeroRepere } from './nommage';
 import type { Local, Niveau, Photo, Plan, Repere } from './types';
@@ -185,8 +186,13 @@ export function fusionner(cible: DonneesProjet, paquet: DonneesProjet): Resultat
     const p: Photo = { ...brut, repereId: brut.repereId ? (idRepere.get(brut.repereId) ?? null) : null };
     const meme = cible.photos.find((x) => x.id === p.id);
     if (meme) {
-      if (dateModifPhoto(p) > dateModifPhoto(meme) && (p.repereId !== meme.repereId || p.commentaire !== meme.commentaire)) {
-        r.photosModifiees.push({ ...meme, repereId: p.repereId, commentaire: p.commentaire, modifieLe: p.modifieLe });
+      if (dateModifPhoto(p) > dateModifPhoto(meme) && (p.repereId !== meme.repereId || p.commentaire !== meme.commentaire || annexesChangees(meme, p))) {
+        const maj: Photo = { ...meme, repereId: p.repereId, commentaire: p.commentaire, modifieLe: p.modifieLe };
+        delete maj.annotations;
+        delete maj.noteVocale;
+        if (p.annotations?.length) maj.annotations = p.annotations;
+        if (p.noteVocale) maj.noteVocale = p.noteVocale;
+        r.photosModifiees.push(maj);
       }
       continue;
     }
@@ -198,8 +204,17 @@ export function fusionner(cible: DonneesProjet, paquet: DonneesProjet): Resultat
     r.photosNouvelles.push(p);
   }
   if (doublons) cr.push(`${doublons} photo${doublons > 1 ? 's' : ''} déjà présente${doublons > 1 ? 's' : ''} (même contenu), ignorée${doublons > 1 ? 's' : ''}.`);
-  if (r.photosModifiees.length) cr.push(`${r.photosModifiees.length} photo(s) reclassée(s) ou commentée(s) sur l'autre appareil.`);
+  if (r.photosModifiees.length) cr.push(`${r.photosModifiees.length} photo(s) reclassée(s), commentée(s) ou annotée(s) sur l'autre appareil.`);
   return r;
+}
+
+/**
+ * Vrai si les annotations ou la note vocale diffèrent : les fichiers rangés à côté de la photo
+ * (copie annotée, note vocale) sont alors à reprendre du paquet.
+ */
+export function annexesChangees(a: Photo, b: Photo): boolean {
+  const notes = (p: Photo) => (p.noteVocale ? `${p.noteVocale.extension}|${p.noteVocale.enregistreLe}` : '');
+  return JSON.stringify(a.annotations ?? []) !== JSON.stringify(b.annotations ?? []) || notes(a) !== notes(b);
 }
 
 // ------------------------------------------------------------------ contrôle des données reçues
@@ -239,8 +254,14 @@ export function controlerDonnees(d: DonneesProjet, codeAutorise: (code: string) 
     );
   }
   for (const ph of d.photos) {
+    const nv = ph.noteVocale;
     verifier(
-      ID.test(ph.id) && (ph.repereId === null || ID.test(ph.repereId)) && DATE.test(ph.date) && Number.isInteger(ph.rang) && ph.rang >= 0 && ph.rang < 10000 && texte(ph.commentaire, 2000) && /^[0-9a-f]{64}$/.test(ph.empreinte),
+      ID.test(ph.id) && (ph.repereId === null || ID.test(ph.repereId)) && DATE.test(ph.date) && Number.isInteger(ph.rang) && ph.rang >= 0 && ph.rang < 10000 && texte(ph.commentaire, 2000) && /^[0-9a-f]{64}$/.test(ph.empreinte) &&
+        (ph.type === undefined || ph.type === 'video') &&
+        (ph.extension === undefined || (ph.type === 'video' && (ph.extension === 'mp4' || ph.extension === 'webm'))) &&
+        (ph.duree === undefined || (typeof ph.duree === 'number' && ph.duree >= 0 && ph.duree < 36000)) &&
+        (ph.annotations === undefined || (Array.isArray(ph.annotations) && ph.annotations.length <= ANNOTATIONS_MAX && ph.annotations.every(annotationValide))) &&
+        (nv === undefined || (['m4a', 'webm', 'ogg'].includes(nv.extension) && typeof nv.duree === 'number' && nv.duree >= 0 && nv.duree < 36000 && texte(nv.enregistreLe, 40) && texte(nv.enregistrePar, 60))),
       `photo ${String(ph.id).slice(0, 40)}`,
     );
   }

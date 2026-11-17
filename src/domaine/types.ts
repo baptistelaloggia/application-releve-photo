@@ -123,7 +123,33 @@ export interface Repere {
   modifiePar: string;
 }
 
-/** _data/photos/{id}.json : une photo. Sans repère (repereId null), elle est dans le panier à classer. */
+/**
+ * Annotation dessinée sur une photo. Coordonnées relatives à l'image (0 à 1), comme les repères
+ * sur les plans : elles ne dépendent pas de la résolution.
+ * - ok : V vert (travaux conformes) ; nok : X rouge (travaux non conformes) ;
+ * - texte : texte libre ; bulle : texte encadré, relié par une pointe au point (px, py) ;
+ * - cercle : ellipse de centre (x, y) et de rayons rx, ry ; trait : tracé à main levée.
+ */
+export type Annotation =
+  | { type: 'ok' | 'nok'; x: number; y: number }
+  | { type: 'texte'; x: number; y: number; texte: string }
+  | { type: 'bulle'; x: number; y: number; px: number; py: number; texte: string }
+  | { type: 'cercle'; x: number; y: number; rx: number; ry: number }
+  | { type: 'trait'; points: Array<[number, number]> };
+
+/** Note vocale d'une photo, enregistrée à côté d'elle : « …_01_note.m4a ». */
+export interface NoteVocale {
+  extension: 'm4a' | 'webm' | 'ogg';
+  /** Durée en secondes. */
+  duree: number;
+  enregistreLe: string;
+  enregistrePar: string;
+}
+
+/**
+ * _data/photos/{id}.json : une prise de vue (photo ou vidéo). Sans repère (repereId null),
+ * elle est dans le panier à classer.
+ */
 export interface Photo {
   schema: number;
   id: string;
@@ -146,6 +172,18 @@ export interface Photo {
   /** appli : appareil photo de l'appli ; appareil : appareil photo du téléphone ; import : fichier importé. */
   source: 'appli' | 'appareil' | 'import';
   nomOrigine?: string;
-  /** Dernier changement de classement ou de commentaire (synchronisation entre appareils). */
+  /** Dernier changement de classement, de commentaire, d'annotations ou de note vocale (synchronisation). */
   modifieLe?: string;
+  /** « video » pour une vidéo ; absent pour une photo. */
+  type?: 'video';
+  /** Extension du fichier d'une vidéo (« mp4 », « webm ») ; une photo est toujours en « jpg ». */
+  extension?: 'mp4' | 'webm';
+  /** Durée d'une vidéo, en secondes. */
+  duree?: number;
+  /**
+   * Annotations dessinées. L'original reste intact ; une copie annotée est enregistrée à côté :
+   * « …_01_annote.jpg ».
+   */
+  annotations?: Annotation[];
+  noteVocale?: NoteVocale;
 }

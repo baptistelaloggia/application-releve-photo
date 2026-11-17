@@ -63,3 +63,14 @@ export async function marquerPhotosExportees(projetId: string, ids: Iterable<str
   for (const id of ids) deja.add(id);
   await ecrireReglage(`photosExportees:${projetId}`, [...deja]);
 }
+
+/**
+ * Une photo annotée ou dotée d'une note vocale après son envoi doit repartir au prochain envoi :
+ * ses fichiers annexes ne sont transmis qu'avec elle.
+ */
+export async function retirerPhotosExportees(projetId: string, ids: Iterable<string>): Promise<void> {
+  const deja = await photosExportees(projetId);
+  let change = false;
+  for (const id of ids) change = deja.delete(id) || change;
+  if (change) await ecrireReglage(`photosExportees:${projetId}`, [...deja]);
+}

@@ -245,10 +245,10 @@ export function PanneauPanier({
           📷 Photo sans repère
         </button>
         <label className="bouton-fichier">
-          Importer des photos…
+          Importer des photos ou vidéos…
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple
             onChange={(e) => {
               surImporter([...(e.target.files ?? [])]);

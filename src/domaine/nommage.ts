@@ -96,15 +96,34 @@ export function nomFichierPhoto(
   numeroRepere: string,
   date: string,
   rang: number,
+  extension = 'jpg',
 ): string {
-  return `${codeAffaire}_${codeNiveau}.${numeroLocal ?? NUMERO_HORS_LOCAL}_${numeroRepere}_${date}_${String(rang).padStart(2, '0')}.jpg`;
+  return `${codeAffaire}_${codeNiveau}.${numeroLocal ?? NUMERO_HORS_LOCAL}_${numeroRepere}_${date}_${String(rang).padStart(2, '0')}.${extension}`;
 }
 
 /** Nom d'une photo du panier : « XXX_A-CLASSER_2026-10-30_143512_3f2a.jpg » (unique, triable). */
-export function nomFichierPhotoAClasser(codeAffaire: string, prisLe: Date, id: string): string {
+export function nomFichierPhotoAClasser(codeAffaire: string, prisLe: Date, id: string, extension = 'jpg'): string {
   const d = dateLocale(prisLe);
   const h = [prisLe.getHours(), prisLe.getMinutes(), prisLe.getSeconds()].map((v) => String(v).padStart(2, '0')).join('');
-  return `${codeAffaire}_A-CLASSER_${d}_${h}_${id.slice(0, 4)}.jpg`;
+  return `${codeAffaire}_A-CLASSER_${d}_${h}_${id.slice(0, 4)}.${extension}`;
+}
+
+/**
+ * Fichiers rangés à côté d'une prise de vue, de même nom suivi d'un suffixe :
+ * « …_P001_2026-11-17_01.jpg », puis « …_01_annote.jpg » (copie annotée) et « …_01_note.m4a »
+ * (note vocale). Triés par nom, ils suivent la photo et précèdent la suivante (« . » < « _ »).
+ */
+export function cheminAnnotee(fichierPhoto: string): string {
+  return fichierPhoto.replace(/\.[^./]+$/, '') + '_annote.jpg';
+}
+
+export function cheminNoteVocale(fichierPhoto: string, extension: string): string {
+  return fichierPhoto.replace(/\.[^./]+$/, '') + `_note.${extension}`;
+}
+
+/** Vrai pour un fichier rangé à côté d'une prise de vue (copie annotée, note vocale). */
+export function estFichierAnnexe(chemin: string): boolean {
+  return /_(annote\.jpg|note\.(m4a|webm|ogg))$/i.test(chemin);
 }
 
 /** Date locale au format AAAA-MM-JJ. */

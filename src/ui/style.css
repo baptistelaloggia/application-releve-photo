@@ -220,7 +220,9 @@ button.projet .discret { font-size: 0.85rem; }
 .groupe-photos { margin: 8px 0; }
 .grille-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-top: 4px; }
 .vignette { padding: 0; border: none; background: none; min-height: 0; border-radius: 6px; overflow: hidden; line-height: 0; }
-.miniature { display: inline-block; background: var(--fond); border-radius: 6px; overflow: hidden; }
+.miniature { display: inline-block; background: var(--fond); border-radius: 6px; overflow: hidden; position: relative; }
+.miniature-marques { position: absolute; left: 2px; bottom: 2px; display: flex; gap: 2px; pointer-events: none; }
+.miniature-marques span { background: rgb(0 0 0 / 0.65); color: #fff; font-size: 0.7rem; line-height: 1; padding: 2px 4px; border-radius: 4px; }
 .miniature img { width: 100%; height: 100%; object-fit: cover; }
 .liste-panier { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .liste-panier li { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; }
@@ -244,10 +246,51 @@ button.projet .discret { font-size: 0.85rem; }
 .camera-natif { justify-self: end; font-size: 0.8rem; color: #fff; border: 1px solid rgb(255 255 255 / 0.6); border-radius: 8px;
   padding: 8px 10px; background: rgb(0 0 0 / 0.4); cursor: pointer; }
 .camera-natif input { display: none; }
+.camera-gauche { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.camera-modes { display: flex; border: 1px solid rgb(255 255 255 / 0.6); border-radius: 18px; overflow: hidden; }
+.camera-modes button { background: rgb(0 0 0 / 0.4); color: #fff; border: none; border-radius: 0; padding: 6px 12px; font-size: 0.85rem; }
+.camera-modes button.actif { background: #fff; color: #000; }
+.camera-declencheur.video { background: #d93025; border-color: #fff; }
+.camera-declencheur.video.en-cours { border-radius: 16px; width: 64px; height: 64px; margin: 8px; }
+.camera-tournage { margin-left: auto; background: #d93025; color: #fff; padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+.camera-derniere { position: absolute; left: 12px; right: 12px; bottom: 130px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  font-size: 0.85rem; text-shadow: 0 1px 2px #000; }
+.camera-derniere button { background: rgb(0 0 0 / 0.55); color: #fff; border-color: rgb(255 255 255 / 0.6); }
+.camera-annoter { position: absolute; inset: 0; z-index: 60; }
 
 .voile-photo { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.92); display: flex; flex-direction: column; }
 .photo-image { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; color: #ccc; }
-.photo-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.photo-image { position: relative; touch-action: pan-y pinch-zoom; }
+.photo-cadre { position: relative; display: inline-flex; max-width: 100%; max-height: 100%; }
+.photo-media { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+video.photo-media { width: 100%; height: 100%; }
+.photo-annotations { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* Flèches de part et d'autre de la photo : grandes zones faciles à toucher. */
+.photo-fleche { position: absolute; top: 50%; transform: translateY(-50%); width: 56px; height: 96px; border: none; border-radius: 12px;
+  background: rgb(0 0 0 / 0.35); color: #fff; font-size: 3rem; line-height: 1; padding: 0; display: flex; align-items: center;
+  justify-content: center; z-index: 2; }
+.photo-fleche:hover, .photo-fleche:focus-visible { background: rgb(0 0 0 / 0.6); }
+.photo-fleche.gauche { left: 8px; }
+.photo-fleche.droite { right: 8px; }
+.photo-position { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgb(0 0 0 / 0.5); color: #fff;
+  font-size: 0.85rem; padding: 2px 10px; border-radius: 12px; }
+.note-vocale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.note-vocale audio { height: 36px; max-width: 100%; }
+button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
+
+/* Éditeur d'annotations */
+.editeur-annotations { position: fixed; inset: 0; z-index: 60; background: #111; color: #fff; display: flex; flex-direction: column; }
+.annot-outils, .annot-bas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; background: #1d1d1d; }
+.annot-espace { flex: 1; }
+.annot-outil { width: 48px; height: 44px; font-size: 1.4rem; padding: 0; background: #2b2b2b; color: #fff; border: 2px solid #444; }
+.annot-outil.actif { border-color: #fff; background: #3d3d3d; }
+.annot-ok { color: #3ccf5c; } .annot-nok { color: #ff5a4f; } .annot-cercle, .annot-trait { color: #ff5a4f; }
+.annot-zone { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.annot-svg { width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.annot-saisie { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; padding: 8px; background: #1d1d1d; }
+.annot-saisie label { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 4px; }
+.annot-saisie input { font: inherit; font-size: 16px; padding: 8px; border-radius: 8px; border: 1px solid #555; }
+.annot-bas .texte-erreur { color: #f2b8b5; }
 .photo-infos { background: var(--carte); padding: 12px 16px; max-height: 45vh; overflow-y: auto; }
 .photo-infos textarea { width: 100%; font: inherit; border: 1px solid var(--bord); border-radius: 8px; padding: 8px;
   background: var(--carte); color: var(--texte); }
