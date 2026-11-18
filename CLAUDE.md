@@ -100,6 +100,9 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   `src/projet/importPaquet.ts`. Transit SharePoint (lot 5) : `src/transit/` (réglages, connexion MSAL, client
   Graph `TransitGraph`, protocole), écrans `src/ui/ReglagesTransit.tsx` et `src/ui/TransitProjet.tsx`.
   Note à la DSI : `docs/NOTE_DSI.md`.
+- Outil autonome, hors appli : estimateur de pertes de charge aérauliques `outils/pertes-de-charge/`
+  (voir `docs/PDC_AERAULIQUE.md`). `node outils/pertes-de-charge/verif.mjs` vérifie le calage ;
+  `node outils/pertes-de-charge/construire.mjs` régénère `pertes-de-charge.html`.
 - Toute écriture dans le dossier projet passe par `EspaceProjet` et l'interface `Stockage`, jamais directement.
 - `npm test` : tests unitaires. `npm run build && npm run build:test && npm run test:e2e` : parcours complet
   dans Chromium (dont `terrain-lot3.mjs` : 300 photos en mode avion, fausse caméra ; `NB_PHOTOS` pour réduire).

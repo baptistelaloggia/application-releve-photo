@@ -1,0 +1,1455 @@
+{
+ "avertissement": "Réseaux de référence anonymisés (circuit le plus défavorisé). Source A : outil de calcul d'une entreprise de désenfumage ; source B : note de calcul DOE d'une entreprise CVC, immeuble de bureaux. Pertes en Pa, longueurs en ml, débits en m³/h.",
+ "reseaux": [
+  {
+   "id": "A01-desenfumage",
+   "source": "A",
+   "reseau": "extraction",
+   "regime": "desenfumage",
+   "debit": 10185,
+   "longueur": 97,
+   "lineaire": 452.4,
+   "forme": 728,
+   "pdMain": 120.5,
+   "particuliers": 106,
+   "rugosite": 0.5,
+   "section": {
+    "a": 500,
+    "b": 400
+   },
+   "elements": {
+    "volet": 1,
+    "terminal": "grille"
+   },
+   "total": 1286.4
+  },
+  {
+   "id": "A02-desenfumage",
+   "source": "A",
+   "reseau": "airNeuf",
+   "regime": "desenfumage",
+   "debit": 4300,
+   "longueur": 17,
+   "lineaire": 14.3,
+   "forme": 166,
+   "pdMain": 19.5,
+   "particuliers": 168,
+   "rugosite": 0.5,
+   "section": {
+    "a": 700,
+    "b": 300
+   },
+   "elements": {
+    "volet": 1,
+    "grilleExt": 1,
+    "autres": 100
+   },
+   "total": 348.3
+  },
+  {
+   "id": "B01-soufflage",
+   "reseau": "soufflage",
+   "debit": 29160,
+   "longueur": 118.0,
+   "lineaire": 68.6,
+   "forme": 140.1,
+   "pdMain": 28.7,
+   "particuliers": 280.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "terminal": "diffuseurBdv"
+   },
+   "total": 488.7,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B01-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 29160,
+   "longueur": 19.0,
+   "lineaire": 8.0,
+   "forme": 14.3,
+   "pdMain": 28.7,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 122.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B01-reprise",
+   "reseau": "reprise",
+   "debit": 26110,
+   "longueur": 66.5,
+   "lineaire": 34.0,
+   "forme": 107.7,
+   "pdMain": 27.0,
+   "particuliers": 290.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 431.7,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B01-rejet",
+   "reseau": "rejet",
+   "debit": 26110,
+   "longueur": 19.0,
+   "lineaire": 1.4,
+   "forme": 0.3,
+   "pdMain": 27.0,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 101.7,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B02-soufflage",
+   "reseau": "soufflage",
+   "debit": 22890,
+   "longueur": 139.5,
+   "lineaire": 93.4,
+   "forme": 139.4,
+   "pdMain": 31.3,
+   "particuliers": 240.0,
+   "elements": {
+    "pas": 1.0,
+    "bdv": 1.0,
+    "terminal": "diffuseurBdv"
+   },
+   "total": 472.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B02-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 22890,
+   "longueur": 19.0,
+   "lineaire": 10.1,
+   "forme": 15.7,
+   "pdMain": 31.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 125.8,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B02-reprise",
+   "reseau": "reprise",
+   "debit": 19890,
+   "longueur": 66.5,
+   "lineaire": 20.6,
+   "forme": 49.5,
+   "pdMain": 15.7,
+   "particuliers": 290.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 360.1,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B03-soufflage",
+   "reseau": "soufflage",
+   "debit": 13100,
+   "longueur": 91.0,
+   "lineaire": 47.0,
+   "forme": 92.8,
+   "pdMain": 16.2,
+   "particuliers": 240.0,
+   "elements": {
+    "pas": 1.0,
+    "bdv": 1.0,
+    "terminal": "diffuseurBdv"
+   },
+   "total": 379.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B03-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 13100,
+   "longueur": 19.0,
+   "lineaire": 6.4,
+   "forme": 8.1,
+   "pdMain": 16.2,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 114.5,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B03-reprise",
+   "reseau": "reprise",
+   "debit": 12050,
+   "longueur": 59.0,
+   "lineaire": 28.1,
+   "forme": 85.6,
+   "pdMain": 14.7,
+   "particuliers": 290.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 403.7,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B03-rejet",
+   "reseau": "rejet",
+   "debit": 12050,
+   "longueur": 19.0,
+   "lineaire": 5.9,
+   "forme": 7.4,
+   "pdMain": 14.7,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 113.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B04-soufflage",
+   "reseau": "soufflage",
+   "debit": 23520,
+   "longueur": 143.5,
+   "lineaire": 91.7,
+   "forme": 224.6,
+   "pdMain": 40.0,
+   "particuliers": 280.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "terminal": "diffuseurBdv"
+   },
+   "total": 596.3,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B04-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 61115,
+   "longueur": 59.0,
+   "lineaire": 17.7,
+   "forme": 26.1,
+   "pdMain": 27.6,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 143.8,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B04-reprise",
+   "reseau": "reprise",
+   "debit": 20820,
+   "longueur": 100.0,
+   "lineaire": 55.9,
+   "forme": 156.7,
+   "pdMain": 22.2,
+   "particuliers": 270.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 482.6,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B04-rejet",
+   "reseau": "rejet",
+   "debit": 55375,
+   "longueur": 62.5,
+   "lineaire": 37.9,
+   "forme": 50.4,
+   "pdMain": 54.0,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 188.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B05-soufflage",
+   "reseau": "soufflage",
+   "debit": 31250,
+   "longueur": 131.0,
+   "lineaire": 66.0,
+   "forme": 141.5,
+   "pdMain": 28.4,
+   "particuliers": 300.0,
+   "elements": {
+    "ccf": 3.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "terminal": "diffuseurBdv"
+   },
+   "total": 507.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B05-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 31250,
+   "longueur": 19.0,
+   "lineaire": 7.6,
+   "forme": 14.2,
+   "pdMain": 28.4,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 121.8,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B05-reprise",
+   "reseau": "reprise",
+   "debit": 27780,
+   "longueur": 96.0,
+   "lineaire": 49.6,
+   "forme": 125.3,
+   "pdMain": 26.1,
+   "particuliers": 290.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "bdv": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 464.9,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B05-rejet",
+   "reseau": "rejet",
+   "debit": 27780,
+   "longueur": 19.0,
+   "lineaire": 1.3,
+   "forme": 0.4,
+   "pdMain": 26.1,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 101.7,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B06-soufflage",
+   "reseau": "soufflage",
+   "debit": 14500,
+   "longueur": 133.5,
+   "lineaire": 65.2,
+   "forme": 92.2,
+   "pdMain": 15.1,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 267.4,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B06-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86225,
+   "longueur": 59.0,
+   "lineaire": 26.3,
+   "forme": 17.9,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 144.2,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B06-reprise",
+   "reseau": "reprise",
+   "debit": 14230,
+   "longueur": 89.5,
+   "lineaire": 68.0,
+   "forme": 88.8,
+   "pdMain": 23.0,
+   "particuliers": 130.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 286.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B06-rejet",
+   "reseau": "rejet",
+   "debit": 43390,
+   "longueur": 109.9,
+   "lineaire": 27.1,
+   "forme": 27.3,
+   "pdMain": 21.8,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 154.4,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B07-soufflage",
+   "reseau": "soufflage",
+   "debit": 14430,
+   "longueur": 139.0,
+   "lineaire": 58.3,
+   "forme": 76.2,
+   "pdMain": 19.6,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 244.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B07-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86225,
+   "longueur": 59.0,
+   "lineaire": 25.4,
+   "forme": 15.1,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 140.5,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B07-reprise",
+   "reseau": "reprise",
+   "debit": 6430,
+   "longueur": 48.0,
+   "lineaire": 27.4,
+   "forme": 29.8,
+   "pdMain": 0.2,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 167.2,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B07-rejet",
+   "reseau": "rejet",
+   "debit": 43390,
+   "longueur": 109.9,
+   "lineaire": 28.0,
+   "forme": 24.1,
+   "pdMain": 21.8,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 152.1,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B08-soufflage",
+   "reseau": "soufflage",
+   "debit": 29800,
+   "longueur": 43.0,
+   "lineaire": 29.9,
+   "forme": 186.6,
+   "pdMain": 44.5,
+   "particuliers": 200.0,
+   "elements": {
+    "pas": 1.0,
+    "terminal": "hotte"
+   },
+   "total": 416.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B08-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86225,
+   "longueur": 59.0,
+   "lineaire": 28.4,
+   "forme": 32.5,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 160.9,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B09-soufflage",
+   "reseau": "soufflage",
+   "debit": 7405,
+   "longueur": 90.0,
+   "lineaire": 49.7,
+   "forme": 62.5,
+   "pdMain": 17.3,
+   "particuliers": 110.8,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 223.0,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B09-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86225,
+   "longueur": 59.0,
+   "lineaire": 26.8,
+   "forme": 13.6,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 140.4,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B09-reprise",
+   "reseau": "reprise",
+   "debit": 7300,
+   "longueur": 69.5,
+   "lineaire": 42.2,
+   "forme": 43.2,
+   "pdMain": 16.8,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 195.4,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B09-rejet",
+   "reseau": "rejet",
+   "debit": 43390,
+   "longueur": 109.9,
+   "lineaire": 27.5,
+   "forme": 24.2,
+   "pdMain": 21.8,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 151.7,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B10-soufflage",
+   "reseau": "soufflage",
+   "debit": 9095,
+   "longueur": 52.0,
+   "lineaire": 44.1,
+   "forme": 72.7,
+   "pdMain": 23.3,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 226.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B10-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86225,
+   "longueur": 59.0,
+   "lineaire": 28.3,
+   "forme": 17.8,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 146.1,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B10-reprise",
+   "reseau": "reprise",
+   "debit": 6370,
+   "longueur": 50.5,
+   "lineaire": 9.8,
+   "forme": 22.7,
+   "pdMain": 11.4,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 142.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B10-rejet",
+   "reseau": "rejet",
+   "debit": 43390,
+   "longueur": 109.9,
+   "lineaire": 25.9,
+   "forme": 21.5,
+   "pdMain": 21.8,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 147.4,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B11-soufflage",
+   "reseau": "soufflage",
+   "debit": 6070,
+   "longueur": 72.0,
+   "lineaire": 53.3,
+   "forme": 57.8,
+   "pdMain": 29.6,
+   "particuliers": 180.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 291.1,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B11-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86225,
+   "longueur": 59.0,
+   "lineaire": 32.6,
+   "forme": 22.1,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 154.7,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B11-reprise",
+   "reseau": "reprise",
+   "debit": 4390,
+   "longueur": 141.5,
+   "lineaire": 113.5,
+   "forme": 52.1,
+   "pdMain": 22.3,
+   "particuliers": 200.0,
+   "elements": {
+    "ccf": 3.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 365.6,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B11-rejet",
+   "reseau": "rejet",
+   "debit": 43390,
+   "longueur": 109.9,
+   "lineaire": 31.9,
+   "forme": 26.9,
+   "pdMain": 21.8,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 158.8,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B12-soufflage",
+   "reseau": "soufflage",
+   "debit": 3555,
+   "longueur": 51.5,
+   "lineaire": 17.5,
+   "forme": 24.0,
+   "pdMain": 4.8,
+   "particuliers": 120.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "aucun"
+   },
+   "total": 161.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B12-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 61115,
+   "longueur": 59.0,
+   "lineaire": 13.2,
+   "forme": 4.1,
+   "pdMain": 27.6,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 117.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B12-reprise",
+   "reseau": "reprise",
+   "debit": 4295,
+   "longueur": 61.5,
+   "lineaire": 20.8,
+   "forme": 17.0,
+   "pdMain": 10.9,
+   "particuliers": 120.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "aucun"
+   },
+   "total": 157.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B12-rejet",
+   "reseau": "rejet",
+   "debit": 55375,
+   "longueur": 62.5,
+   "lineaire": 37.8,
+   "forme": 43.2,
+   "pdMain": 54.0,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 181.0,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B13-soufflage",
+   "reseau": "soufflage",
+   "debit": 4920,
+   "longueur": 84.5,
+   "lineaire": 79.9,
+   "forme": 74.6,
+   "pdMain": 19.4,
+   "particuliers": 160.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 314.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B13-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 86220,
+   "longueur": 59.0,
+   "lineaire": 30.0,
+   "forme": 15.0,
+   "pdMain": 54.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 145.0,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B13-reprise",
+   "reseau": "reprise",
+   "debit": 4670,
+   "longueur": 75.0,
+   "lineaire": 60.1,
+   "forme": 40.4,
+   "pdMain": 17.5,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 210.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B13-rejet",
+   "reseau": "rejet",
+   "debit": 45840,
+   "longueur": 109.9,
+   "lineaire": 28.3,
+   "forme": 21.9,
+   "pdMain": 24.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 150.2,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B14-soufflage",
+   "reseau": "soufflage",
+   "debit": 13800,
+   "longueur": 62.0,
+   "lineaire": 49.1,
+   "forme": 105.1,
+   "pdMain": 43.5,
+   "particuliers": 160.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 314.2,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B14-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 39525,
+   "longueur": 11.0,
+   "lineaire": 2.9,
+   "forme": 6.9,
+   "pdMain": 34.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 109.8,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B14-reprise",
+   "reseau": "reprise",
+   "debit": 11950,
+   "longueur": 29.5,
+   "lineaire": 18.0,
+   "forme": 59.4,
+   "pdMain": 5.1,
+   "particuliers": 160.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 237.4,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B14-rejet",
+   "reseau": "rejet",
+   "debit": 17285,
+   "longueur": 106.0,
+   "lineaire": 42.6,
+   "forme": 25.7,
+   "pdMain": 12.5,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 168.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B15-soufflage",
+   "reseau": "soufflage",
+   "debit": 12785,
+   "longueur": 101.5,
+   "lineaire": 75.5,
+   "forme": 190.3,
+   "pdMain": 37.3,
+   "particuliers": 110.3,
+   "elements": {
+    "ccf": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 376.1,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B15-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 39525,
+   "longueur": 11.0,
+   "lineaire": 2.8,
+   "forme": 5.9,
+   "pdMain": 34.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 108.7,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B15-reprise",
+   "reseau": "reprise",
+   "debit": 5335,
+   "longueur": 70.5,
+   "lineaire": 47.2,
+   "forme": 43.6,
+   "pdMain": 14.6,
+   "particuliers": 220.0,
+   "elements": {
+    "ccf": 4.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 310.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B15-rejet",
+   "reseau": "rejet",
+   "debit": 17285,
+   "longueur": 105.0,
+   "lineaire": 19.0,
+   "forme": 16.7,
+   "pdMain": 12.5,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 135.7,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B16-soufflage",
+   "reseau": "soufflage",
+   "debit": 4040,
+   "longueur": 109.5,
+   "lineaire": 23.9,
+   "forme": 13.7,
+   "pdMain": 6.2,
+   "particuliers": 160.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 197.6,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B16-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 38440,
+   "longueur": 10.0,
+   "lineaire": 3.1,
+   "forme": 4.3,
+   "pdMain": 32.4,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 107.4,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B16-reprise",
+   "reseau": "reprise",
+   "debit": 3850,
+   "longueur": 58.0,
+   "lineaire": 22.5,
+   "forme": 12.8,
+   "pdMain": 10.1,
+   "particuliers": 230.0,
+   "elements": {
+    "ccf": 7.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 265.3,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B16-rejet",
+   "reseau": "rejet",
+   "debit": 34660,
+   "longueur": 103.0,
+   "lineaire": 51.9,
+   "forme": 60.4,
+   "pdMain": 50.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 212.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B17-soufflage",
+   "reseau": "soufflage",
+   "debit": 1810,
+   "longueur": 66.0,
+   "lineaire": 47.5,
+   "forme": 41.8,
+   "pdMain": 12.0,
+   "particuliers": 90.0,
+   "elements": {
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 179.3,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B17-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 5210,
+   "longueur": 11.0,
+   "lineaire": 4.9,
+   "forme": 12.0,
+   "pdMain": 0.6,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 116.9,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B17-reprise",
+   "reseau": "reprise",
+   "debit": 1065,
+   "longueur": 70.5,
+   "lineaire": 32.6,
+   "forme": 27.1,
+   "pdMain": 6.8,
+   "particuliers": 140.0,
+   "elements": {
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 199.7,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B17-rejet",
+   "reseau": "rejet",
+   "debit": 3505,
+   "longueur": 51.0,
+   "lineaire": 0.5,
+   "forme": 0.7,
+   "pdMain": 0.5,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 101.2,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B18-soufflage",
+   "reseau": "soufflage",
+   "debit": 4520,
+   "longueur": 110.0,
+   "lineaire": 32.4,
+   "forme": 62.7,
+   "pdMain": 12.9,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "aucun"
+   },
+   "total": 195.1,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B18-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 38435,
+   "longueur": 10.0,
+   "lineaire": 4.5,
+   "forme": 4.1,
+   "pdMain": 32.4,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 108.6,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B18-reprise",
+   "reseau": "reprise",
+   "debit": 4820,
+   "longueur": 121.0,
+   "lineaire": 52.1,
+   "forme": 59.9,
+   "pdMain": 14.7,
+   "particuliers": 140.0,
+   "elements": {
+    "ccf": 2.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "aucun"
+   },
+   "total": 252.0,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B18-rejet",
+   "reseau": "rejet",
+   "debit": 34660,
+   "longueur": 65.0,
+   "lineaire": 49.0,
+   "forme": 61.8,
+   "pdMain": 50.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 210.8,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B19-soufflage",
+   "reseau": "soufflage",
+   "debit": 12940,
+   "longueur": 87.5,
+   "lineaire": 82.5,
+   "forme": 83.6,
+   "pdMain": 38.2,
+   "particuliers": 200.0,
+   "elements": {
+    "pas": 1.0,
+    "terminal": "hotte"
+   },
+   "total": 366.1,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B19-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 39525,
+   "longueur": 11.0,
+   "lineaire": 8.2,
+   "forme": 24.3,
+   "pdMain": 34.3,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 132.5,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B20-soufflage",
+   "reseau": "soufflage",
+   "debit": 7810,
+   "longueur": 60.0,
+   "lineaire": 41.2,
+   "forme": 37.6,
+   "pdMain": 20.1,
+   "particuliers": 160.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 238.8,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B20-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 12240,
+   "longueur": 27.0,
+   "lineaire": 16.4,
+   "forme": 14.0,
+   "pdMain": 28.6,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 130.4,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B20-reprise",
+   "reseau": "reprise",
+   "debit": 7810,
+   "longueur": 49.0,
+   "lineaire": 29.2,
+   "forme": 22.1,
+   "pdMain": 15.6,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 161.3,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B20-rejet",
+   "reseau": "rejet",
+   "debit": 12140,
+   "longueur": 50.0,
+   "lineaire": 32.5,
+   "forme": 46.5,
+   "pdMain": 27.2,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 179.0,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B21-soufflage",
+   "reseau": "soufflage",
+   "debit": 4330,
+   "longueur": 61.0,
+   "lineaire": 35.1,
+   "forme": 57.5,
+   "pdMain": 14.1,
+   "particuliers": 160.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "mr": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 252.6,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B21-airNeuf",
+   "reseau": "airNeuf",
+   "debit": 12240,
+   "longueur": 27.0,
+   "lineaire": 15.9,
+   "forme": 10.4,
+   "pdMain": 28.6,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 126.3,
+   "source": "B",
+   "regime": "prise"
+  },
+  {
+   "id": "B21-reprise",
+   "reseau": "reprise",
+   "debit": 4330,
+   "longueur": 53.0,
+   "lineaire": 31.4,
+   "forme": 21.1,
+   "pdMain": 14.1,
+   "particuliers": 110.0,
+   "elements": {
+    "ccf": 1.0,
+    "pas": 1.0,
+    "terminal": "diffuseurPlenum"
+   },
+   "total": 162.5,
+   "source": "B",
+   "regime": "bassePression"
+  },
+  {
+   "id": "B21-rejet",
+   "reseau": "rejet",
+   "debit": 12140,
+   "longueur": 50.0,
+   "lineaire": 41.9,
+   "forme": 56.9,
+   "pdMain": 35.1,
+   "particuliers": 100.0,
+   "elements": {
+    "pas": 1.0,
+    "grilleExt": 1.0
+   },
+   "total": 198.8,
+   "source": "B",
+   "regime": "prise"
+  }
+ ]
+}

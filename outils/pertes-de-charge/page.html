@@ -1,0 +1,459 @@
+<title>Estimateur PDC aéraulique</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Mise en page : bandeau d'onglets, saisie des réseaux à gauche, résultats collants à droite. */
+:root {
+  --bg: #eef2f5; --surface: #ffffff; --surface-2: #f6f8fa; --ink: #15202b; --muted: #586674; --line: #d3dbe2;
+  --accent: #0a6680; --accent-soft: #dcecf1; --signal: #c26a00; --signal-soft: #fbead3;
+  --ok: #2e7a4c; --ok-soft: #dff0e5; --warn: #9a6a12; --warn-soft: #f6ead0; --crit: #a83a3a; --crit-soft: #f6dddd;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-text: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1419; --surface: #161f27; --surface-2: #1c2731; --ink: #e2e8ee; --muted: #93a2b0; --line: #2a3742;
+  --accent: #5ab8d3; --accent-soft: #173543; --signal: #f0a542; --signal-soft: #3a2b14;
+  --ok: #6cc893; --ok-soft: #173326; --warn: #e2b553; --warn-soft: #362c14; --crit: #ec8787; --crit-soft: #3a1d1d;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1419; --surface: #161f27; --surface-2: #1c2731; --ink: #e2e8ee; --muted: #93a2b0; --line: #2a3742;
+  --accent: #5ab8d3; --accent-soft: #173543; --signal: #f0a542; --signal-soft: #3a2b14;
+  --ok: #6cc893; --ok-soft: #173326; --warn: #e2b553; --warn-soft: #362c14; --crit: #ec8787; --crit-soft: #3a1d1d;
+  color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-text); font-size: 14px; line-height: 1.45; margin: 0; }
+.cadre { max-width: 1240px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: 1.7rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1.02rem; }
+.chapeau { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.chapeau p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.num, input[type=number], .mono { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.etiq { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.onglets button { font: inherit; font-weight: 600; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+.onglets button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.types { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.types button { font: inherit; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); cursor: pointer; display: grid; gap: 2px; }
+.types button small { color: var(--muted); font-size: .78rem; }
+.types button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.travail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .travail { grid-template-columns: minmax(0, 1fr); } }
+.reseaux { display: grid; gap: 12px; }
+.reseau { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; }
+.reseau header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.reseau header .sous { font-family: var(--f-data); font-size: .85rem; color: var(--muted); }
+.reseau header .sous b { color: var(--ink); font-weight: 500; }
+.champs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 12px; }
+.champ { display: grid; gap: 3px; min-width: 0; }
+.champ label { font-size: .8rem; color: var(--muted); }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; width: 100%; min-width: 0; }
+input[type=number] { text-align: right; }
+.unite { position: relative; }
+.unite input { padding-right: 44px; }
+.unite span { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .78rem; pointer-events: none; font-family: var(--f-data); }
+.grand { grid-column: span 2; }
+@media (max-width: 420px) { .grand { grid-column: auto; } }
+details.avance summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: .85rem; }
+details.avance[open] summary { margin-bottom: 10px; }
+.aide { font-size: .8rem; color: var(--muted); margin: 0; }
+.resultats { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 12px; }
+.vent { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
+.vent .chiffre { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.vent .chiffre strong { font-family: var(--f-data); font-size: 2.1rem; font-weight: 500; color: var(--signal); line-height: 1; }
+.vent .chiffre span { color: var(--muted); }
+.barre { position: relative; height: 46px; }
+.barre .axe { position: absolute; left: 0; right: 0; top: 14px; height: 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; }
+.barre .plage { position: absolute; top: 14px; height: 10px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 5px; }
+.barre .marque { position: absolute; top: 8px; width: 2px; height: 22px; background: var(--accent); transform: translateX(-1px); }
+.barre .marque.cons { background: var(--signal); width: 3px; }
+.barre .lib { position: absolute; top: 30px; font-family: var(--f-data); font-size: .72rem; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+.trois { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+.trois div { background: var(--surface-2); border-radius: 4px; padding: 6px 4px; }
+.trois b { display: block; font-family: var(--f-data); font-weight: 500; font-size: 1.05rem; }
+.decomp { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .84rem; }
+th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+td.n, th.n { text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.st td { font-weight: 600; background: var(--surface-2); }
+.note { font-size: .8rem; color: var(--muted); background: var(--surface-2); border-left: 3px solid var(--line); padding: 8px 10px; border-radius: 0 4px 4px 0; margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { font: inherit; font-weight: 500; border: 1px solid var(--accent); color: var(--accent); background: var(--surface); padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.btn.plein { background: var(--accent); color: var(--surface); }
+.panneau { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.panneau p { margin: 0; max-width: 80ch; }
+.matrice { overflow-x: auto; }
+.matrice table { min-width: 640px; }
+.matrice td { text-align: center; font-family: var(--f-data); font-size: .78rem; line-height: 1.25; white-space: nowrap; }
+.matrice td small { display: block; color: var(--muted); font-size: .7rem; }
+.matrice th:first-child, .matrice td:first-child { text-align: right; position: sticky; left: 0; background: var(--surface); }
+.j1 { background: var(--ok-soft); } .j2 { background: var(--surface-2); } .j3 { background: var(--warn-soft); } .j4 { background: var(--crit-soft); }
+.legende { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .78rem; color: var(--muted); }
+.legende i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 5px; vertical-align: -2px; border: 1px solid var(--line); }
+.calc { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 12px; align-items: end; }
+.sortie { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.sortie div { background: var(--surface-2); border-radius: 4px; padding: 8px 10px; }
+.sortie b { display: block; font-family: var(--f-data); font-size: 1.2rem; font-weight: 500; }
+.formule { font-family: var(--f-data); background: var(--surface-2); padding: 10px 12px; border-radius: 4px; overflow-x: auto; white-space: pre; font-size: .82rem; }
+.toast { min-height: 1.2em; font-size: .8rem; color: var(--ok); }
+@media (prefers-reduced-motion: no-preference) { .barre .plage, .barre .marque { transition: left .2s, width .2s; } }
+</style>
+
+<div class="cadre">
+  <div class="chapeau">
+    <div>
+      <div class="etiq">Études de conception · pression disponible ventilateur</div>
+      <h1>Estimateur de pertes de charge aérauliques</h1>
+      <p>Fourchette de pertes de charge du circuit le plus défavorisé, à partir de la longueur de gaine et des éléments les plus pénalisants. Ratios calés sur deux notes de calcul d'entreprise (désenfumage et 23 CTA de bureaux).</p>
+    </div>
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" id="t-estim" aria-selected="true" data-vue="estim">Estimation</button>
+    <button role="tab" id="t-ratios" aria-selected="false" data-vue="ratios">Ratios Pa/ml</button>
+    <button role="tab" id="t-hyp" aria-selected="false" data-vue="hyp">Hypothèses et sources</button>
+  </div>
+
+  <!-- ============ ESTIMATION ============ -->
+  <section id="v-estim" class="vue" style="display:grid;gap:14px">
+    <div class="types" id="types"></div>
+    <div class="travail">
+      <div class="reseaux" id="reseaux"></div>
+      <aside class="resultats" id="resultats"></aside>
+    </div>
+  </section>
+
+  <!-- ============ RATIOS ============ -->
+  <section id="v-ratios" class="vue" hidden style="display:grid;gap:14px">
+    <div class="panneau">
+      <h2>Perte linéique d'une gaine</h2>
+      <div class="calc">
+        <div class="champ"><label for="c-debit">Débit</label><div class="unite"><input id="c-debit" type="number" min="0" step="10" value="3500"><span>m³/h</span></div></div>
+        <div class="champ"><label for="c-a">Ø ou largeur</label><div class="unite"><input id="c-a" type="number" min="0" step="10" value="600"><span>mm</span></div></div>
+        <div class="champ"><label for="c-b">Hauteur (vide = circulaire)</label><div class="unite"><input id="c-b" type="number" min="0" step="10" value="400"><span>mm</span></div></div>
+        <div class="champ grand"><label for="c-rug">Rugosité</label><select id="c-rug"></select></div>
+      </div>
+      <div class="sortie" id="c-sortie"></div>
+    </div>
+    <div class="panneau">
+      <div class="chapeau">
+        <div>
+          <h2>Pa/ml selon le débit et la vitesse de dimensionnement</h2>
+          <p class="aide">Chaque case donne la section normalisée qui respecte la vitesse en tête de colonne, puis sa perte linéique en Pa/ml (tôle galvanisée sauf choix contraire ci-dessus).</p>
+        </div>
+        <div class="champ" style="min-width:200px"><label for="m-forme">Section</label>
+          <select id="m-forme"><option value="c">Circulaire (Ø normalisés)</option><option value="r">Rectangulaire (pas de 50 mm, rapport ≤ 2,5)</option></select></div>
+      </div>
+      <div class="legende">
+        <span><i class="j1"></i>j &lt; 0,5 Pa/ml</span><span><i class="j2"></i>0,5 à 1</span><span><i class="j3"></i>1 à 2</span><span><i class="j4"></i>&gt; 2 Pa/ml</span>
+      </div>
+      <div class="matrice" id="matrice"></div>
+      <p class="note">Repères usuels de vitesse : CTA et caissons, tronc 5 à 7 m/s, antennes 3 à 4 m/s, raccordement terminal ≤ 2,5 m/s ; VMC 2 à 4 m/s ; désenfumage 8 à 14 m/s dans les collecteurs [À VÉRIFIER selon contraintes acoustiques du projet].</p>
+    </div>
+  </section>
+
+  <!-- ============ HYPOTHÈSES ============ -->
+  <section id="v-hyp" class="vue" hidden style="display:grid;gap:14px">
+    <div class="panneau">
+      <h2>Méthode</h2>
+      <p>Pour le circuit le plus défavorisé de chaque réseau (du ventilateur au terminal le plus éloigné), la perte de charge est la somme de trois postes :</p>
+      <div class="formule">ΔP = L × j × (1 + kr)           gaines + accidents de forme répartis (coudes, piquages, réductions)
+   + ζb × Pd tronc              accidents de forme concentrés près du ventilateur (plénums, coudes du local technique)
+   + Σ pertes particulières     CCF, PAS, BDV, MR, batteries, terminal, grilles extérieures, volets</div>
+      <p>Chaque coefficient a une valeur basse, probable et haute. La valeur probable additionne les valeurs probables. Les bornes de la fourchette combinent les écarts de chaque poste quadratiquement, en les supposant indépendants : cumuler toutes les valeurs extrêmes donnerait une enveloppe 1,8 fois la valeur probable, rarement atteinte. L'enveloppe reste affichée sous chaque résultat.</p>
+      <p>La pression disponible à demander = valeur probable + marge (10 % par défaut, comme l'outil de la source A), arrondie à la dizaine supérieure comme dans la note de la source B. Elle couvre les pertes <b>externes</b> au caisson ou à la CTA ; filtres, batteries et récupérateur internes sont pris en compte par le constructeur.</p>
+      <p>Pd tronc = ρv²/2 au départ du ventilateur. Sans section saisie, la vitesse du tronc suit la loi v ≈ 2,2 log₁₀(Q) − 2,5 (3 à 8,5 m/s), calée sur les CTA de la source B. Les pertes linéiques se calculent par Colebrook-White, air à 20 °C (ρ = 1,204 kg/m³), diamètre équivalent de Huebscher pour les gaines rectangulaires.</p>
+    </div>
+    <div class="panneau">
+      <h2>Coefficients par régime de réseau</h2>
+      <div class="decomp" id="h-regimes"></div>
+    </div>
+    <div class="panneau">
+      <h2>Pertes de charge particulières</h2>
+      <div class="decomp" id="h-part"></div>
+    </div>
+    <div class="panneau">
+      <h2>Calage et validation</h2>
+      <p>Source A : outil de calcul d'une entreprise de désenfumage (onglet « PDC particulières », deux réseaux détaillés). Source B : note de calcul DOE d'une entreprise CVC, 23 CTA d'un immeuble de bureaux, soit 79 réseaux (soufflage, air neuf, reprise, rejet) avec longueurs, pertes linéaires et singulières tronçon par tronçon.</p>
+      <ul>
+        <li>Pertes linéiques recalculées à ± 5 % des deux notes. La source A calcule j avec la vitesse réelle de la gaine rectangulaire et le diamètre équivalent ; la source B, comme cet outil, avec le débit dans le conduit équivalent. L'écart entre conventions atteint 10 à 20 % en rectangulaire.</li>
+        <li>Sur les 40 réseaux soufflage et reprise de la source B : j moyen du circuit 0,34 à 0,80 Pa/ml (médiane 0,58) ; gaines et accidents de forme ensemble 0,8 à 2,3 Pa/ml (médiane 1,35).</li>
+        <li>Calcul à l'aveugle des 81 réseaux, avec seulement le débit, la longueur et les éléments particuliers : valeur réelle dans la fourchette pour 75 réseaux (93 %), écart moyen de la valeur probable 12 %. Les 6 réseaux hors fourchette sont surestimés (petits réseaux à faible vitesse) : l'erreur va dans le sens de la sécurité.</li>
+        <li>Exemple chargé à l'ouverture : la CTA de bureaux de la source B, notée 620 Pa au soufflage et 540 Pa à la reprise.</li>
+      </ul>
+    </div>
+    <div class="panneau">
+      <h2>Limites</h2>
+      <ul>
+        <li>La longueur à saisir est celle du <b>circuit le plus défavorisé</b>, pas le linéaire total du réseau.</li>
+        <li>Ratios calés sur des réseaux tertiaires dimensionnés à perte linéique modérée. Un réseau très compact (local technique encombré, nombreux coudes) ou dimensionné serré sort de la fourchette : saisir alors la section du tronc et j dans « Réglages avancés ».</li>
+        <li>VMC, simple flux et désenfumage s'appuient sur moins de données de référence que les CTA [À VÉRIFIER sur des notes de calcul de ces réseaux].</li>
+        <li>Les valeurs des bouches autoréglables, poutres froides et volets de désenfumage dépendent fortement du fabricant et de la vitesse de passage : préférer la valeur du catalogue dès qu'elle est connue (champ « Autres »).</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+/*MOTEUR*/
+</script>
+<script>
+(() => {
+  const fmt = (x, d = 0) => Number(x).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const RUGOSITES = [
+    [0.05, 'Très lisse : PVC, aluminium (0,05 mm)'],
+    [0.15, 'Tôle galvanisée (0,15 mm)'],
+    [0.5, 'Conduit coupe-feu, staff (0,5 mm, outil A)'],
+    [1.5, 'Maçonné, béton (1,5 mm) [À VÉRIFIER]'],
+  ];
+  const TYPE_INFOS = {
+    cta: 'Soufflage, reprise, air neuf et rejet',
+    simpleFlux: 'Caisson d\'extraction ou d\'insufflation',
+    vmc: 'Bouches autoréglables ou hygro',
+    desenfumage: 'Volets, collecteur, fuites',
+  };
+  // Éléments proposés selon le régime du réseau.
+  const ELEMENTS = {
+    bassePression: ['ccf', 'pas', 'bdv', 'mr', 'batterie'],
+    vmc: ['ccf', 'pas', 'mr'],
+    prise: ['pas', 'grilleExt', 'ccf'],
+    desenfumage: ['volet', 'pas'],
+  };
+  const COURTS = { ccf: 'CCF', pas: 'Pièges à son', bdv: 'BDV', mr: 'MR', batterie: 'Batteries terminales', volet: 'Volets / trappes', grilleExt: 'Grilles extérieures' };
+  const TERMINAUX_PAR_REGIME = {
+    bassePression: ['grille', 'diffuseurPlenum', 'diffuseurBdv', 'poutreFroide', 'hotte', 'aucun'],
+    vmc: ['bouchAutoreglable', 'grille', 'aucun'],
+    desenfumage: ['grille', 'aucun'],
+  };
+
+  // Exemple d'ouverture : CTA de bureaux de la source B.
+  const EXEMPLES = {
+    cta: {
+      soufflage: { debit: 29160, longueur: 118, elements: { ccf: 2, pas: 1, bdv: 1, terminal: 'diffuseurBdv' } },
+      airNeuf: { longueur: 19, elements: { pas: 1, grilleExt: 1 } },
+      reprise: { debit: 26110, longueur: 66.5, elements: { ccf: 2, pas: 1, bdv: 1, mr: 1, terminal: 'diffuseurPlenum' } },
+      rejet: { longueur: 19, elements: { pas: 1, grilleExt: 1 } },
+    },
+    simpleFlux: { principal: { debit: 2500, longueur: 45, elements: { ccf: 1, pas: 1, terminal: 'grille' } }, exterieur: { longueur: 4, elements: { grilleExt: 1 } } },
+    vmc: { principal: { debit: 1800, longueur: 35, elements: { ccf: 1, terminal: 'bouchAutoreglable' } }, exterieur: { longueur: 2, elements: { grilleExt: 1 } } },
+    desenfumage: { principal: { debit: 9700, longueur: 97, rugosite: 0.5, section: { a: 500, b: 400 }, elements: { volet: 1, terminal: 'grille' } }, exterieur: { longueur: 3, elements: { grilleExt: 1 } } },
+  };
+
+  const CLE = 'pdc-aeraulique-v1';
+  let etat;
+  try { etat = JSON.parse(localStorage.getItem(CLE)); } catch { etat = null; }
+  if (!etat || !etat.saisies) etat = { type: 'cta', marge: 10, saisies: structuredClone(EXEMPLES) };
+  for (const t of Object.keys(TYPES)) if (!etat.saisies[t]) etat.saisies[t] = structuredClone(EXEMPLES[t]);
+  const sauver = () => { try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch { /* stockage indisponible */ } };
+
+  // ---------- Onglets ----------
+  const vues = ['estim', 'ratios', 'hyp'];
+  function montrer(v) {
+    if (!vues.includes(v)) v = 'estim';
+    for (const x of vues) {
+      $('#v-' + x).hidden = x !== v;
+      $('#t-' + x).setAttribute('aria-selected', String(x === v));
+    }
+  }
+  document.querySelectorAll('.onglets button').forEach((b) => b.addEventListener('click', () => { montrer(b.dataset.vue); try { history.replaceState(null, '', '#' + b.dataset.vue); } catch {} }));
+  montrer((location.hash || '').slice(1));
+
+  // ---------- Choix du type ----------
+  function dessinerTypes() {
+    $('#types').innerHTML = Object.entries(TYPES).map(([k, t]) =>
+      `<button type="button" data-type="${k}" aria-pressed="${k === etat.type}"><b>${esc(t.libelle)}</b><small>${esc(TYPE_INFOS[k])}</small></button>`).join('');
+    $('#types').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { etat.type = b.dataset.type; sauver(); dessinerTypes(); dessinerSaisie(); calculer(); }));
+  }
+
+  // ---------- Saisie ----------
+  const champNombre = (id, lib, val, unite, attrs = '', classe = '') =>
+    `<div class="champ ${classe}"><label for="${id}">${lib}</label><div class="unite"><input id="${id}" type="number" ${attrs} value="${val ?? ''}"><span>${unite}</span></div></div>`;
+
+  function dessinerSaisie() {
+    const def = TYPES[etat.type];
+    const s = etat.saisies[etat.type];
+    let html = '';
+    for (const [cle, r] of Object.entries(def.reseaux)) {
+      const v = s[cle] || (s[cle] = structuredClone(r.defaut));
+      v.elements = v.elements || {};
+      const p = `${etat.type}-${cle}`;
+      const regime = r.regime;
+      const lien = r.memeDebitQue ? def.reseaux[r.memeDebitQue].libelle.toLowerCase() : null;
+      html += `<section class="reseau" data-reseau="${cle}">
+        <header><h3>${esc(r.libelle)}</h3><span class="sous" id="${p}-sous"></span></header>
+        <div class="champs">
+          ${champNombre(`${p}-debit`, lien ? `Débit (vide = ${esc(lien)})` : 'Débit au ventilateur', v.debit, 'm³/h', 'min="0" step="10" data-k="debit"')}
+          ${champNombre(`${p}-longueur`, 'Longueur circuit défavorisé', v.longueur, 'ml', 'min="0" step="0.5" data-k="longueur"')}
+          ${ELEMENTS[regime].map((e) => champNombre(`${p}-${e}`, esc(COURTS[e]), v.elements[e] ?? 0, 'u', `min="0" step="1" data-e="${e}"`)).join('')}
+          ${TERMINAUX_PAR_REGIME[regime] ? `<div class="champ grand"><label for="${p}-terminal">Terminal le plus défavorisé</label><select id="${p}-terminal" data-e="terminal">${TERMINAUX_PAR_REGIME[regime].map((t) => `<option value="${t}" ${v.elements.terminal === t ? 'selected' : ''}>${esc(TERMINAUX[t].libelle)} (${TERMINAUX[t].pa[1]} Pa)</option>`).join('')}</select></div>` : ''}
+          ${champNombre(`${p}-autres`, 'Autres pertes particulières', v.elements.autres ?? '', 'Pa', 'min="0" step="5" data-e="autres"')}
+        </div>
+        <details class="avance">
+          <summary>Réglages avancés</summary>
+          <div class="champs">
+            ${champNombre(`${p}-sa`, 'Tronc : Ø ou largeur', v.section?.a ?? '', 'mm', 'min="0" step="50" data-s="a"')}
+            ${champNombre(`${p}-sb`, 'Tronc : hauteur', v.section?.b ?? '', 'mm', 'min="0" step="50" data-s="b"')}
+            ${champNombre(`${p}-j`, 'j imposé (sinon ratio)', v.jImpose ?? '', 'Pa/ml', 'min="0" step="0.05" data-k="jImpose"')}
+            <div class="champ grand"><label for="${p}-rug">Rugosité des conduits</label><select id="${p}-rug" data-k="rugosite">${RUGOSITES.map(([x, l]) => `<option value="${x}" ${(v.rugosite ?? 0.15) == x ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+            ${r.fuites != null ? champNombre(`${p}-fuites`, 'Fuites des volets fermés', v.fuites != null ? v.fuites * 100 : r.fuites * 100, '%', 'min="0" step="1" data-k="fuites"') : ''}
+          </div>
+          <p class="aide">Sans section saisie, la vitesse du tronc suit le débit (loi calée sur la source B). Sans j imposé, le ratio du régime « ${esc(REGIMES[regime].libelle)} » s'applique${regime === 'desenfumage' ? ' ; en désenfumage, j est celui du tronc (collecteur à section constante)' : ''}.</p>
+        </details>
+      </section>`;
+    }
+    html += `<section class="reseau"><div class="champs">
+      ${champNombre('marge', 'Marge de sécurité', etat.marge, '%', 'min="0" step="1"')}
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="b-copier">Copier la saisie (JSON)</button>
+        <button type="button" class="btn" id="b-exemple">Recharger l'exemple</button>
+        <span class="toast" id="toast" role="status"></span>
+      </div>
+      <details class="avance"><summary>Coller une saisie (JSON)</summary>
+        <div style="display:grid;gap:8px"><textarea id="t-json" rows="5" aria-label="Saisie au format JSON"></textarea>
+        <div class="actions"><button type="button" class="btn plein" id="b-coller">Appliquer</button></div>
+        <p class="aide">Format prévu pour être rempli automatiquement plus tard, par exemple à partir des polylignes d'un plan de réseau.</p></div>
+      </details>
+    </section>`;
+    $('#reseaux').innerHTML = html;
+
+    $('#reseaux').querySelectorAll('section[data-reseau]').forEach((sec) => {
+      const cle = sec.dataset.reseau;
+      sec.querySelectorAll('input, select').forEach((inp) => inp.addEventListener('input', () => {
+        const v = etat.saisies[etat.type][cle];
+        const brut = inp.value.trim();
+        const num = brut === '' ? null : Number(brut);
+        if (inp.dataset.e) v.elements[inp.dataset.e] = inp.dataset.e === 'terminal' ? brut : num;
+        else if (inp.dataset.s) { v.section = v.section || {}; v.section[inp.dataset.s] = num; if (!v.section.a) delete v.section; }
+        else if (inp.dataset.k === 'fuites') v.fuites = num == null ? null : num / 100;
+        else v[inp.dataset.k] = num;
+        sauver(); calculer();
+      }));
+    });
+    $('#marge').addEventListener('input', (e) => { etat.marge = Number(e.target.value) || 0; sauver(); calculer(); });
+    $('#b-exemple').addEventListener('click', () => { etat.saisies[etat.type] = structuredClone(EXEMPLES[etat.type]); sauver(); dessinerSaisie(); calculer(); dire('Exemple rechargé'); });
+    $('#b-copier').addEventListener('click', () => {
+      const txt = JSON.stringify({ type: etat.type, marge: etat.marge, reseaux: etat.saisies[etat.type] }, null, 2);
+      const repli = () => { $('#t-json').value = txt; $('#t-json').closest('details').open = true; $('#t-json').select(); dire('Copie bloquée : texte sélectionné ci-dessous'); };
+      try { navigator.clipboard.writeText(txt).then(() => dire('Saisie copiée'), repli); } catch { repli(); }
+    });
+    $('#b-coller').addEventListener('click', () => {
+      try {
+        const o = JSON.parse($('#t-json').value);
+        if (!TYPES[o.type] || typeof o.reseaux !== 'object') throw new Error();
+        etat.type = o.type; etat.saisies[o.type] = o.reseaux; if (o.marge != null) etat.marge = Number(o.marge);
+        sauver(); dessinerTypes(); dessinerSaisie(); calculer(); dire('Saisie appliquée');
+      } catch { dire('JSON non reconnu : attendu {"type": "cta", "reseaux": {…}}'); }
+    });
+  }
+  function dire(t) { const el = $('#toast'); if (el) { el.textContent = t; clearTimeout(dire.h); dire.h = setTimeout(() => (el.textContent = ''), 3500); } }
+
+  // ---------- Calcul et résultats ----------
+  function calculer() {
+    const def = TYPES[etat.type];
+    const marge = (Number(etat.marge) || 0) / 100;
+    const r = calculerType(etat.type, etat.saisies[etat.type], marge);
+    for (const cle of Object.keys(def.reseaux)) {
+      const x = r.reseaux[cle];
+      const el = document.getElementById(`${etat.type}-${cle}-sous`);
+      if (el) el.innerHTML = `<b>${fmt(x.fourchette.probable)} Pa</b> · ${fmt(x.fourchette.bas)} à ${fmt(x.fourchette.haut)} · tronc ${fmt(x.tronc.v, 1)} m/s`;
+    }
+    $('#resultats').innerHTML = r.ventilateurs.map((v) => carteVentilateur(v, r, def)).join('') +
+      `<p class="note">${esc(def.note)}</p>`;
+  }
+
+  function carteVentilateur(v, r, def) {
+    const max = Math.max(v.haut, v.conseillee) * 1.12 || 1;
+    const pos = (x) => `${Math.max(0, Math.min(100, (x / max) * 100)).toFixed(2)}%`;
+    const lignes = v.reseaux.map((cle) => {
+      const x = r.reseaux[cle], p = x.probable;
+      const det = p.detail.map((d) => `<tr><td>${esc(d.libelle)}${d.nombre > 1 ? ` × ${fmt(d.nombre)}` : ''}</td><td class="n">${fmt(d.pa)}</td></tr>`).join('');
+      return `<tr class="st"><td>${esc(def.reseaux[cle].libelle)} <span class="mono" style="font-weight:400;color:var(--muted)">${fmt(x.debit)} m³/h</span></td><td class="n">${fmt(x.fourchette.probable)}</td></tr>
+        <tr><td>Gaines : ${fmt(Number(etat.saisies[etat.type][cle]?.longueur) || 0, 1)} ml × ${fmt(p.j, 2)} Pa/ml</td><td class="n">${fmt(p.lineaire)}</td></tr>
+        <tr><td>Accidents de forme (répartis + tronc à ${fmt(x.tronc.v, 1)} m/s)</td><td class="n">${fmt(p.forme)}</td></tr>${det}`;
+    }).join('');
+    return `<article class="vent">
+      <div class="etiq">${esc(v.nom)}</div>
+      <div class="chiffre"><strong>${fmt(v.conseillee)}</strong><span>Pa à demander</span></div>
+      <p class="aide">Valeur probable ${fmt(v.probable)} Pa + marge ${fmt(v.marge * 100)} %, arrondie à la dizaine supérieure.</p>
+      <div class="barre" aria-hidden="true">
+        <div class="axe"></div>
+        <div class="plage" style="left:${pos(v.bas)};width:calc(${pos(v.haut)} - ${pos(v.bas)})"></div>
+        <div class="marque" style="left:${pos(v.probable)}"></div>
+        <div class="marque cons" style="left:${pos(v.conseillee)}"></div>
+        <div class="lib" style="left:${pos(v.bas)}">${fmt(v.bas)}</div>
+        <div class="lib" style="left:${pos(v.haut)}">${fmt(v.haut)}</div>
+      </div>
+      <div class="trois">
+        <div><span class="etiq">Bas</span><b>${fmt(v.bas)}</b></div>
+        <div><span class="etiq">Probable</span><b>${fmt(v.probable)}</b></div>
+        <div><span class="etiq">Haut</span><b>${fmt(v.haut)}</b></div>
+      </div>
+      <div class="decomp"><table><thead><tr><th>Poste (valeur probable)</th><th class="n">Pa</th></tr></thead><tbody>${lignes}</tbody></table></div>
+      <p class="aide">Enveloppe si tous les postes sont au plus défavorable : ${fmt(v.envBas)} à ${fmt(v.envHaut)} Pa.</p>
+    </article>`;
+  }
+
+  // ---------- Ratios ----------
+  $('#c-rug').innerHTML = RUGOSITES.map(([x, l]) => `<option value="${x}" ${x === 0.15 ? 'selected' : ''}>${l}</option>`).join('');
+  function calculette() {
+    const debit = Number($('#c-debit').value) || 0, a = Number($('#c-a').value) || 0, b = Number($('#c-b').value) || 0;
+    const rug = Number($('#c-rug').value);
+    if (!(debit > 0 && a > 0)) { $('#c-sortie').innerHTML = '<p class="aide">Saisir un débit et une dimension.</p>'; return; }
+    const r = perteLineique({ debit, a, b: b || null, rugosite: rug });
+    const rv = b ? perteLineique({ debit, a, b, rugosite: rug, vitesseReelle: true }) : null;
+    $('#c-sortie').innerHTML = `
+      <div><span class="etiq">Vitesse</span><b>${fmt(r.v, 2)} m/s</b></div>
+      <div><span class="etiq">Perte linéique</span><b>${fmt(r.j, 2)} Pa/ml</b></div>
+      <div><span class="etiq">Pression dyn.</span><b>${fmt(r.pd, 1)} Pa</b></div>
+      <div><span class="etiq">Ø équivalent</span><b>${fmt(r.deq)} mm</b></div>
+      ${rv ? `<div><span class="etiq">j convention A</span><b>${fmt(rv.j, 2)} Pa/ml</b></div>` : ''}`;
+    dessinerMatrice();
+  }
+  ['#c-debit', '#c-a', '#c-b', '#c-rug'].forEach((s) => $(s).addEventListener('input', calculette));
+  $('#m-forme').addEventListener('change', dessinerMatrice);
+  function dessinerMatrice() {
+    const rug = Number($('#c-rug').value);
+    const rect = $('#m-forme').value === 'r';
+    const debits = [150, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 30000, 40000];
+    const vitesses = [2.5, 3, 4, 5, 6, 7, 8, 10, 12];
+    const classe = (j) => (j < 0.5 ? 'j1' : j < 1 ? 'j2' : j < 2 ? 'j3' : 'j4');
+    let h = `<table><thead><tr><th>Débit m³/h</th>${vitesses.map((v) => `<th class="n">≤ ${fmt(v, v % 1 ? 1 : 0)} m/s</th>`).join('')}</tr></thead><tbody>`;
+    for (const q of debits) {
+      h += `<tr><td class="n">${fmt(q)}</td>`;
+      for (const v of vitesses) {
+        let lib, r;
+        if (rect) { const s = rectanglePourVitesse(q, v); if (!s) { h += '<td>–</td>'; continue; } r = perteLineique({ debit: q, a: s.a, b: s.b, rugosite: rug }); lib = `${s.a}×${s.b}`; }
+        else { const d = diametrePourVitesse(q, v); r = perteLineique({ debit: q, a: d, rugosite: rug }); lib = `Ø${d}`; if (r.v > v * 1.001) { h += '<td>–</td>'; continue; } }
+        h += `<td class="${classe(r.j)}" title="${fmt(r.v, 2)} m/s">${fmt(r.j, 2)}<small>${lib}</small></td>`;
+      }
+      h += '</tr>';
+    }
+    $('#matrice').innerHTML = h + '</tbody></table>';
+  }
+
+  // ---------- Hypothèses ----------
+  const trio = (t) => t ? t.map((x) => fmt(x, x % 1 ? 2 : 0)).join(' / ') : 'j du tronc';
+  $('#h-regimes').innerHTML = `<table><thead><tr><th>Régime</th><th class="n">j (Pa/ml)</th><th class="n">kr</th><th class="n">ζb</th><th>Utilisé pour</th></tr></thead><tbody>
+    ${Object.entries(REGIMES).map(([k, r]) => `<tr><td>${esc(r.libelle)}</td><td class="n">${trio(r.jDim)}</td><td class="n">${trio(r.kr)}</td><td class="n">${trio(r.zb)}</td><td>${esc(Object.values(TYPES).flatMap((t) => Object.values(t.reseaux).filter((x) => x.regime === k).map((x) => x.libelle)).filter((x, i, a) => a.indexOf(x) === i).join(', '))}</td></tr>`).join('')}
+    </tbody></table><p class="aide">Valeurs données en bas / probable / haut.</p>`;
+  $('#h-part').innerHTML = `<table><thead><tr><th>Élément</th><th class="n">Bas</th><th class="n">Probable</th><th class="n">Haut</th><th>Sources</th></tr></thead><tbody>
+    ${[...Object.values(PARTICULIERS), ...Object.values(TERMINAUX).filter((t) => t.pa[2] > 0)].map((p) => `<tr><td>${esc(p.libelle)}</td>${p.pa.map((x) => `<td class="n">${fmt(x)}</td>`).join('')}<td>${esc(p.source)}</td></tr>`).join('')}
+    </tbody></table><p class="aide">Pertes en Pa par élément traversé sur le circuit le plus défavorisé. Source A, CCF : 26 Pa calculés en Ø200 à 340 m³/h, minimum retenu 10 Pa ; en rectangulaire ΔP(4 m/s) × V²/64.</p>`;
+
+  dessinerTypes();
+  dessinerSaisie();
+  calculer();
+  calculette();
+})();
+</script>
