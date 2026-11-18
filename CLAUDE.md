@@ -39,7 +39,8 @@ Ce fichier n'en est que le résumé opérationnel.
   `RDC`, `R+1`, `R+2`…, `TT` (toiture), ou code libre d'un niveau intermédiaire (`R+4-MEZZANINE` : lettres,
   chiffres, `+`, `-`, jamais `_` ni `.`). L'ordre des niveaux est enregistré (`ordre`) et modifiable.
 - Un carnet de plans multi-pages est découpé à l'import : une page = le plan d'un niveau.
-- Locaux : `_data/locaux/{uuid}.json`, rattachés à un plan, numéro unique dans le projet. Voir CONCEPTION §A.6 ter.
+- Locaux : `_data/locaux/{uuid}.json`, rattachés à un plan, **nom unique sur le plan** (le numéro n'est plus affiché ni
+  utilisé dans les noms depuis le 18/11/2026). Voir CONCEPTION §A.6 ter.
 - Repères `_data/reperes/`, photos `_data/photos/`, miniatures `_data/miniatures/`, panier `01_PHOTOS/_A-CLASSER/`.
   Le chemin d'une photo se déduit de son repère, de son local, de son niveau et de sa date (`cheminAttendu`) :
   après toute modification, `rangerPhotos` remet les fichiers en place. Voir CONCEPTION §A.6 quater.
@@ -52,7 +53,8 @@ Ce fichier n'en est que le résumé opérationnel.
 ```
 2026-XXX_NomProjet/
 ├── 00_PLANS/       XXX_R+1.pdf
-├── 01_PHOTOS/{NN}_{Niveau}/{Niveau}.{N°local}_{NomLocal}/XXX_{Niveau}.{N°local}_P001_AAAA-MM-JJ_01.jpg
+├── 01_PHOTOS/{NN}_{Niveau}/{Niveau}.{NomLocal}/XXX_{Niveau}.{NomLocal}_P001_AAAA-MM-JJ_01.jpg
+│   (hors local : {Niveau}.Hors-local/XXX_{Niveau}_P001_AAAA-MM-JJ_01.jpg)
 ├── 02_EXPORTS/
 └── _data/
 ```
@@ -62,9 +64,13 @@ Les noms triés alphabétiquement doivent donner l'ordre chronologique par repè
 ## Priorités fonctionnelles
 
 - Usages : **relevé d'existant, audit et suivi de chantier**.
-- Terrain : **2 appuis maximum par photo**. Appui long sur le plan = nouveau repère + appareil photo.
+- Terrain : **2 appuis maximum par photo**. Appui long sur le plan = nouveau repère (rattaché au local le plus proche,
+  modifiable dans la visée) + appareil photo.
+- **Bouton Retour du téléphone** : ne jamais faire quitter l'appli ; il ferme le dernier calque ouvert (`src/ui/retour.ts`,
+  `useRetour(actif, fermer, niveau)`). Tout nouvel écran, fiche ou mode doit s'y inscrire.
+- Alléger les boutons : pas de bouton Enregistrer ni Fermer quand le Retour ou la sortie du champ suffisent.
 - Photos compressées vers 1 à 1,5 Mo, **métadonnées EXIF conservées**.
-- Recherche par local (« chaufferie », « TGBT », « 012 »).
+- Recherche par local (« chaufferie », « TGBT »).
 - Pas de filtres par lot technique (CFO, CVC…) : jugés inutiles.
 
 ## Plan de réalisation (CONCEPTION §A.8)

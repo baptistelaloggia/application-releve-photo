@@ -21,19 +21,21 @@ describe('nommage', () => {
 import { dateLocale, nomDossierLocal, nomFichierPhoto, nomFichierPhotoAClasser, numeroRepere } from './nommage';
 describe('nommage des photos', () => {
   it('suit CONCEPTION §A.6', () => {
-    expect(nomDossierLocal('R+1', { numero: '012', nom: 'Local TGBT' })).toBe('R+1.012_Local-TGBT');
-    expect(nomDossierLocal('R+2', { numero: 'SF202', nom: 'SANIT. F' })).toBe('R+2.SF202_SANIT-F');
-    expect(nomDossierLocal('RDC', null)).toBe('RDC.000_Hors-local');
-    expect(nomFichierPhoto('XXX', 'R+1', '012', 'P001', '2026-10-30', 1)).toBe('XXX_R+1.012_P001_2026-10-30_01.jpg');
+    expect(nomDossierLocal('R+1', { nom: 'Local TGBT' })).toBe('R+1.Local-TGBT');
+    expect(nomDossierLocal('R+2', { nom: 'SANIT. F' })).toBe('R+2.SANIT-F');
+    expect(nomDossierLocal('RDC', null)).toBe('RDC.Hors-local');
+    expect(nomFichierPhoto('XXX', 'R+1', 'Local TGBT', 'P001', '2026-10-30', 1)).toBe('XXX_R+1.Local-TGBT_P001_2026-10-30_01.jpg');
+    expect(nomFichierPhoto('XXX', 'R+1', null, 'P001', '2026-10-30', 1)).toBe('XXX_R+1_P001_2026-10-30_01.jpg');
+    expect(nomFichierPhoto('XXX', 'R+2', 'Circulation B1', 'P004', '2026-11-18', 2, 'mp4')).toBe('XXX_R+2.Circulation-B1_P004_2026-11-18_02.mp4');
     expect(numeroRepere(7)).toBe('P007');
     expect(numeroRepere(1234)).toBe('P1234');
   });
   it('trie les photos d’un repère dans l’ordre chronologique', () => {
     const noms = [
-      nomFichierPhoto('XXX', 'R+1', '012', 'P001', '2027-03-15', 1),
-      nomFichierPhoto('XXX', 'R+1', '012', 'P002', '2026-10-30', 1),
-      nomFichierPhoto('XXX', 'R+1', '012', 'P001', '2026-10-30', 2),
-      nomFichierPhoto('XXX', 'R+1', '012', 'P001', '2026-10-30', 1),
+      nomFichierPhoto('XXX', 'R+1', 'TGBT', 'P001', '2027-03-15', 1),
+      nomFichierPhoto('XXX', 'R+1', 'TGBT', 'P002', '2026-10-30', 1),
+      nomFichierPhoto('XXX', 'R+1', 'TGBT', 'P001', '2026-10-30', 2),
+      nomFichierPhoto('XXX', 'R+1', 'TGBT', 'P001', '2026-10-30', 1),
     ];
     expect([...noms].sort()).toEqual([noms[3], noms[2], noms[0], noms[1]]);
   });

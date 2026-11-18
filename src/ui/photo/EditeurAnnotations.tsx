@@ -4,6 +4,7 @@ import type { Annotation, Photo } from '../../domaine/types';
 import type { EspaceProjet } from '../../projet/EspaceProjet';
 import { fabriquerCopieAnnotee } from '../../photo/annotation';
 import { texteErreur } from '../commun';
+import { useRetour } from '../retour';
 
 type Outil = 'ok' | 'nok' | 'bulle' | 'cercle' | 'trait';
 
@@ -210,6 +211,15 @@ export function EditeurAnnotations({ espace, photo, surFermer, surEnregistre }: 
   }
 
   const modifie = JSON.stringify(annotations) !== JSON.stringify(photo.annotations ?? []);
+  // Bouton Retour du téléphone : ferme l'éditeur (après confirmation s'il y a des modifications).
+  useRetour(
+    true,
+    () => {
+      if (modifie && !confirm('Abandonner les modifications ?')) return false;
+      surFermer();
+    },
+    4,
+  );
   const dessin = taille ? elementsSvg(enCours ? [...annotations, enCours] : annotations, taille.l, taille.h) : '';
 
   return (

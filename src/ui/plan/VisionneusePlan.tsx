@@ -20,6 +20,8 @@ export interface Marqueur {
   libelle: string;
   titre?: string;
   style: StyleMarqueur;
+  /** Local auquel est rattaché le repère sélectionné : entouré en rouge. */
+  associe?: boolean;
   /** Petit nombre affiché à côté de l'étiquette (nombre de photos d'un repère). */
   pastille?: number;
 }
@@ -127,7 +129,7 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
             <button
               key={m.id}
               type="button"
-              className={`marqueur marqueur-${m.style}`}
+              className={`marqueur marqueur-${m.style}${m.associe ? ' marqueur-associe' : ''}`}
               data-marqueur={m.id}
               data-x={m.x}
               data-y={m.y}

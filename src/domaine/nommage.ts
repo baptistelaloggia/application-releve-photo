@@ -73,32 +73,42 @@ export const DOSSIERS = {
   donnees: '_data',
 } as const;
 
-/** Numéro de local utilisé dans les noms quand le repère est hors local. */
-export const NUMERO_HORS_LOCAL = '000';
+/**
+ * Nom d'un local tel qu'il figure dans les noms de dossiers et de fichiers : « Local TGBT » →
+ * « Local-TGBT », « SANIT. F » → « SANIT-F », 30 caractères au plus.
+ * Depuis le 18/11/2026, le numéro du local n'y figure plus (CONCEPTION §A.6).
+ */
+export function nomLocalPourFichier(nom: string): string {
+  return nettoyerPourNom(nom.replace(/\./g, ' ')).slice(0, 30).replace(/-+$/, '') || 'Local';
+}
+
+/** Dossier des photos hors local, sous le dossier du niveau. */
+export const DOSSIER_HORS_LOCAL = 'Hors-local';
 
 /**
- * Dossier d'un local sous le dossier de son niveau : « R+1.012_Local-TGBT »,
- * ou « R+1.000_Hors-local » pour un repère qui n'est rattaché à aucun local.
+ * Dossier d'un local sous le dossier de son niveau : « R+1.Local-TGBT », ou « R+1.Hors-local »
+ * pour un repère qui n'est rattaché à aucun local.
  */
-export function nomDossierLocal(codeNiveau: string, local: { numero: string | null; nom: string } | null): string {
-  if (!local) return `${codeNiveau}.${NUMERO_HORS_LOCAL}_Hors-local`;
-  return `${codeNiveau}.${local.numero ?? NUMERO_HORS_LOCAL}_${nettoyerPourNom(local.nom.replace(/\./g, ' ')).slice(0, 40) || 'Local'}`;
+export function nomDossierLocal(codeNiveau: string, local: { nom: string } | null): string {
+  return `${codeNiveau}.${local ? nomLocalPourFichier(local.nom) : DOSSIER_HORS_LOCAL}`;
 }
 
 /**
- * Nom d'une photo : « XXX_R+1.012_P001_2026-10-30_01.jpg ».
+ * Nom d'une photo : « XXX_R+1.Local-TGBT_P001_2026-10-30_01.jpg » ; hors local :
+ * « XXX_R+1_P001_2026-10-30_01.jpg ».
  * Triés par ordre alphabétique, les noms d'un même repère se suivent dans l'ordre chronologique.
  */
 export function nomFichierPhoto(
   codeAffaire: string,
   codeNiveau: string,
-  numeroLocal: string | null,
+  nomLocal: string | null,
   numeroRepere: string,
   date: string,
   rang: number,
   extension = 'jpg',
 ): string {
-  return `${codeAffaire}_${codeNiveau}.${numeroLocal ?? NUMERO_HORS_LOCAL}_${numeroRepere}_${date}_${String(rang).padStart(2, '0')}.${extension}`;
+  const lieu = nomLocal === null ? codeNiveau : `${codeNiveau}.${nomLocalPourFichier(nomLocal)}`;
+  return `${codeAffaire}_${lieu}_${numeroRepere}_${date}_${String(rang).padStart(2, '0')}.${extension}`;
 }
 
 /** Nom d'une photo du panier : « XXX_A-CLASSER_2026-10-30_143512_3f2a.jpg » (unique, triable). */

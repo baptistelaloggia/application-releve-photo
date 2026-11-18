@@ -154,10 +154,48 @@ try {
   assert.ok(vY / hImage < 0.42, `V déplacé (y relatif ${(vY / hImage).toFixed(2)})`);
   await voile.locator('audio').waitFor();
   await tel.capture('2b-visionneuse');
-  await voile.getByRole('button', { name: 'Fermer' }).click();
+  // Bouton Retour du téléphone : ferme la visionneuse, puis la fiche du local.
+  await p.goBack();
+  await voile.waitFor({ state: 'detached' });
+  await p.goBack();
+  await p.getByRole('button', { name: '📷 Photo du local' }).waitFor({ state: 'detached' });
+
+  // Appui long sur le plan, près du LOCAL CTA : nouveau repère, rattaché d'office au local le plus
+  // proche (entouré en rouge), choix proposé dans une fenêtre de la visée.
+  const cta = await p.locator('.marqueur .marqueur-libelle', { hasText: 'LOCAL CTA' }).boundingBox();
+  await p.mouse.move(cta.x + cta.width / 2 + 30, cta.y + 70);
+  await p.mouse.down();
+  await p.waitForTimeout(800);
+  await p.mouse.up();
+  const fenetre = p.locator('.camera-rattachement.ouvert');
+  await fenetre.waitFor();
+  assert.match(await fenetre.innerText(), /P002 → LOCAL CTA/);
+  assert.match(await p.locator('.marqueur-associe').innerText(), /LOCAL CTA/);
+  await tel.capture('2d-rattachement');
+  await fenetre.getByRole('button', { name: 'Hors local' }).click();
+  await p.locator('.camera-local', { hasText: 'hors local' }).waitFor();
+  assert.equal(await p.locator('.marqueur-associe').count(), 0);
+  await fenetre.getByRole('button', { name: 'OK' }).click();
+  await p.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
+  await p.getByRole('button', { name: 'Prendre la photo' }).click();
+  await p.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 60_000 });
+  await p.goBack(); // retour au plan, fiche du repère ouverte
+  await p.locator('.camera').waitFor({ state: 'detached' });
+  await p.getByRole('heading', { name: 'Repère P002 · hors local' }).waitFor();
+  await p.goBack(); // fiche fermée
+  await p.getByRole('heading', { name: /Repère P002/ }).waitFor({ state: 'detached' });
+  // Menu « Affichage » : plus de choix numéro / nom ; le contenu reste dans la largeur de l'écran.
+  await p.getByText('Affichage', { exact: true }).click();
+  const menu = p.locator('.options-plan-contenu');
+  await menu.waitFor();
+  assert.equal(await menu.getByRole('button', { name: 'Numéro' }).count(), 0);
+  const bMenu = await menu.boundingBox();
+  assert.ok(bMenu.x >= 0 && bMenu.x + bMenu.width <= p.viewportSize().width + 1, 'menu Affichage dans l’écran');
+  await tel.capture('2e-affichage');
+  await p.getByText('Affichage', { exact: true }).click();
+
   // Photos importées volumineuses (bruit, environ 1,3 Mo chacune) : le paquet dépasse 9,4 Mo,
   // ce qui impose l'envoi en plusieurs morceaux.
-  await p.getByRole('button', { name: 'Fermer' }).first().click();
   await p.getByRole('tab', { name: /Panier/ }).click();
   const images = await p.evaluate(async () => {
     const liste = [];
@@ -197,8 +235,8 @@ try {
   await pc.capture('3-collecte');
   const arbo = await arborescenceOpfs(p, `simule-parent-projets/${dossier}/01_PHOTOS`);
   const jpg = arbo.filter((l) => l.endsWith('.jpg'));
-  assert.ok(jpg.some((l) => l.startsWith('01_R+1/R+1.R1-01_TGBT/T05_R+1.R1-01_P001_')), 'photos du TGBT rangées');
-  const tgbt = arbo.filter((l) => l.startsWith('01_R+1/R+1.R1-01_TGBT/')).map((l) => l.split('/').pop().replace(/^T05_R\+1\.R1-01_P001_\d{4}-\d{2}-\d{2}_/, ''));
+  assert.ok(jpg.some((l) => l.startsWith('01_R+1/R+1.TGBT/T05_R+1.TGBT_P001_')), 'photos du TGBT rangées');
+  const tgbt = arbo.filter((l) => l.startsWith('01_R+1/R+1.TGBT/')).map((l) => l.split('/').pop().replace(/^T05_R\+1\.TGBT_P001_\d{4}-\d{2}-\d{2}_/, ''));
   console.log(`Local TGBT : ${tgbt.join(', ')}`);
   assert.deepEqual(tgbt.filter((n) => n && !/^0[1-3]\.jpg$/.test(n)).map((n) => n.replace(/\.(wav|m4a|webm|ogg|mp4)$/, '.son-ou-video')).sort(), [
     '03_annote.jpg',
@@ -206,6 +244,7 @@ try {
     '04.son-ou-video',
   ]);
   assert.equal(jpg.filter((l) => l.startsWith('_A-CLASSER/')).length, 8);
+  assert.ok(jpg.some((l) => /^01_R\+1\/R\+1\.Hors-local\/T05_R\+1_P002_\d{4}-\d{2}-\d{2}_01\.jpg$/.test(l)), 'photo hors local rangée');
   g = await etatGraphe();
   assert.equal(g.fichiers.filter((f) => f.includes('/depots/')).length, 0, 'dépôt purgé après collecte');
 
@@ -213,7 +252,7 @@ try {
   await p.getByLabel('Rechercher un local').fill('tgbt');
   await p.locator('.resultats button').first().click();
   await p.getByLabel('Nom').fill('TGBT principal');
-  await p.getByRole('button', { name: 'Enregistrer' }).click();
+  await p.getByLabel('Nom').press('Enter'); // le nom s'enregistre, sans bouton Enregistrer
   await p.getByRole('button', { name: '← Projet' }).click();
   await p.getByRole('button', { name: 'Publier la copie de travail' }).click();
   await p.getByText(/Copie de travail publiée sur le transit/).first().waitFor();
@@ -222,7 +261,7 @@ try {
   await p.getByRole('button', { name: "Actualiser l'état" }).click();
   await p.getByText('· nouvelle version disponible').waitFor();
   await p.getByRole('button', { name: 'Mettre à jour la copie de travail' }).click();
-  await p.getByText(/Local mis à jour \(modification plus récente\) : R1-01 TGBT principal/).waitFor({ timeout: 60_000 });
+  await p.getByText(/Local mis à jour \(modification plus récente\) : TGBT principal/).waitFor({ timeout: 60_000 });
   await p.getByLabel('Rechercher un local').fill('principal');
   await p.locator('.resultats button', { hasText: 'TGBT principal' }).waitFor();
 

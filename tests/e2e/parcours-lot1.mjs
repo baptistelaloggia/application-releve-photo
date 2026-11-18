@@ -238,11 +238,17 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   const boite = await page.locator('.visionneuse').boundingBox();
   await page.mouse.click(boite.x + boite.width * 0.5, boite.y + boite.height * 0.3);
   await page.getByLabel('Nom').fill('Local CTA');
-  assert.equal(await page.getByLabel('Numéro').inputValue(), 'R1-01'); // numéro automatique proposé
-  await page.getByLabel('Numéro').fill('lt003');
-  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  assert.equal(await page.getByLabel('Numéro').count(), 0); // plus de numéro de local (18/11/2026)
+  await page.getByRole('button', { name: 'Créer le local' }).click();
   await page.locator('.marqueur-selection').filter({ hasText: 'Local CTA' }).waitFor({ state: 'attached' });
-  await page.getByRole('button', { name: 'Fermer' }).click();
+  // Plus de bouton Enregistrer ni Fermer : le nom s'enregistre en quittant le champ ; le bouton
+  // Retour (ici celui du navigateur) ferme la fiche sans quitter l'écran du plan.
+  await page.getByLabel('Nom').fill('Local CTA 2');
+  await page.getByLabel('Nom').press('Enter');
+  await page.locator('.marqueur-selection').filter({ hasText: 'Local CTA 2' }).waitFor({ state: 'attached' });
+  await page.goBack();
+  await page.locator('.marqueur-selection').waitFor({ state: 'detached' });
+  await page.getByRole('heading', { name: /Locaux de ce plan/ }).waitFor();
 
   // « Je tape TGBT, je trouve le local » depuis l'écran projet.
   await page.getByRole('button', { name: '← Projet' }).click();
