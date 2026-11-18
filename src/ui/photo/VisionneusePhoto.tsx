@@ -95,7 +95,7 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
       if (annoter || (e.target as HTMLElement).closest?.('textarea, input')) return;
       if (e.key === 'ArrowLeft') aller(index - 1);
       else if (e.key === 'ArrowRight') aller(index + 1);
-      else if (e.key === 'Escape') surFermer();
+      // Échap : géré comme le bouton Retour (ui/retour.ts).
     };
     window.addEventListener('keydown', clavier);
     return () => window.removeEventListener('keydown', clavier);

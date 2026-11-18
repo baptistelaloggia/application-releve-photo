@@ -23,6 +23,7 @@ import {
   numeroRepere,
   normaliserCodeAffaire,
   normaliserIndice,
+  nomLocalPourFichier,
 } from '../domaine/nommage';
 import { VERSION_SCHEMA, type Annotation, type Local, type NoteVocale, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
 import { nomDeBase, numeroterNomsEnDouble, proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
@@ -55,8 +56,6 @@ export interface AnnexesRecues {
   annotee?: Blob | null;
   note?: Blob | null;
 }
-/** Distance (relative à la page) au-delà de laquelle un repère n'est rattaché à aucun local. */
-const DISTANCE_RATTACHEMENT = 0.06;
 /** Écart entre deux niveaux dans le champ « ordre ». */
 const PAS_ORDRE = 10;
 /** Écritures simultanées pour les enregistrements groupés (détection des locaux…). */
@@ -563,7 +562,7 @@ export class EspaceProjet {
   locauxDuPlan(planId: string): Local[] {
     return this.locaux
       .filter((l) => l.planId === planId)
-      .sort((a, b) => (a.numero ?? a.nom).localeCompare(b.numero ?? b.nom, 'fr', { numeric: true }));
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { numeric: true }));
   }
 
   /** Contrôle une saisie ; renvoie la saisie nettoyée ou lève une erreur explicite. */
@@ -591,6 +590,20 @@ export class EspaceProjet {
     return { ...saisie, nom, numero };
   }
 
+  /**
+   * Le nom d'un local donne le nom de son dossier de photos (sans numéro, depuis le 18/11/2026) :
+   * deux locaux d'un même plan ne peuvent pas porter le même nom. Propose un nom libre.
+   */
+  private controlerNomLibre(planId: string, nom: string, idModifie?: string) {
+    const cle = (n: string) => nomLocalPourFichier(n).toUpperCase();
+    const autres = this.locaux.filter((l) => l.planId === planId && l.id !== idModifie);
+    if (!autres.some((l) => cle(l.nom) === cle(nom))) return;
+    const base = nomDeBase(nom);
+    let rang = 1;
+    while (autres.some((l) => cle(l.nom) === cle(`${base} ${String(rang).padStart(2, '0')}`))) rang++;
+    throw new Error(`Le nom « ${nom.trim()} » est déjà pris sur ce plan. Proposition : « ${base} ${String(rang).padStart(2, '0')} ».`);
+  }
+
   private async ecrireLocal(local: Local) {
     await ecrireJson(this.stockage, `${DOSSIER_LOCAUX}/${local.id}.json`, local);
     this.locaux = [...this.locaux.filter((l) => l.id !== local.id), local];
@@ -616,6 +629,7 @@ export class EspaceProjet {
   private construireLocal(planId: string, saisie: SaisieLocal, auteur: string, origine: Local['origine']): Local {
     if (!this.planParId(planId)) throw new Error('Plan introuvable.');
     const propre = this.controlerLocal(saisie);
+    this.controlerNomLibre(planId, propre.nom);
     const date = maintenant();
     return {
       schema: VERSION_SCHEMA,
@@ -634,10 +648,11 @@ export class EspaceProjet {
     const existant = this.locaux.find((l) => l.id === id);
     if (!existant) throw new Error('Local introuvable.');
     const propre = this.controlerLocal(saisie, id);
+    if (propre.nom !== existant.nom) this.controlerNomLibre(existant.planId, propre.nom, id);
     const local: Local = { ...existant, ...propre, modifieLe: maintenant(), modifiePar: auteur };
     await this.ecrireLocal(local);
-    // Le numéro et le nom du local figurent dans les noms des dossiers et des photos.
-    if (local.numero !== existant.numero || local.nom !== existant.nom) {
+    // Le nom du local figure dans les noms des dossiers et des photos.
+    if (local.nom !== existant.nom) {
       await this.rangerPhotos(this.photos.filter((p) => this.repereDe(p)?.localId === id));
     }
     // Le repère d'étiquette suit l'étiquette du local.
@@ -750,10 +765,14 @@ export class EspaceProjet {
     return this.photos.filter((p) => !p.repereId).sort((a, b) => b.prisLe.localeCompare(a.prisLe));
   }
 
-  /** Local le plus proche d'un point, s'il est assez près (les locaux sont des points, pas des contours). */
+  /**
+ * Local le plus proche d'un point (les locaux sont des points, pas des contours). Depuis le
+ * 18/11/2026, sans limite de distance : un nouveau repère est rattaché par défaut au local le plus
+ * proche, ce que l'utilisateur voit et peut changer aussitôt. null s'il n'y a aucun local sur le plan.
+ */
   localProche(planId: string, x: number, y: number): Local | null {
     let meilleur: Local | null = null;
-    let distance = DISTANCE_RATTACHEMENT;
+    let distance = Infinity;
     for (const l of this.locaux) {
       if (l.planId !== planId) continue;
       const d = Math.hypot(l.x - x, l.y - y);
@@ -871,7 +890,7 @@ export class EspaceProjet {
     return [
       this.dossierNiveau(niveau.code),
       nomDossierLocal(niveau.code, local),
-      nomFichierPhoto(this.projet.codeAffaire, niveau.code, local?.numero ?? null, repere.numero, photo.date, photo.rang, extensionPhoto(photo)),
+      nomFichierPhoto(this.projet.codeAffaire, niveau.code, local?.nom ?? null, repere.numero, photo.date, photo.rang, extensionPhoto(photo)),
     ].join('/');
   }
 
@@ -881,15 +900,6 @@ export class EspaceProjet {
     let rang = 1;
     while (pris.has(rang)) rang++;
     return rang;
-  }
-
-  /** Un local photographé doit avoir un numéro : il figure dans les noms de fichiers. */
-  private async numeroterLocalDuRepere(repereId: string | null, auteur: string) {
-    const repere = repereId ? this.reperes.find((r) => r.id === repereId) : undefined;
-    const local = repere?.localId ? this.locaux.find((l) => l.id === repere.localId) : undefined;
-    if (local && !local.numero) {
-      await this.modifierLocal(local.id, { ...local, numero: this.proposerNumero(local.planId) }, auteur);
-    }
   }
 
   /**
@@ -913,7 +923,6 @@ export class EspaceProjet {
     auteur: string,
   ): Promise<Photo> {
     if (entree.repereId && !this.reperes.some((r) => r.id === entree.repereId)) throw new Error('Repère introuvable.');
-    await this.numeroterLocalDuRepere(entree.repereId, auteur);
     const prisLe = entree.prisLe ?? new Date();
     const date = dateLocale(prisLe);
     const id = crypto.randomUUID();
@@ -951,11 +960,10 @@ export class EspaceProjet {
   }
 
   /** Classe une photo du panier sur un repère (ou la renvoie au panier avec null). */
-  async classerPhoto(photoId: string, repereId: string | null, auteur: string): Promise<Photo> {
+  async classerPhoto(photoId: string, repereId: string | null, _auteur: string): Promise<Photo> {
     const photo = this.photos.find((p) => p.id === photoId);
     if (!photo) throw new Error('Photo introuvable.');
     if (repereId && !this.reperes.some((r) => r.id === repereId)) throw new Error('Repère introuvable.');
-    await this.numeroterLocalDuRepere(repereId, auteur);
     const modifiee: Photo = {
       ...photo,
       repereId,
@@ -1120,6 +1128,75 @@ export class EspaceProjet {
     return compteRendu;
   }
 
+  /** Prises de vue qui ne sont pas à leur place (par exemple après le changement de nommage du 18/11/2026). */
+  photosARanger(): Photo[] {
+    return this.photos.filter((p) => {
+      try {
+        return this.cheminAttendu(p) !== p.fichier;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  /**
+   * Locaux d'un même plan qui portent le même nom (détectés avant le 17/11/2026, quand le numéro
+   * les distinguait) : leurs photos iraient dans un même dossier.
+   */
+  locauxEnDouble(): Local[][] {
+    const groupes = new Map<string, Local[]>();
+    for (const l of this.locaux) {
+      const cle = `${l.planId}|${nomLocalPourFichier(l.nom).toUpperCase()}`;
+      groupes.set(cle, [...(groupes.get(cle) ?? []), l]);
+    }
+    return [...groupes.values()].filter((g) => g.length > 1);
+  }
+
+  /** Renomme les locaux en double : « Open Space 01 », « Open Space 02 »… (de haut en bas, puis de gauche à droite). */
+  async nommerLocauxEnDouble(auteur: string): Promise<string[]> {
+    const compteRendu: string[] = [];
+    for (const groupe of this.locauxEnDouble()) {
+      const tries = [...groupe].sort((a, b) => Math.round((a.y - b.y) * 50) || a.x - b.x);
+      const pris = new Set(
+        this.locaux.filter((x) => x.planId === groupe[0].planId && !groupe.includes(x)).map((x) => nomLocalPourFichier(x.nom).toUpperCase()),
+      );
+      let rang = 1;
+      for (const l of tries) {
+        const base = nomDeBase(l.nom);
+        let nom = `${base} ${String(rang).padStart(2, '0')}`;
+        while (pris.has(nomLocalPourFichier(nom).toUpperCase())) nom = `${base} ${String(++rang).padStart(2, '0')}`;
+        rang++;
+        pris.add(nomLocalPourFichier(nom).toUpperCase());
+        await this.ecrireLocal({ ...l, nom, modifieLe: maintenant(), modifiePar: auteur });
+        compteRendu.push(`Local renommé (même nom qu'un autre local du plan) : ${l.nom} → ${nom}`);
+      }
+    }
+    return compteRendu;
+  }
+
+  /**
+   * Mise en conformité des noms (18/11/2026 : le numéro du local ne figure plus dans les noms) :
+   * locaux en double renommés, puis chaque photo remise à son chemin attendu, et les dossiers vidés supprimés.
+   */
+  async mettreAJourNoms(auteur: string, progression: (texte: string) => void = () => undefined): Promise<string[]> {
+    const compteRendu = await this.nommerLocauxEnDouble(auteur);
+    const aRanger = this.photosARanger();
+    let faites = 0;
+    for (const p of aRanger) {
+      await this.rangerPhotos([p]);
+      progression(`Photos renommées : ${++faites}/${aRanger.length}`);
+    }
+    if (aRanger.length) compteRendu.push(`${aRanger.length} photo(s) renommée(s) selon les nouveaux noms.`);
+    for (const niveau of this.niveaux) {
+      const dossier = this.dossierNiveau(niveau.code);
+      if (!(await this.stockage.existe(dossier))) continue;
+      for (const e of await this.stockage.lister(dossier)) {
+        if (e.type === 'dossier') await this.supprimerDossierSiVide(`${dossier}/${e.nom}`);
+      }
+    }
+    return compteRendu;
+  }
+
   /** Après renommage d'un dossier de niveau, met à jour le chemin des photos qu'il contient. */
   private async majCheminsPhotos(ancien: string, nouveau: string) {
     for (const p of this.photos.filter((x) => x.fichier.startsWith(ancien))) {
@@ -1147,7 +1224,7 @@ export class EspaceProjet {
    * ajoutées ensuite une à une par ajouterPhotoImportee à mesure que le paquet est lu.
    * pdfDuPlan : le PDF d'un plan nouveau, lu dans le paquet.
    */
-  async appliquerFusion(r: ResultatFusion, pdfDuPlan: (planId: string) => Blob | undefined, auteur: string): Promise<string[]> {
+  async appliquerFusion(r: ResultatFusion, pdfDuPlan: (planId: string) => Blob | undefined, _auteur: string): Promise<string[]> {
     const compteRendu = [...r.compteRendu];
     for (const n of r.niveaux) {
       this.niveaux.push(n);
@@ -1179,10 +1256,6 @@ export class EspaceProjet {
     // Locaux renommés ou renumérotés : leurs photos changent de nom.
     const locauxModifies = new Set(r.locaux.map((l) => l.id));
     compteRendu.push(...(await this.rangerPhotos(this.photos.filter((p) => locauxModifies.has(this.repereDe(p)?.localId ?? '')))));
-    // Un local qui va recevoir des photos doit avoir un numéro (il figure dans les noms de fichiers).
-    for (const repereId of new Set(r.photosNouvelles.flatMap((p) => (p.repereId ? [p.repereId] : [])))) {
-      await this.numeroterLocalDuRepere(repereId, auteur);
-    }
     return compteRendu;
   }
 

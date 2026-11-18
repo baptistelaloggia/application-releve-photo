@@ -131,10 +131,10 @@ try {
   });
   let arbo = await arborescenceOpfs(page, `${dossierProjet}/01_PHOTOS`);
   assert.deepEqual(arbo.filter((l) => l.endsWith('.jpg')), [
-    `01_R+1/R+1.R1-01_TGBT/T03_R+1.R1-01_P001_${jour}_01.jpg`,
-    `01_R+1/R+1.R1-01_TGBT/T03_R+1.R1-01_P001_${jour}_02.jpg`,
-    `01_R+1/R+1.R1-01_TGBT/T03_R+1.R1-01_P001_${jour}_03.jpg`,
-    `01_R+1/R+1.R1-02_BUREAUX/T03_R+1.R1-02_P002_${jour}_01.jpg`,
+    `01_R+1/R+1.BUREAUX/T03_R+1.BUREAUX_P002_${jour}_01.jpg`,
+    `01_R+1/R+1.TGBT/T03_R+1.TGBT_P001_${jour}_01.jpg`,
+    `01_R+1/R+1.TGBT/T03_R+1.TGBT_P001_${jour}_02.jpg`,
+    `01_R+1/R+1.TGBT/T03_R+1.TGBT_P001_${jour}_03.jpg`,
   ]);
 
   // 3. Mode avion : rechargement hors ligne, puis visite de NB_PHOTOS photos sur le repère P001.
@@ -238,10 +238,10 @@ try {
   await page.getByRole('tab', { name: 'Panier (0)', selected: true }).waitFor();
   await capture('4-photos-sur-etiquette');
   arbo = await arborescenceOpfs(page, `${dossierProjet}/01_PHOTOS`);
-  assert.deepEqual(arbo.filter((l) => l.startsWith('01_R+1/R+1.R1-03_LOCAL-CTA/') && l.endsWith('.jpg')), [
-    `01_R+1/R+1.R1-03_LOCAL-CTA/T03_R+1.R1-03_P003_2026-10-30_01.jpg`,
-    `01_R+1/R+1.R1-03_LOCAL-CTA/T03_R+1.R1-03_P003_${jour}_01.jpg`,
-    `01_R+1/R+1.R1-03_LOCAL-CTA/T03_R+1.R1-03_P003_${jour}_02.jpg`,
+  assert.deepEqual(arbo.filter((l) => l.startsWith('01_R+1/R+1.LOCAL-CTA/') && l.endsWith('.jpg')), [
+    `01_R+1/R+1.LOCAL-CTA/T03_R+1.LOCAL-CTA_P003_2026-10-30_01.jpg`,
+    `01_R+1/R+1.LOCAL-CTA/T03_R+1.LOCAL-CTA_P003_${jour}_01.jpg`,
+    `01_R+1/R+1.LOCAL-CTA/T03_R+1.LOCAL-CTA_P003_${jour}_02.jpg`,
   ]);
   // Le repère d'étiquette n'est pas dessiné : seul le compteur s'affiche sur l'étiquette du local.
   assert.equal(await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P003' }).count(), 0);
@@ -272,8 +272,8 @@ try {
   await page.getByRole('heading', { name: 'Repère P002' }).waitFor();
   await page.locator('.rattachement strong', { hasText: 'LOCAL CTA' }).waitFor();
   arbo = await arborescenceOpfs(page, `${dossierProjet}/01_PHOTOS`);
-  assert.ok(arbo.includes(`01_R+1/R+1.R1-03_LOCAL-CTA/T03_R+1.R1-03_P002_${jour}_02.jpg`), 'photos de P002 déplacées');
-  assert.ok(!arbo.some((l) => l.startsWith('01_R+1/R+1.R1-02_BUREAUX')), 'dossier des bureaux vidé et supprimé');
+  assert.ok(arbo.includes(`01_R+1/R+1.LOCAL-CTA/T03_R+1.LOCAL-CTA_P002_${jour}_02.jpg`), 'photos de P002 déplacées');
+  assert.ok(!arbo.some((l) => l.startsWith('01_R+1/R+1.BUREAUX')), 'dossier des bureaux vidé et supprimé');
 
   // Double appui sur l'étiquette du local LOCAL CTA : ses photos s'ouvrent (la plus récente affichée).
   await page.getByRole('button', { name: 'Fermer' }).first().click();
@@ -300,14 +300,14 @@ try {
   await page.getByRole('heading', { name: 'TGBT · R+1' }).waitFor();
   await page.getByRole('button', { name: 'Fermer' }).first().click();
   await page.locator('.marqueur .marqueur-libelle', { hasText: 'TGBT' }).click();
-  await page.getByText('R+1 · R1-01 TGBT · photo du local').waitFor();
+  await page.getByText('R+1 · TGBT · photo du local').waitFor();
   await declencher(1);
   await attendreEnregistrements();
   await page.getByRole('button', { name: '✕ Retour au plan' }).click();
   await page.getByRole('button', { name: '📷 Photo du local' }).waitFor();
 
   arbo = await arborescenceOpfs(page, `${dossierProjet}/01_PHOTOS`);
-  const nb = arbo.filter((l) => l.startsWith('01_R+1/R+1.R1-01_TGBT/') && l.endsWith('.jpg')).length;
+  const nb = arbo.filter((l) => l.startsWith('01_R+1/R+1.TGBT/') && l.endsWith('.jpg')).length;
   assert.equal(nb, 3 + NB_PHOTOS + 1);
   const donnees = await arborescenceOpfs(page, `${dossierProjet}/_data/photos`);
   assert.equal(donnees.length, 3 + NB_PHOTOS + 1 + 1 + 1 + 2 + 3 + 1);

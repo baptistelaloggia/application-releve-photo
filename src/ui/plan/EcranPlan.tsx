@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRetour } from '../retour';
 import type { LocalDetecte } from '../../domaine/locaux';
 import type { Local, Photo } from '../../domaine/types';
 import { dateLocale } from '../../domaine/nommage';
@@ -57,10 +58,21 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const [, setVersion] = useState(0);
   const vue = useRef<CommandesVisionneuse>(null);
   const [repereSel, setRepereSel] = useState<string | null>(null);
-  const [camera, setCamera] = useState<{ repereId: string | null } | null>(null);
+  /** Appareil photo ouvert ; nouveau : repère créé par appui long (son rattachement est proposé). */
+  const [camera, setCamera] = useState<{ repereId: string | null; nouveau?: boolean } | null>(null);
   const [onglet, setOnglet] = useState<'terrain' | 'locaux' | 'panier'>('terrain');
   const [photoOuverte, setPhotoOuverte] = useState<{ photos: Photo[]; index: number } | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  // Bouton Retour du téléphone (18/11/2026) : il annule le mode en cours, puis désélectionne le
+  // repère ou le local ; l'appareil photo et la visionneuse se ferment d'abord (niveau 3).
+  useRetour(!!selection, () => setSelection(null), 2);
+  useRetour(!!repereSel, () => setRepereSel(null), 2);
+  useRetour(mode.type !== 'consultation', () => setMode({ type: 'consultation' }), 2);
+  useRetour(!!photoOuverte, () => setPhotoOuverte(null), 3);
+  /** Fermeture de l'appareil photo par le bouton Retour : la visée termine d'abord les prises en cours. */
+  const fermetureCamera = useRef<(() => void) | null>(null);
+  useRetour(!!camera, () => (fermetureCamera.current ? fermetureCamera.current() : setCamera(null)), 3);
 
   // Le menu « Affichage » se ferme dès qu'on touche ailleurs (le plan, le panneau…).
   const menuAffichage = useRef<HTMLDetailsElement>(null);
@@ -185,18 +197,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
     [espace, espace.plans, espace.niveaux],
   );
 
-  // Texte des étiquettes sur le plan : numéro du local (par défaut) ou nom. Mémorisé sur l'appareil.
-  // Le nom par défaut : depuis le 17/11/2026, la détection ne garde plus le numéro des locaux.
-  const [etiquettes, setEtiquettes] = useState<'numero' | 'nom'>('nom');
-  useEffect(() => {
-    void lireReglage<'numero' | 'nom'>('etiquettes').then((v) => v && setEtiquettes(v));
-  }, []);
-  const choisirEtiquettes = (v: 'numero' | 'nom') => {
-    setEtiquettes(v);
-    void ecrireReglage('etiquettes', v);
-  };
-  const texteEtiquette = (l: { numero: string | null; nom: string }) =>
-    court(etiquettes === 'nom' ? l.nom : (l.numero ?? l.nom), etiquettes === 'nom' ? 22 : 16);
+  // Étiquettes sur le plan : le nom du local (le choix « numéro » est retiré le 18/11/2026).
+  const texteEtiquette = (l: { nom: string }) => court(l.nom, 22);
 
   async function executer(action: () => Promise<void>) {
     setErreur(null);
@@ -214,6 +216,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   // ------------------------------------------------------------ marqueurs
 
   const marqueurs: Marqueur[] = [];
+  // Repère sélectionné (ou en cours de prise de vue) : son local est entouré en rouge.
+  const repereAssocie = espace.reperes.find((r) => r.id === (repereSel ?? camera?.repereId) && !r.surEtiquette);
   const photographies = espace.locauxPhotographies(dateLocale(new Date()));
   for (const l of locaux) {
     if (mode.type === 'deplacement' && mode.localId === l.id) continue;
@@ -222,8 +226,9 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       x: l.x,
       y: l.y,
       libelle: texteEtiquette(l),
-      titre: [l.numero, l.nom].filter(Boolean).join(' · ') + (photographies.has(l.id) ? ' (photographié aujourd’hui)' : ''),
+      titre: l.nom + (photographies.has(l.id) ? ' (photographié aujourd’hui)' : ''),
       style: l.id === selection ? 'selection' : photographies.has(l.id) ? 'local-visite' : 'local',
+      associe: !!repereAssocie && repereAssocie.localId === l.id,
       pastille: espace.photosDuLocal(l.id).length || undefined,
     });
   }
@@ -235,7 +240,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         id: PREFIXE_REPERE + rep.id,
         x: rep.x,
         y: rep.y,
-        libelle: etiquettes === 'nom' && rep.libelle ? court(rep.libelle, 22) : rep.numero,
+        libelle: rep.libelle ? court(rep.libelle, 22) : rep.numero,
         titre: `${rep.numero}${rep.libelle ? ` · ${rep.libelle}` : ''}`,
         style: rep.id === repereSel ? 'repere-selection' : 'repere',
         pastille: espace.photosDuRepere(rep.id).length || undefined,
@@ -271,7 +276,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       const r = await espace.creerRepere(planId, x, y, auteur);
       setSelection(null);
       setRepereSel(r.id);
-      ouvrirCamera(r.id);
+      setCamera({ repereId: r.id, nouveau: true });
     });
   }
 
@@ -339,7 +344,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         const r = await espace.repereEtiquette(id, auteur);
         await espace.classerPhotos(photoIds, r.id, auteur);
         const l = espace.locaux.find((x) => x.id === id);
-        apresPlacement(photoIds.length, `le local ${l ? `${l.numero ?? ''} ${l.nom}`.trim() : ''}`);
+        apresPlacement(photoIds.length, `le local ${l?.nom ?? ''}`);
       });
       return;
     }
@@ -419,10 +424,28 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
     const rep = repereId ? espace.reperes.find((x) => x.id === repereId) : undefined;
     if (!rep) return 'Photo sans repère → panier à classer';
     const local = rep.localId ? espace.locaux.find((l) => l.id === rep.localId) : undefined;
-    if (rep.surEtiquette && local) return [niveau.code, `${local.numero ?? ''} ${local.nom}`.trim(), 'photo du local'].join(' · ');
-    return [rep.numero, niveau.code, local ? `${local.numero ?? ''} ${local.nom}`.trim() : 'hors local', rep.libelle]
+    if (rep.surEtiquette && local) return [niveau.code, local.nom, 'photo du local'].join(' · ');
+    return [rep.numero, niveau.code, local ? local.nom : 'hors local', rep.libelle]
       .filter(Boolean)
       .join(' · ');
+  }
+
+  /**
+   * Rattachement d'un repère, proposé dans la visée (18/11/2026) : le local associé par défaut
+   * (le plus proche), les autres locaux proches et « hors local ». Déplié d'office pour un nouveau repère.
+   */
+  function rattachementCamera(repereId: string | null, nouveau: boolean) {
+    const rep = repereId ? espace.reperes.find((x) => x.id === repereId) : undefined;
+    if (!rep || rep.surEtiquette) return undefined;
+    const local = rep.localId ? espace.locaux.find((l) => l.id === rep.localId) : undefined;
+    return {
+      repere: rep.numero,
+      local: local?.nom ?? null,
+      localId: rep.localId,
+      proches: espace.locauxProches(planId, rep.x, rep.y, 4).map((l) => ({ id: l.id, nom: l.nom })),
+      ouvert: nouveau,
+      surChoisir: (localId: string | null) => executer(async () => void (await espace.modifierRepere(rep.id, { localId }, auteur))),
+    };
   }
 
   const detecter = () =>
@@ -479,15 +502,6 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         <details className="options-plan" ref={menuAffichage}>
           <summary>Affichage</summary>
           <div className="options-plan-contenu">
-            <div className="bascule" role="group" aria-label="Texte des étiquettes">
-              <span className="discret">Étiquettes :</span>
-              <button className={etiquettes === 'numero' ? 'actif' : undefined} aria-pressed={etiquettes === 'numero'} onClick={() => choisirEtiquettes('numero')}>
-                Numéro
-              </button>
-              <button className={etiquettes === 'nom' ? 'actif' : undefined} aria-pressed={etiquettes === 'nom'} onClick={() => choisirEtiquettes('nom')}>
-                Nom
-              </button>
-            </div>
             <div className="bascule" role="group" aria-label="Appui sur un repère ou une étiquette">
               <span className="discret">Appui sur repère ou étiquette :</span>
               {(['photo', 'fiche'] as const).map((v) => (
@@ -608,8 +622,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
             <FicheLocal
               key="brouillon"
               titre="Nouveau local"
-              initial={{ nom: '', numero: espace.proposerNumero(planId), surface: null, x: mode.x, y: mode.y }}
-              numeroAutomatique
+              initial={{ nom: '', numero: null, surface: null, x: mode.x, y: mode.y }}
               occupe={occupe}
               surAnnuler={() => setMode({ type: 'consultation' })}
               surEnregistrer={(s) =>
@@ -643,7 +656,6 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 ) : undefined
               }
               initial={selectionne}
-              numeroPropose={selectionne.numero ? undefined : espace.proposerNumero(planId)}
               occupe={occupe}
               surAnnuler={() => setSelection(null)}
               surEnregistrer={(s) => executer(async () => void (await espace.modifierLocal(selectionne.id, s, auteur)))}
@@ -713,7 +725,6 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 setSelection(null);
                 setMode({ type: 'ajout' });
               }}
-              surNumeroter={() => executer(async () => surJournal(await espace.numeroterLocauxSansNumero(auteur, planId)))}
             />
             )}
             </>
@@ -726,6 +737,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
           espace={espace}
           auteur={auteur}
           titre={titreCamera(camera.repereId)}
+          rattachement={rattachementCamera(camera.repereId, !!camera.nouveau)}
+          fermeture={fermetureCamera}
           enAttente={enAttente}
           surCapture={(photo, source, prisLe) => enregistrerPhoto(photo, source, prisLe, camera.repereId)}
           surVideo={(fichier, source, prisLe, nom) => enregistrerVideo(fichier, source, prisLe, camera.repereId, nom)}
@@ -754,16 +767,13 @@ function ListeLocaux({
   surChoix,
   surDetecter,
   surAjouter,
-  surNumeroter,
 }: {
   locaux: Local[];
   occupe: boolean;
   surChoix: (l: Local) => void;
   surDetecter: () => void;
   surAjouter: () => void;
-  surNumeroter: () => void;
 }) {
-  const sansNumero = locaux.filter((l) => !l.numero).length;
   return (
     <>
       <div className="boutons">
@@ -773,11 +783,6 @@ function ListeLocaux({
         <button onClick={surAjouter} disabled={occupe}>
           + Ajouter un local
         </button>
-        {sansNumero > 0 && (
-          <button className="petit" onClick={surNumeroter} disabled={occupe}>
-            Numéroter les {sansNumero} sans numéro
-          </button>
-        )}
       </div>
       <h2>
         Locaux de ce plan <span className="discret">({locaux.length})</span>
@@ -792,7 +797,6 @@ function ListeLocaux({
             <li key={l.id}>
               <button onClick={() => surChoix(l)}>
                 <span>{l.nom}</span>
-                {l.numero && <span className="mono discret">{l.numero}</span>}
               </button>
             </li>
           ))}
@@ -877,6 +881,11 @@ function PanneauDetection({
   );
 }
 
+/**
+ * Fiche d'un local. Local existant (18/11/2026) : ni numéro, ni bouton Enregistrer ni Fermer.
+ * Le nom s'enregistre en quittant le champ (ou par Entrée) ; le bouton Retour du téléphone ferme
+ * la fiche (sur PC : Échap, ou la croix). Nouveau local : boutons Créer et Annuler.
+ */
 function FicheLocal({
   titre,
   local,
@@ -886,8 +895,6 @@ function FicheLocal({
   surAnnuler,
   surDeplacer,
   surSupprimer,
-  numeroAutomatique,
-  numeroPropose,
   photos,
 }: {
   titre: string;
@@ -895,10 +902,6 @@ function FicheLocal({
   photos?: ReactNode;
   local?: Local;
   initial: SaisieLocal;
-  /** Le numéro initial a été proposé automatiquement (nouveau local). */
-  numeroAutomatique?: boolean;
-  /** Numéro automatique proposé pour un local qui n'en a pas. */
-  numeroPropose?: string;
   occupe: boolean;
   surEnregistrer: (s: SaisieLocal) => void;
   surAnnuler: () => void;
@@ -906,51 +909,56 @@ function FicheLocal({
   surSupprimer?: () => void;
 }) {
   const [nom, setNom] = useState(initial.nom);
-  const [numero, setNumero] = useState(initial.numero ?? '');
+  // Le numéro et la surface ne se saisissent plus ; une valeur déjà enregistrée est conservée.
+  const enregistrer = () => {
+    if (nom.trim() && nom.trim() !== initial.nom) surEnregistrer({ ...initial, nom });
+  };
 
   return (
     <form
       className="fiche-local"
       onSubmit={(e) => {
         e.preventDefault();
-        // Surface : plus saisie (17/11/2026) ; une valeur déjà enregistrée est conservée.
-        surEnregistrer({ ...initial, nom, numero: numero.trim() || null });
+        if (local) {
+          enregistrer();
+          (document.activeElement as HTMLElement | null)?.blur();
+        } else if (nom.trim()) surEnregistrer({ ...initial, nom });
       }}
     >
-      <h2>{titre}</h2>
+      <div className="titre-fiche">
+        <h2>{titre}</h2>
+        {local && (
+          <button type="button" className="petit fermer-pc" aria-label="Fermer la fiche" title="Fermer (Échap)" onClick={surAnnuler}>
+            ✕
+          </button>
+        )}
+      </div>
       {photos}
       <label>
         Nom
-        <input value={nom} autoFocus={!local} maxLength={60} onChange={(e) => setNom(e.target.value)} />
+        <input
+          value={nom}
+          autoFocus={!local}
+          maxLength={60}
+          onChange={(e) => setNom(e.target.value)}
+          onBlur={() => local && enregistrer()}
+        />
       </label>
-      <div className="grille-formulaire">
-        <label>
-          Numéro
-          <input value={numero} maxLength={20} placeholder="facultatif" onChange={(e) => setNumero(e.target.value.toUpperCase())} />
-          {numeroPropose && !numero && (
-            <button type="button" className="petit" onClick={() => setNumero(numeroPropose)}>
-              Numéro automatique : {numeroPropose}
-            </button>
-          )}
-        </label>
-      </div>
-      {numeroAutomatique && numero === initial.numero && (
-        <p className="discret">Numéro attribué automatiquement : vous pouvez le modifier ou l'effacer.</p>
-      )}
-      {local && (
-        <p className="discret">
+      {local ? (
+        <p className="discret petit-texte">
           {local.origine === 'auto' ? 'Détecté sur le plan' : 'Placé à la main'} · modifié par {local.modifiePar} le{' '}
           {new Date(local.modifieLe).toLocaleDateString('fr-FR')}
         </p>
+      ) : (
+        <div className="boutons">
+          <button className="principal" disabled={!nom.trim() || occupe}>
+            Créer le local
+          </button>
+          <button type="button" onClick={surAnnuler}>
+            Annuler
+          </button>
+        </div>
       )}
-      <div className="boutons">
-        <button className="principal" disabled={!nom.trim() || occupe}>
-          Enregistrer
-        </button>
-        <button type="button" onClick={surAnnuler}>
-          {local ? 'Fermer' : 'Annuler'}
-        </button>
-      </div>
       {(surDeplacer || surSupprimer) && (
         <div className="boutons">
           {surDeplacer && (

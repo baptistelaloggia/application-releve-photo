@@ -170,6 +170,9 @@ button.projet .discret { font-size: 0.85rem; }
 .marqueur-selection { z-index: 2; --couleur: #e8743b; }
 .marqueur-selection .marqueur-libelle { font-size: 14px; font-weight: 600; }
 .marqueur-brouillon { --couleur: #e8743b; }
+/* Local du repère sélectionné (ou du nouveau repère) : entouré en rouge. */
+.marqueur-associe { z-index: 3; }
+.marqueur-associe .marqueur-libelle { outline: 3px solid #e0281e; outline-offset: 2px; box-shadow: 0 0 0 6px rgb(224 40 30 / 0.25); }
 .marqueur-candidat { --couleur: #1b6e3a; }
 .marqueur-candidat .marqueur-libelle { background: #fff; color: #1b6e3a; border: 2px dashed #1b6e3a; }
 .marqueur-candidat-ecarte { --couleur: #999; }
@@ -257,6 +260,19 @@ button.projet .discret { font-size: 0.85rem; }
   font-size: 0.85rem; text-shadow: 0 1px 2px #000; }
 .camera-derniere button { background: rgb(0 0 0 / 0.55); color: #fff; border-color: rgb(255 255 255 / 0.6); }
 .camera-annoter { position: absolute; inset: 0; z-index: 60; }
+/* Rattachement du repère (18/11/2026) : bien visible sous le titre ; fenêtre ouverte d'office pour un nouveau repère. */
+.camera-rattachement { position: absolute; left: 12px; right: 12px; top: 72px; z-index: 5; display: flex; flex-direction: column;
+  align-items: flex-start; gap: 8px; }
+.camera-local { background: rgb(0 0 0 / 0.6); color: #fff; border: 2px solid #e0281e; border-radius: 20px; padding: 6px 14px;
+  font-size: 0.95rem; }
+.camera-rattachement.ouvert .camera-rattachement-choix { background: rgb(255 255 255 / 0.96); color: #111; border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.4); max-width: 520px; }
+.camera-rattachement-choix .boutons { margin-top: 6px; }
+.camera-rattachement-choix button:not(.principal) { background: #fff; color: #111; }
+/* Fiches : croix de fermeture pour la souris seulement (au doigt : bouton Retour du téléphone). */
+.titre-fiche { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fermer-pc { display: none; }
+@media (hover: hover) and (pointer: fine) { .fermer-pc { display: inline-flex; } }
 
 .voile-photo { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.92); display: flex; flex-direction: column; }
 .photo-image { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; color: #ccc; }
@@ -303,13 +319,18 @@ button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
 .options-plan > summary::after { content: ' ▾'; color: var(--discret); }
 .options-plan-contenu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; display: grid; gap: 10px; padding: 12px;
   background: var(--carte); border: 1px solid var(--bord); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); white-space: nowrap; }
+.options-plan-contenu .bascule { flex-wrap: wrap; row-gap: 6px; }
 @media (max-width: 760px) {
   .barre-plan { gap: 6px; padding: 6px 8px; }
   .barre-plan select { max-width: 42vw; }
   .barre-plan > button, .options-plan > summary { padding: 0 10px; }
   .zone-vue { flex: 1 1 65%; }
   .panneau-plan { flex: 0 1 35%; padding: 8px 12px; }
-  .options-plan-contenu { left: auto; right: -60px; }
+  /* Sur téléphone : le menu se place sous la barre, dans la largeur de l'écran (18/11/2026). */
+  .options-plan { position: static; }
+  .barre-plan { position: relative; }
+  .options-plan-contenu { left: 8px; right: 8px; top: calc(100% - 4px); white-space: normal; }
+  .options-plan-contenu .bascule .discret { flex-basis: 100%; margin-bottom: 2px; }
 }
 .liste-panier li { grid-template-columns: 28px 72px 1fr; }
 .liste-panier li.choisie { background: var(--info-fond); border-radius: 8px; }

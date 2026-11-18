@@ -17,7 +17,7 @@ export function BarreRecherche({ espace, surChoix, autoFocus }: Props) {
         type="search"
         value={requete}
         autoFocus={autoFocus}
-        placeholder="Rechercher un local (TGBT, 012…)"
+        placeholder="Rechercher un local (TGBT, chaufferie…)"
         aria-label="Rechercher un local"
         onChange={(e) => setRequete(e.target.value)}
         onKeyDown={(e) => {
@@ -46,9 +46,7 @@ export function BarreRecherche({ espace, surChoix, autoFocus }: Props) {
                 }}
               >
                 <span className="res-niveau">{r.niveau.code}</span>
-                <span className="res-numero mono">{r.local.numero ?? '—'}</span>
                 <span className="res-nom">{r.local.nom}</span>
-                {r.local.surface !== null && <span className="discret">{String(r.local.surface).replace('.', ',')} m²</span>}
               </button>
             </li>
           ))}

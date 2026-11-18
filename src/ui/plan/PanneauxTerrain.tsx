@@ -66,7 +66,7 @@ export function PanneauTerrain({
                 <button onClick={() => surChoixRepere(r)}>
                   <span className="mono">{r.numero}</span>
                   <span>
-                    {local ? `${local.numero ?? ''} ${local.nom}`.trim() : 'Hors local'}
+                    {local ? local.nom : 'Hors local'}
                     {r.libelle && <span className="discret"> · {r.libelle}</span>}
                   </span>
                   <span className="discret">
@@ -115,10 +115,13 @@ export function FicheRepere({
   const localActuel = repere.localId ? espace.locaux.find((l) => l.id === repere.localId) : undefined;
   return (
     <div className="fiche-local">
-      <div className="titre-projet">
-        <h2>Repère {repere.numero}</h2>
-        <button className="petit" onClick={surFermer}>
-          Fermer
+      <div className="titre-fiche">
+        {/* Nom du local associé juste après le nom du repère (18/11/2026). */}
+        <h2>
+          Repère {repere.numero} · <span className={localActuel ? undefined : 'discret'}>{localActuel ? localActuel.nom : 'hors local'}</span>
+        </h2>
+        <button className="petit fermer-pc" aria-label="Fermer la fiche" title="Fermer (Échap)" onClick={surFermer}>
+          ✕
         </button>
       </div>
       <div className="boutons">
@@ -144,13 +147,13 @@ export function FicheRepere({
       ))}
       <div className="rattachement">
         <div>
-          Local : <strong>{localActuel ? `${localActuel.numero ?? ''} ${localActuel.nom}`.trim() : 'hors local'}</strong>
+          Local : <strong>{localActuel ? localActuel.nom : 'hors local'}</strong>
         </div>
         {proches.length > 0 && (
           <div className="boutons">
             {proches.map((l) => (
               <button key={l.id} className="petit puce" disabled={occupe} onClick={() => surModifier({ localId: l.id })} title="Rattacher à ce local">
-                {l.numero ?? '—'} · {l.nom}
+                {l.nom}
               </button>
             ))}
           </div>
@@ -171,7 +174,7 @@ export function FicheRepere({
           <option value="">Hors local</option>
           {locaux.map((l) => (
             <option key={l.id} value={l.id}>
-              {l.numero ?? '—'} · {l.nom}
+              {l.nom}
             </option>
           ))}
         </select>

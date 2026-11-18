@@ -6,6 +6,7 @@ import { activerHorsLigne } from '../pwa';
 import { Accueil } from './Accueil';
 import { NouveauProjet } from './NouveauProjet';
 import { EcranProjet } from './EcranProjet';
+import { useRetour } from './retour';
 import { Diagnostic } from './Diagnostic';
 import { ReglagesTransit } from './ReglagesTransit';
 
@@ -34,6 +35,8 @@ export function App() {
   const ouvert = (espace: EspaceProjet, connu: ProjetConnu, paquet?: File | null) =>
     setEcran({ type: 'projet', espace, connu, paquet });
   const accueil = () => setEcran({ type: 'accueil' });
+  // Retour du téléphone sur un écran autre que l'accueil : retour à l'accueil (sans quitter l'appli).
+  useRetour(ecran.type !== 'accueil', accueil, 0);
 
   return (
     <div className="appli">

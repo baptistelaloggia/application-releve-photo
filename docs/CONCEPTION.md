@@ -90,16 +90,28 @@ Règles :
 │   └── XXX_R+1.pdf
 ├── 01_PHOTOS/
 │   └── 02_R+1/       (numéro d'ordre du niveau devant le code : voir A.6 bis)
-│       ├── R+1.012_Local-TGBT/
-│       │   ├── XXX_R+1.012_P001_2026-10-30_01.jpg
-│       │   ├── XXX_R+1.012_P001_2027-03-15_01.jpg   (même repère, autre date)
-│       │   └── XXX_R+1.012_P002_2026-10-30_01.jpg
-│       └── R+1.013_Bureau/
+│       ├── R+1.Local-TGBT/
+│       │   ├── XXX_R+1.Local-TGBT_P001_2026-10-30_01.jpg
+│       │   ├── XXX_R+1.Local-TGBT_P001_2027-03-15_01.jpg   (même repère, autre date)
+│       │   └── XXX_R+1.Local-TGBT_P002_2026-10-30_01.jpg
+│       ├── R+1.Bureau/
+│       └── R+1.Hors-local/
+│           └── XXX_R+1_P003_2026-10-30_01.jpg   (repère hors local)
 ├── 02_EXPORTS/       (rapports PDF, listes Excel)
 └── _data/            (données de l'appli : un JSON par repère / photo / local)
 ```
 
 Principe : une fois les noms triés par ordre alphabétique, les photos d'un même repère se suivent dans l'ordre chronologique. Tout reste lisible sans l'appli.
+
+- **Sans numéro de local (décision du 18/11/2026, modifie la règle précédente `{Niveau}.{N°local}_{NomLocal}`)** :
+  - **Noms :** le dossier d'un local est `{Niveau}.{NomLocal}`, et une photo `{Projet}_{Niveau}.{NomLocal}_{P001}_{date}_{rang}.jpg`.
+  - **Nom du local :** il est nettoyé (accents, espaces et points remplacés) et coupé à 30 caractères.
+  - **Hors local :** dossier `{Niveau}.Hors-local`, photo `{Projet}_{Niveau}_{P001}_….jpg`.
+  - **Unicité :** deux locaux d'un même plan ne peuvent plus porter le même nom ; l'appli refuse et propose « … 02 ». Le numéro de repère (`P001`, unique dans le projet) garantit l'unicité des noms de photos.
+  - **Projets existants :** un bandeau de l'écran Projet propose « Mettre à jour les noms ». Il fait deux choses :
+    - les locaux de même nom sur un plan, distingués jusqu'ici par leur numéro, sont renommés « Open Space 01 », « 02 »… ;
+    - toutes les photos sont renommées et rangées selon la nouvelle règle, et les dossiers vidés sont supprimés.
+  - **Champ `numero` :** il reste dans les données (recherche, anciens projets), mais ne s'affiche ni ne se saisit plus.
 
 ## A.6 bis Codes de niveau (décidé le 04/11/2026)
 
@@ -114,7 +126,7 @@ Principe : une fois les noms triés par ordre alphabétique, les photos d'un mê
 Règles (validées le 04/11/2026) :
 - **Sous-sols** : `SS1`, `SS2`… (`SS1` étant le plus proche du RDC). **Un seul sous-sol : `SS1`** (décidé le 04/11/2026 ; le code `SS` seul n'est plus utilisé, une saisie « SS » devient `SS1`).
 - **Nom des plans** : `{Projet}_{Niveau}.pdf`, par exemple `XXX_R+1.pdf`. Ni indice ni lot dans le nom.
-- **Ordre dans l'Explorateur Windows** : les dossiers de niveau sous `01_PHOTOS/` portent un **numéro d'ordre à 2 chiffres** devant le code, attribué par l'appli dans l'ordre du bâtiment (du plus bas au plus haut), par exemple `00_SS2`, `01_SS1`, `02_ES`, `03_RDC`, `04_R+1`… `NN_TT`. **Seuls ces dossiers** portent ce numéro. Les noms des plans, des dossiers de locaux et des photos gardent le code seul (`XXX_R+1.012_P001_…jpg`).
+- **Ordre dans l'Explorateur Windows** : les dossiers de niveau sous `01_PHOTOS/` portent un **numéro d'ordre à 2 chiffres** devant le code, attribué par l'appli dans l'ordre du bâtiment (du plus bas au plus haut), par exemple `00_SS2`, `01_SS1`, `02_ES`, `03_RDC`, `04_R+1`… `NN_TT`. **Seuls ces dossiers** portent ce numéro. Les noms des plans, des dossiers de locaux et des photos gardent le code seul (`XXX_R+1.Local-TGBT_P001_…jpg`).
 
 Règles complémentaires (validées le 04/11/2026) :
 - **Indices des plans** : l'indice courant est enregistré dans les données de l'appli (`_data/plans/{uuid}.json`). À chaque nouvel indice, le PDF remplacé est déplacé dans `00_PLANS/_ANCIENS/` sous le nom `{Projet}_{Niveau}_Ind-{Indice}.pdf`.
@@ -149,22 +161,35 @@ Règles issues du lot 1 (04/11/2026) :
   - **Nouvelle détection :** elle reconnaît « LT 02 » comme « LT » à la même place et ne le recrée pas.
   - **Surface :** elle n'est plus saisie dans la fiche du local. Une valeur déjà enregistrée est conservée dans `_data/`.
   - **Étiquettes sur le plan :** elles affichent le nom par défaut.
-  - **Numéro dans les noms de fichiers :** il reste nécessaire, car il garantit des chemins uniques et stables. À la première photo d'un local sans numéro, l'appli lui attribue un **numéro automatique** (`R1-01`, `R1-02`…, §A.6 quater), ce qui donne par exemple `R+1.R1-03_LT-02/XXX_R+1.R1-03_P004_…jpg`. [À VÉRIFIER avec l'utilisateur : faut-il retirer ce numéro des noms de dossiers et de fichiers, et ne garder que le nom ? Ce serait une modification de §A.6.]
+  - **Numéro dans les noms de fichiers :** retiré le 18/11/2026, à la demande de l'utilisateur (voir §A.6). Le numéro n'est plus attribué automatiquement à la première photo. La fiche du local ne montre plus le numéro ; elle n'a plus non plus de bouton Enregistrer ni Fermer : le nom s'enregistre en quittant le champ, et le bouton Retour du téléphone ferme la fiche (sur PC : Échap ou la croix).
 - **Numéro unique** dans le projet ; nom obligatoire.
 - **Numéro automatique** (10/11/2026) : à la création d'un local, l'appli propose le premier numéro libre du niveau, sous la forme `{niveau sans +}-{rang}` (`R2-01`, `RDC-03`, `SS1-12`, `R4-MEZ-01`), modifiable ou effaçable. Un local sans numéro peut en recevoir un d'un clic.
 - **Étiquettes sur le plan** : placées au-dessus de l'étiquette du local dessinée sur le plan, pour la laisser lisible. Elles affichent au choix le numéro ou le nom (choix mémorisé sur l'appareil).
 - **Détection sur tous les plans** : un récapitulatif par niveau (locaux sûrs, noms seuls à vérifier, déjà présents) est présenté avant l'enregistrement.
 - **Recherche** : par nom, numéro et code de niveau, sans tenir compte des accents ni de la casse (« tgbt », « 012 », « cta ss1 »). Le numéro exact passe en premier.
 - **Affichage des plans** : image de fond de la page entière, puis tuiles de 512 px calculées à la demande pour le zoom courant (jusqu'à 8 pixels par point PDF). Le zoom se fait à la molette, au pincement ou au double appui.
-- [À VÉRIFIER, à trancher avant le lot 3] **Locaux sans numéro** (par ex. « BUREAUX » en plateau) : le dossier photos prévu est `{Niveau}.{N°local}_{NomLocal}`. Il faut décider comment nommer le dossier d'un local sans numéro.
+- **Locaux sans numéro** : tranché le 18/11/2026. Plus aucun numéro de local dans les noms : voir §A.6.
 
 ## A.6 quater Repères et photos (lot 3, 10/11/2026)
 
-- **Repère** : `_data/reperes/{uuid}.json` (plan, local de rattachement ou aucun, numéro `P001`… unique dans le projet, libellé facultatif, position relative). À sa création, il est rattaché au **local le plus proche**, s'il est à moins de 6 % de la page [À VÉRIFIER sur le terrain : les locaux sont des points, pas des contours]. Le local se corrige dans la fiche du repère.
+- **Repère** : `_data/reperes/{uuid}.json` (plan, local de rattachement ou aucun, numéro `P001`… unique dans le projet, libellé facultatif, position relative). À sa création, il est rattaché au **local le plus proche**, **sans limite de distance** depuis le 18/11/2026 (avant : à moins de 6 % de la page).
+  - **Fenêtre de rattachement :** à la création par appui long, la visée ouvre d'office une fenêtre « 📍 P004 → Circulation B1 ». Elle propose les autres locaux proches et « Hors local » en un appui, puis OK. Elle n'empêche pas de déclencher (2 appuis par photo).
+  - **Sur le plan :** le local du repère sélectionné (ou en cours de prise de vue) est **entouré en rouge**.
+  - **Fiche du repère :** son titre donne le nom du local après celui du repère (« Repère P004 · Circulation B1 »).
+  - **Correction :** le local se corrige aussi dans la fiche du repère.
 - **Photo** : `_data/photos/{uuid}.json` (repère ou panier, chemin du JPEG, miniature, date du jour, heure, auteur, rang, dimensions, taille, empreinte SHA-256, commentaire, source : appli, appareil du téléphone ou import). Miniature de 320 px dans `_data/miniatures/{uuid}.jpg`.
-- **Rangement** : `01_PHOTOS/{NN}_{Niveau}/{Niveau}.{N°local}_{NomLocal}/{Projet}_{Niveau}.{N°local}_{P001}_{AAAA-MM-JJ}_{rang}.jpg`. Hors local : `{Niveau}.000_Hors-local`. Un local photographé sans numéro reçoit un numéro automatique à sa 1re photo. Quand un local, un repère ou un niveau change, les photos concernées sont renommées et déplacées automatiquement ; un dossier de local vidé est supprimé.
+- **Rangement** (18/11/2026) : `01_PHOTOS/{NN}_{Niveau}/{Niveau}.{NomLocal}/{Projet}_{Niveau}.{NomLocal}_{P001}_{AAAA-MM-JJ}_{rang}.jpg`. Hors local : dossier `{Niveau}.Hors-local`, photo `{Projet}_{Niveau}_{P001}_….jpg`. Quand un local, un repère ou un niveau change, les photos concernées sont renommées et déplacées automatiquement ; un dossier de local vidé est supprimé.
 - **Panier à classer** : `01_PHOTOS/_A-CLASSER/{Projet}_A-CLASSER_{date}_{heure}_{id}.jpg`. On coche une ou plusieurs photos (MAJ + clic coche toutes les photos entre deux), puis on les place d'un coup : sur l'étiquette d'un local, sur un repère existant, ou sur le plan, ce qui crée un repère. Après chaque placement, l'appli revient sur l'onglet Panier pour enchaîner.
 - **Photos sur l'étiquette du local** (10/11/2026) : chaque local peut avoir un **repère d'étiquette** (`surEtiquette: true`), placé sur son étiquette et créé à la première photo. Il n'est pas dessiné comme un repère : le nombre de photos s'affiche sur l'étiquette du local. Accès : appui long sur l'étiquette (photo directe), bouton « Photo du local » dans la fiche, ou placement depuis le panier. Il suit l'étiquette si on la déplace ; si le local est supprimé, il redevient un repère ordinaire, hors local.
+- **Bouton Retour du téléphone** (18/11/2026) : il ne fait plus quitter l'appli. Il ferme ce qui est ouvert, du plus récent au plus ancien, jusqu'à l'accueil :
+  - l'éditeur d'annotations (confirmation s'il y a des modifications) ;
+  - l'appareil photo (après la fin des prises en cours) ou la visionneuse ;
+  - le mode en cours (ajout, déplacement, classement…) ;
+  - la fiche du repère ou du local ;
+  - le plan (retour au projet), puis le projet (retour à l'accueil).
+
+  Sur PC, la touche Échap fait de même. Techniquement, chaque calque ajoute une entrée à l'historique du navigateur (`src/ui/retour.ts`).
+- **Étiquettes** : toujours le nom du local ; le choix « Numéro / Nom » du menu Affichage est retiré (18/11/2026). Ce menu reste dans la largeur de l'écran du téléphone.
 - **Appui sur un repère ou sur l'étiquette d'un local** (réglage « Affichage ») : « Photo » (par défaut) ouvre l'appareil photo, et l'appui long ouvre la fiche ; « Fiche » fait l'inverse.
 - **Double appui** sur un repère ou sur l'étiquette d'un local (16/11/2026) : ouvre ses photos, la plus récente en premier. Le simple appui n'est traité qu'après 0,28 s, le temps de distinguer un double appui. Le tableau des niveaux indique aussi le nombre de photos de chaque plan.
 - **Rattachement rapide d'un repère à un local** : la fiche du repère propose les 3 locaux les plus proches en un appui, ou « Choisir le local sur le plan », puis un appui sur l'étiquette du local. Les photos sont alors renommées et déplacées.
@@ -217,7 +242,7 @@ Règles issues du lot 1 (04/11/2026) :
 
 ## A.6 octies Vidéos, annotations dessinées et notes vocales (17/11/2026)
 
-- **Vidéos.** Une vidéo est une prise de vue comme une photo : même repère, même date, même rang, même nommage, avec une autre extension. Exemple : `XXX_R+1.012_P001_2026-11-17_04.mp4`. Dans `_data/photos/{id}.json`, elle porte `type: "video"`, `extension` (`mp4` ou `webm`) et `duree` en secondes.
+- **Vidéos.** Une vidéo est une prise de vue comme une photo : même repère, même date, même rang, même nommage, avec une autre extension. Exemple : `XXX_R+1.Local-TGBT_P001_2026-11-17_04.mp4`. Dans `_data/photos/{id}.json`, elle porte `type: "video"`, `extension` (`mp4` ou `webm`) et `duree` en secondes.
   - **Prise de vue :** bouton **Photo / Vidéo** dans la visée. En mode vidéo, la définition passe en 720p avec le son, à environ 2,5 Mbit/s, soit environ 20 Mo par minute [À VÉRIFIER sur téléphone].
   - **Durée :** 3 minutes au plus par vidéo.
   - **Format :** l'appli enregistre en MP4 quand le navigateur le sait, sinon en WebM.

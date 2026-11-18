@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { Photo } from '../../domaine/types';
 import type { EspaceProjet } from '../../projet/EspaceProjet';
 import { cameraDisponible, fermerCamera, ouvrirCamera, prendrePhoto, texteErreurCamera } from '../../photo/camera';
@@ -29,6 +29,20 @@ interface Props {
   /** Enregistre une vidéo. */
   surVideo: (video: Blob, source: 'appli' | 'appareil', prisLe: Date, nomOrigine?: string) => Promise<Photo | null>;
   surFermer: () => void;
+  /**
+   * Rattachement du repère photographié à un local (18/11/2026). Pour un nouveau repère, la fenêtre
+   * est ouverte d'office : local associé par défaut (le plus proche), autres locaux proches, hors local.
+   */
+  rattachement?: {
+    repere: string;
+    local: string | null;
+    localId: string | null;
+    proches: Array<{ id: string; nom: string }>;
+    ouvert: boolean;
+    surChoisir: (localId: string | null) => Promise<void> | void;
+  };
+  /** Reçoit la fonction de fermeture (pour le bouton Retour du téléphone). */
+  fermeture?: MutableRefObject<(() => void) | null>;
 }
 
 type Mode = 'photo' | 'video';
@@ -37,7 +51,8 @@ type Mode = 'photo' | 'video';
  * Visée plein écran : déclencheur, rafale, mode vidéo, retour au plan.
  * Après une prise de vue, deux raccourcis sur la dernière : « Annoter » et « Note vocale ».
  */
-export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, surVideo, surFermer }: Props) {
+export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, surVideo, surFermer, rattachement, fermeture }: Props) {
+  const [rattachementOuvert, setRattachementOuvert] = useState(!!rattachement?.ouvert);
   const video = useRef<HTMLVideoElement>(null);
   const flux = useRef<MediaStream | null>(null);
   const micro = useRef<MediaStream | null>(null);
@@ -169,6 +184,13 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
     await arreterVideo();
     void file.current.then(surFermer);
   };
+  if (fermeture) fermeture.current = () => void fermer();
+  useEffect(
+    () => () => {
+      if (fermeture) fermeture.current = null;
+    },
+    [fermeture],
+  );
 
   const enVideo = mode === 'video';
   return (
@@ -182,6 +204,35 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
         <div className="camera-titre">{titre}</div>
         {tournage && <div className="camera-tournage">● {dureeLisible(tournage.secondes)}</div>}
       </div>
+      {rattachement && !tournage && (
+        <div className={`camera-rattachement${rattachementOuvert ? ' ouvert' : ''}`} role={rattachementOuvert ? 'dialog' : undefined} aria-label="Local du repère">
+          <button className="camera-local" onClick={() => setRattachementOuvert(!rattachementOuvert)} aria-expanded={rattachementOuvert}>
+            📍 {rattachement.repere} → <strong>{rattachement.local ?? 'hors local'}</strong> {rattachementOuvert ? '▴' : '▾'}
+          </button>
+          {rattachementOuvert && (
+            <div className="camera-rattachement-choix">
+              <span className="petit-texte">Associé par défaut au local le plus proche. Autre choix :</span>
+              <div className="boutons">
+                {rattachement.proches
+                  .filter((l) => l.id !== rattachement.localId)
+                  .map((l) => (
+                    <button key={l.id} className="petit" onClick={() => void rattachement.surChoisir(l.id)}>
+                      {l.nom}
+                    </button>
+                  ))}
+                {rattachement.localId && (
+                  <button className="petit" onClick={() => void rattachement.surChoisir(null)}>
+                    Hors local
+                  </button>
+                )}
+                <button className="petit principal" onClick={() => setRattachementOuvert(false)}>
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {erreur && <div className="camera-erreur">{erreur}</div>}
       {derniere && !tournage && (
         <div className="camera-derniere">

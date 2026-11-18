@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRetour } from './retour';
 import { normaliserCodeNiveau } from '../domaine/niveaux';
 import type { EspaceProjet } from '../projet/EspaceProjet';
 import type { ProjetConnu } from '../stockage/registre';
@@ -36,8 +37,13 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
   const [detectionGlobale, setDetectionGlobale] = useState(false);
   // Paquet reçu à l'ouverture : lu une seule fois (pas à chaque retour depuis un plan).
   const [paquet, setPaquet] = useState<File | null>(paquetInitial ?? null);
-  const sansNumero = espace.locaux.filter((l) => !l.numero).length;
   const [planOuvert, setPlanOuvert] = useState<{ planId: string; localId: string | null } | null>(null);
+  // Retour du téléphone sur un plan : retour à l'écran du projet.
+  useRetour(!!planOuvert, () => setPlanOuvert(null), 1);
+  // Noms à mettre à jour : photos rangées sous l'ancien nommage (avec numéro de local), ou locaux
+  // de même nom sur un plan (18/11/2026).
+  const nbARanger = espace.photosARanger().length;
+  const nbEnDouble = espace.locauxEnDouble().reduce((n, g) => n + g.length, 0);
   const [occupe, setOccupe] = useState(false);
   const { projet } = espace;
 
@@ -108,6 +114,16 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
               onClick={() => void executer(() => espace.reparer(auteur, preparerMiniature))}
             >
               Réparer
+            </button>
+          </Message>
+        )}
+        {(nbARanger > 0 || nbEnDouble > 0) && (
+          <Message type="info">
+            Le numéro des locaux ne figure plus dans les noms des dossiers et des photos.{' '}
+            {nbEnDouble > 0 && `${nbEnDouble} locaux portent le même nom qu'un autre local de leur plan : ils seront numérotés (« Open Space 01 », « 02 »…). `}
+            {nbARanger > 0 && `${nbARanger} photo(s) à renommer. `}
+            <button className="petit" disabled={occupe} onClick={() => void executer(() => espace.mettreAJourNoms(auteur))}>
+              Mettre à jour les noms
             </button>
           </Message>
         )}
@@ -279,18 +295,6 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
             <button onClick={() => setDetectionGlobale(true)} disabled={occupe}>
               Détecter les locaux sur tous les plans…
             </button>
-            {sansNumero > 0 && (
-              <button
-                disabled={occupe}
-                onClick={() => {
-                  if (confirm(`Attribuer un numéro automatique (« R2-04 »…) aux ${sansNumero} locaux qui n'en ont pas ?`)) {
-                    void executer(() => espace.numeroterLocauxSansNumero(auteur));
-                  }
-                }}
-              >
-                Numéroter les locaux sans numéro ({sansNumero})
-              </button>
-            )}
           </div>
         )}
       </section>
