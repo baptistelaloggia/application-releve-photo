@@ -10,10 +10,11 @@
     "build:test": "tsc -b && vite build --mode fichier-unique",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/parcours-lot1.mjs && node --experimental-strip-types --no-warnings tests/e2e/terrain-lot3.mjs && node tests/e2e/synchro-lot4.mjs && node tests/e2e/transit-lot5.mjs && node --experimental-strip-types --no-warnings tests/e2e/suivi-lot6.mjs"
+    "test:e2e": "node tests/e2e/parcours-lot1.mjs && node --experimental-strip-types --no-warnings tests/e2e/terrain-lot3.mjs && node tests/e2e/synchro-lot4.mjs && node tests/e2e/transit-lot5.mjs && node --experimental-strip-types --no-warnings tests/e2e/suivi-lot6.mjs && node --experimental-strip-types --no-warnings tests/e2e/regroupement-panier.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "5.27.0",
+    "@mediapipe/tasks-vision": "1.2.3",
     "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "pdf-lib": "^1.17.1",

@@ -102,12 +102,16 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   `src/projet/importPaquet.ts`. Transit SharePoint (lot 5) : `src/transit/` (réglages, connexion MSAL, client
   Graph `TransitGraph`, protocole), écrans `src/ui/ReglagesTransit.tsx` et `src/ui/TransitProjet.tsx`.
   Note à la DSI : `docs/NOTE_DSI.md`.
+  Regroupement des photos du panier (CONCEPTION §A.6 nonies) : règles `src/domaine/regroupement.ts`, reconnaissance
+  visuelle sur l'appareil `src/photo/reconnaissance.ts` (MediaPipe, modèle `public/reconnaissance/`, moteur recopié par
+  `vite.config.ts`), vue « Par groupes » `src/ui/photo/RegroupementPanier.tsx`. GPS de l'EXIF : `lirePositionGps`.
 - Toute écriture dans le dossier projet passe par `EspaceProjet` et l'interface `Stockage`, jamais directement.
 - `npm test` : tests unitaires. `npm run build && npm run build:test && npm run test:e2e` : parcours complet
   dans Chromium (dont `terrain-lot3.mjs` : 300 photos en mode avion, fausse caméra ; `NB_PHOTOS` pour réduire).
   `synchro-lot4.mjs` : aller-retour PC ↔ téléphone par paquets (`NB_SYNCHRO` photos).
   `transit-lot5.mjs` : échanges par le transit, contre une imitation de Microsoft Graph (`tests/e2e/outils.mjs`).
   `suivi-lot6.mjs` : calque, avant / après, direction (même cadrage à 2 dates).
+  `regroupement-panier.mjs` : regroupement et rattachement des photos importées.
   `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
 - Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.
 - Les réglages SharePoint (tenant ID, client ID, site) se saisissent dans l'appli et restent sur l'appareil :

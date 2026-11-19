@@ -44,7 +44,7 @@ export function pdfFictif(texte, etiquettes = []) {
 
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.json': 'application/json',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.wasm': 'application/wasm',
 };
 
 /** Petit serveur web de fichiers statiques. */

@@ -1,0 +1,8 @@
+Reconnaissance visuelle sur l'appareil (regroupement des photos du panier, CONCEPTION §A.6 nonies).
+
+mobilenet_v3_large.tflite : modèle « image embedder » MobileNet V3 publié par Google pour MediaPipe
+(https://ai.google.dev/edge/mediapipe/solutions/vision/image_embedder), licence Apache 2.0.
+SHA-256 : 11af3c560dfeed7737cb4c03c23bf52a8403020784192d4dea0b74862a12828d
+
+Le moteur (vision_wasm_internal.js et .wasm) est recopié à la construction depuis le paquet npm
+@mediapipe/tasks-vision (licence Apache 2.0) : voir vite.config.ts.
