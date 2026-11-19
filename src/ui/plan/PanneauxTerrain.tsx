@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { comparable } from '../photo/ComparaisonPhotos';
 import type { Photo, Repere } from '../../domaine/types';
 import type { EspaceProjet } from '../../projet/EspaceProjet';
 import { Miniature } from '../photo/Miniature';
@@ -95,7 +96,15 @@ export function FicheRepere({
   surOuvrirPhoto,
   surFermer,
   surChoisirLocalSurPlan,
+  surDirection,
+  surEffacerDirection,
+  surComparer,
 }: {
+  /** Passe en mode « touchez le plan dans la direction de prise de vue » (lot 6). */
+  surDirection: () => void;
+  surEffacerDirection: () => void;
+  /** Ouvre la comparaison avant / après (lot 6). */
+  surComparer: () => void;
   espace: EspaceProjet;
   repere: Repere;
   /** Passe en mode « touchez le local sur le plan ». */
@@ -189,6 +198,21 @@ export function FicheRepere({
           onBlur={() => libelle.trim() !== repere.libelle && surModifier({ libelle })}
         />
       </label>
+      <div className="boutons">
+        {comparable(photos) && (
+          <button className="petit" onClick={surComparer} disabled={occupe}>
+            ↔ Avant / après
+          </button>
+        )}
+        <button className="petit" onClick={surDirection} disabled={occupe} title="Flèche sur le plan : direction où regarde l'appareil">
+          🧭 {repere.visee ? 'Changer la direction' : 'Direction de prise de vue'}
+        </button>
+        {repere.visee && (
+          <button className="petit discret" onClick={surEffacerDirection} disabled={occupe}>
+            Effacer la direction
+          </button>
+        )}
+      </div>
       <div className="boutons">
         <button className="petit" onClick={surDeplacer} disabled={occupe}>
           Déplacer le repère
@@ -306,28 +330,23 @@ export function PanneauPanier({
 export function PhotosDuLocal({
   espace,
   localId,
-  occupe,
-  surPhoto,
+  appuiPhoto,
   surOuvrirPhoto,
 }: {
   espace: EspaceProjet;
   localId: string;
-  occupe: boolean;
-  /** Photo sur l'étiquette du local. */
-  surPhoto: () => void;
+  /** Mode photo : un appui sur l'étiquette photographie le local ; sinon, l'appui long. */
+  appuiPhoto: boolean;
   surOuvrirPhoto: (photos: Photo[], index: number) => void;
 }) {
   const photos = espace.photosDuLocal(localId);
+  // Plus de bouton « Photo du local » (19/11/2026) : on photographie le local depuis son étiquette.
   return (
     <div className="photos-local">
-      <div className="boutons">
-        <button type="button" className="principal" onClick={surPhoto} disabled={occupe}>
-          📷 Photo du local
-        </button>
-        <span className="discret petit-texte">
-          {photos.length} photo{photos.length > 1 ? 's' : ''} · raccourci : appui long sur l'étiquette du local
-        </span>
-      </div>
+      <p className="discret petit-texte">
+        {photos.length} photo{photos.length > 1 ? 's' : ''} · pour photographier le local :{' '}
+        {appuiPhoto ? 'appui sur son étiquette (mode 📷)' : 'appui long sur son étiquette'}
+      </p>
       {parJour(photos).map(([jour, liste]) => (
         <div key={jour} className="groupe-photos">
           <div className="discret">{dateLongue(jour)}</div>

@@ -208,6 +208,10 @@ button.projet .discret { font-size: 0.85rem; }
 /* Repère : posé par l'utilisateur (pas de texte du plan dessous) : point plein et étiquette proche. */
 .marqueur-repere, .marqueur-repere-selection { --couleur: #c0392b; --decalage: 12px; z-index: 1; }
 .marqueur-repere-selection { --couleur: #e8743b; z-index: 3; }
+/* Direction de prise de vue (lot 6) : cône partant du repère, vers le point visé. */
+.marqueur-direction { position: absolute; left: 0; top: -16px; width: 52px; height: 32px; transform-origin: 0 50%;
+  transform: rotate(var(--angle, 0rad)); background: linear-gradient(to right, var(--couleur), transparent);
+  clip-path: polygon(0 50%, 100% 0, 100% 100%); opacity: 0.55; pointer-events: none; }
 .marqueur-repere .marqueur-point, .marqueur-repere-selection .marqueur-point {
   background: var(--couleur); width: 14px; height: 14px; left: -7px; top: -7px; border: 2px solid #fff; }
 .marqueur-repere::before, .marqueur-repere-selection::before { display: none; }
@@ -260,15 +264,52 @@ button.projet .discret { font-size: 0.85rem; }
   font-size: 0.85rem; text-shadow: 0 1px 2px #000; }
 .camera-derniere button { background: rgb(0 0 0 / 0.55); color: #fff; border-color: rgb(255 255 255 / 0.6); }
 .camera-annoter { position: absolute; inset: 0; z-index: 60; }
-/* Rattachement du repère (18/11/2026) : bien visible sous le titre ; fenêtre ouverte d'office pour un nouveau repère. */
-.camera-rattachement { position: absolute; left: 12px; right: 12px; top: 72px; z-index: 5; display: flex; flex-direction: column;
-  align-items: flex-start; gap: 8px; }
-.camera-local { background: rgb(0 0 0 / 0.6); color: #fff; border: 2px solid #e0281e; border-radius: 20px; padding: 6px 14px;
-  font-size: 0.95rem; }
-.camera-rattachement.ouvert .camera-rattachement-choix { background: rgb(255 255 255 / 0.96); color: #111; border-radius: 12px;
-  padding: 10px 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.4); max-width: 520px; }
-.camera-rattachement-choix .boutons { margin-top: 6px; }
-.camera-rattachement-choix button:not(.principal) { background: #fff; color: #111; }
+/* Calque (lot 6) : photo précédente en transparence, cadrée comme la visée. */
+.camera-calque { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.camera-calque-commandes { position: absolute; right: 12px; top: 72px; z-index: 4; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 6px; }
+.camera-calque-commandes button { background: rgb(0 0 0 / 0.55); color: #fff; border-color: rgb(255 255 255 / 0.6); }
+.camera-calque-commandes input { width: 150px; }
+/* Comparaison avant / après (lot 6). */
+.comparaison { position: fixed; inset: 0; z-index: 45; background: #111; color: #fff; display: flex; flex-direction: column; }
+.comparaison-haut, .comparaison-bas { padding: 8px 12px; background: #1d1d1d; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.comparaison-haut strong { flex: 1; }
+.comparaison-bas { flex-direction: column; align-items: stretch; }
+.comparaison-rideau { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.comparaison-rideau input { width: 100%; }
+.comparaison-cadre { position: relative; flex: 1; min-height: 0; }
+.comparaison-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.comparaison-trait { position: absolute; top: 0; bottom: 0; width: 2px; background: #ffd54f; pointer-events: none; }
+.comparaison-etiquette { position: absolute; top: 8px; background: rgb(0 0 0 / 0.6); padding: 2px 8px; border-radius: 10px; font-size: 0.85rem; }
+.comparaison-etiquette.gauche { left: 8px; }
+.comparaison-etiquette.droite { right: 8px; }
+.comparaison-cote { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
+.comparaison-cote figure { margin: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.comparaison-cote img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.comparaison-cote figcaption { font-size: 0.85rem; }
+@media (orientation: portrait) { .comparaison-cote { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+.comparaison .bascule button { background: #2b2b2b; color: #fff; border-color: #555; }
+.comparaison .bascule button.actif { background: #fff; color: #000; }
+.comparaison > .comparaison-haut > button { background: #2b2b2b; color: #fff; }
+.frise { list-style: none; margin: 0; padding: 4px 0; display: flex; gap: 6px; overflow-x: auto; }
+.frise li { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+.frise li.nouveau-jour { margin-left: 8px; padding-left: 8px; border-left: 2px solid #555; }
+.frise li:first-child { margin-left: 0; padding-left: 0; border-left: none; }
+.frise-date { font-size: 0.75rem; color: #ccc; }
+.frise li:not(.nouveau-jour) { padding-top: 1.1em; }
+.frise-photo { padding: 2px; border: 3px solid transparent; background: none; border-radius: 8px; min-height: 0; }
+.frise-photo.avant { border-color: #4fc3f7; }
+.frise-photo.apres { border-color: #ffd54f; }
+/* Rattachement d'un nouveau repère, après ses prises de vue (19/11/2026) : en bas de l'écran, plan visible. */
+.fenetre-rattachement { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 35; max-width: 640px; margin: 0 auto;
+  background: var(--carte); border: 2px solid #e0281e; border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.3); }
+.fenetre-rattachement .local-associe { color: #c0392b; }
+/* Bascule photo / consultation (19/11/2026). */
+.bascule-appui { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; }
+.bascule-appui span[aria-hidden] { font-size: 1.3rem; line-height: 1; }
+.bascule-appui.photo { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); }
+@media (max-width: 760px) { .bascule-appui-texte { display: none; } }
 /* Fiches : croix de fermeture pour la souris seulement (au doigt : bouton Retour du téléphone). */
 .titre-fiche { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fermer-pc { display: none; }

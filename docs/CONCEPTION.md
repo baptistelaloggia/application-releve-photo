@@ -173,7 +173,7 @@ Règles issues du lot 1 (04/11/2026) :
 ## A.6 quater Repères et photos (lot 3, 10/11/2026)
 
 - **Repère** : `_data/reperes/{uuid}.json` (plan, local de rattachement ou aucun, numéro `P001`… unique dans le projet, libellé facultatif, position relative). À sa création, il est rattaché au **local le plus proche**, **sans limite de distance** depuis le 18/11/2026 (avant : à moins de 6 % de la page).
-  - **Fenêtre de rattachement :** à la création par appui long, la visée ouvre d'office une fenêtre « 📍 P004 → Circulation B1 ». Elle propose les autres locaux proches et « Hors local » en un appui, puis OK. Elle n'empêche pas de déclencher (2 appuis par photo).
+  - **Fenêtre de rattachement :** « 📍 Repère P004 → Circulation B1 », ouverte à la fin des prises de vue (depuis le 19/11/2026 ; avant, dans la visée). Elle propose les autres locaux proches, « Hors local » et « Choisir sur le plan », puis OK.
   - **Sur le plan :** le local du repère sélectionné (ou en cours de prise de vue) est **entouré en rouge**.
   - **Fiche du repère :** son titre donne le nom du local après celui du repère (« Repère P004 · Circulation B1 »).
   - **Correction :** le local se corrige aussi dans la fiche du repère.
@@ -189,8 +189,13 @@ Règles issues du lot 1 (04/11/2026) :
   - le plan (retour au projet), puis le projet (retour à l'accueil).
 
   Sur PC, la touche Échap fait de même. Techniquement, chaque calque ajoute une entrée à l'historique du navigateur (`src/ui/retour.ts`).
-- **Étiquettes** : toujours le nom du local ; le choix « Numéro / Nom » du menu Affichage est retiré (18/11/2026). Ce menu reste dans la largeur de l'écran du téléphone.
-- **Appui sur un repère ou sur l'étiquette d'un local** (réglage « Affichage ») : « Photo » (par défaut) ouvre l'appareil photo, et l'appui long ouvre la fiche ; « Fiche » fait l'inverse.
+- **Étiquettes** : toujours le nom du local ; le choix « Numéro / Nom » est retiré (18/11/2026).
+- **Bascule photo / consultation** (19/11/2026) : le menu déroulant « Affichage » est remplacé par un bouton unique, 📷 (mode photo) ou 👁 (mode consultation) ; un appui passe de l'un à l'autre.
+- **Fiche du local** (19/11/2026) : plus de bouton « Photo du local ». On photographie le local depuis son étiquette : appui en mode 📷, appui long en mode 👁.
+- **Rattachement d'un nouveau repère** (19/11/2026) : la fenêtre de choix du local s'ouvre **une fois les prises de vue terminées**, à la fermeture de la visée, et non plus dans la visée.
+  - **Position :** elle s'affiche en bas de l'écran, le plan restant visible avec le local associé entouré en rouge.
+  - **Choix :** autres locaux proches, « Hors local », « Choisir sur le plan », OK. Le bouton Retour vaut OK.
+- **Appui sur un repère ou sur l'étiquette d'un local** (bascule 📷 / 👁) : « Photo » (par défaut) ouvre l'appareil photo, et l'appui long ouvre la fiche ; « Fiche » fait l'inverse.
 - **Double appui** sur un repère ou sur l'étiquette d'un local (16/11/2026) : ouvre ses photos, la plus récente en premier. Le simple appui n'est traité qu'après 0,28 s, le temps de distinguer un double appui. Le tableau des niveaux indique aussi le nombre de photos de chaque plan.
 - **Rattachement rapide d'un repère à un local** : la fiche du repère propose les 3 locaux les plus proches en un appui, ou « Choisir le local sur le plan », puis un appui sur l'étiquette du local. Les photos sont alors renommées et déplacées.
 - **Un local est un point, pas une surface** : sa position est celle de son étiquette. La surface en m² lue sur le plan n'est qu'une valeur, sans contour. Le rattachement automatique d'un repère se fait donc au local dont l'étiquette est la plus proche, et non au local qui le contient. [À DÉCIDER : tracé du contour des locaux, voir A.9-7]
@@ -299,10 +304,19 @@ Règles issues du lot 1 (04/11/2026) :
 - Renommage des plans selon la convention `{Projet}_{Niveau}.pdf` (A.6 bis), éventuellement depuis un tableau Excel.
 - Changement d'indice : report des repères, avec recalage par 2 points si le cadrage a changé.
 
-**Suivi dans le temps**
-- Photo précédente affichée **en transparence** dans la visée, pour refaire le même cadrage.
-- Frise chronologique par repère, comparaison avant/après.
-- Direction de prise de vue (flèche sur le plan) [À VÉRIFIER : boussole peu fiable près des masses métalliques].
+**Suivi dans le temps** (lot 6, réalisé le 19/11/2026)
+- **Calque** : la photo précédente du repère est affichée **en transparence** dans la visée, pour refaire le même cadrage.
+  - **Photo retenue :** la plus récente prise un jour précédent, à défaut la plus récente du jour ; les vidéos sont écartées.
+  - **Commandes :** activé d'office (40 %), avec un bouton « ◐ Calque du jj/mm/aa » pour le masquer et un curseur de transparence (10 à 80 %).
+  - **Limite :** l'image est calée comme la visée (« contain ») ; si la proportion de la photo diffère de celle de la caméra, le calque ne couvre pas exactement la visée [À VÉRIFIER sur téléphone].
+- **Avant / après** : bouton « ↔ Avant / après » dans la fiche du repère (s'il a des photos à au moins deux dates), et « ↔ Comparer » dans la visionneuse (avant = photo d'une date antérieure).
+  - **Affichage :** **rideau** à glisser entre les deux photos, ou **côte à côte** (l'une sous l'autre sur un téléphone en portrait).
+  - **Frise chronologique :** en bas, elle montre les photos du repère groupées par date ; une photo touchée remplace l'image « Avant » ou « Après ».
+  - **Fermeture :** par le bouton Retour.
+- **Direction de prise de vue** : bouton « 🧭 Direction de prise de vue » dans la fiche du repère, puis un appui sur le plan dans la direction où regarde l'appareil.
+  - **Dessin :** un cône part du repère sur le plan.
+  - **Données :** `visee` (point visé, coordonnées relatives) dans le JSON du repère ; « Effacer la direction » la supprime.
+  - **Choix :** **saisie à la main**, et non par la boussole du téléphone. La boussole est peu fiable près des masses métalliques, et le nord des plans n'est pas connu de l'appli. Une saisie par boussole reste possible plus tard [À VÉRIFIER].
 
 **Recherche et exports**
 - Recherche par local (« TGBT », « 012 ») : position sur le plan et toutes les photos.
@@ -318,7 +332,7 @@ Règles issues du lot 1 (04/11/2026) :
 | 3. Terrain | Repères, photo en 2 appuis, panier à classer, hors ligne, compression | Visite de 300 photos en mode avion (**réalisé le 10/11/2026**, validé en test automatique ; essai sur téléphone à faire) |
 | 4. Synchro zip | Export et import `.zip`, rangement, contrôle des doublons | **Première version utilisable de bout en bout** (**réalisé le 13/11/2026**, validé en test automatique ; essai réel à faire) |
 | 5. SharePoint transit | MSAL, envoi depuis le téléphone, collecte par le PC puis purge | Deux personnes sur un même projet (**développé le 16/11/2026**, testé contre une imitation de Graph ; **en attente de la DSI** pour l'essai réel) |
-| 6. Suivi dans le temps | Transparence, frise, avant/après, direction | Même cadrage à 2 dates |
+| 6. Suivi dans le temps | Transparence, frise, avant/après, direction | Même cadrage à 2 dates (**réalisé le 19/11/2026**, validé en test automatique `suivi-lot6.mjs` ; essai sur téléphone à faire) |
 | 7. Exports | Rapport PDF, liste Excel | Livrable d'audit |
 
 Les lots 1 à 4 ne dépendent pas de la DSI.

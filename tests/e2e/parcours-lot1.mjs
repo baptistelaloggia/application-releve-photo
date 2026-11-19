@@ -215,16 +215,14 @@ async function parcours(url, libelle, telephone = false, memoire = false) {
   // Le plan s'ouvre d'un clic sur le nom du niveau.
   await page.locator('.lien-niveau', { hasText: 'R+1' }).click();
   await page.locator('.visionneuse[data-fond-pret]').waitFor();
-  // Le menu « Affichage » se ferme quand on touche le plan.
-  await page.getByText('Affichage', { exact: true }).click();
-  await page.getByRole('button', { name: 'Fiche', exact: true }).click();
-  assert.equal(await page.locator('details.options-plan').evaluate((d) => d.open), true);
+  // Bascule photo / consultation (19/11/2026) : un appui passe de l'une à l'autre.
+  const bascule = page.locator('.bascule-appui');
+  assert.match(await bascule.innerText(), /Photo/);
+  await bascule.click();
+  assert.match(await bascule.innerText(), /Consultation/);
+  await bascule.click();
+  assert.match(await bascule.innerText(), /Photo/);
   const vue = await page.locator('.visionneuse').boundingBox();
-  await page.mouse.click(vue.x + 20, vue.y + vue.height - 20);
-  assert.equal(await page.locator('details.options-plan').evaluate((d) => d.open), false);
-  await page.getByText('Affichage', { exact: true }).click();
-  await page.getByRole('button', { name: 'Photo', exact: true }).click();
-  await page.mouse.click(vue.x + 20, vue.y + vue.height - 20);
   await page.getByRole('tab', { name: /Locaux/ }).click();
   await page.getByRole('button', { name: 'Détecter les locaux' }).click();
   await page.getByRole('button', { name: 'Enregistrer 4 locaux' }).waitFor();

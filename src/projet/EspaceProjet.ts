@@ -853,11 +853,20 @@ export class EspaceProjet {
       .map((v) => v.l);
   }
 
-  async modifierRepere(id: string, maj: Partial<Pick<Repere, 'libelle' | 'localId' | 'x' | 'y'>>, auteur: string): Promise<Repere> {
+  async modifierRepere(
+    id: string,
+    maj: Partial<Pick<Repere, 'libelle' | 'localId' | 'x' | 'y'>> & { visee?: { x: number; y: number } | null },
+    auteur: string,
+  ): Promise<Repere> {
     const existant = this.reperes.find((r) => r.id === id);
     if (!existant) throw new Error('Repère introuvable.');
     if (maj.localId && !this.locaux.some((l) => l.id === maj.localId)) throw new Error('Local introuvable.');
-    const repere: Repere = { ...existant, ...maj, libelle: (maj.libelle ?? existant.libelle).trim(), modifieLe: maintenant(), modifiePar: auteur };
+    const { visee, ...reste } = maj;
+    if (visee && !(visee.x >= 0 && visee.x <= 1 && visee.y >= 0 && visee.y <= 1)) throw new Error('Direction hors du plan.');
+    const repere: Repere = { ...existant, ...reste, libelle: (maj.libelle ?? existant.libelle).trim(), modifieLe: maintenant(), modifiePar: auteur };
+    // Direction : null l'efface ; absente, elle est conservée.
+    if (visee === null) delete repere.visee;
+    else if (visee) repere.visee = { x: visee.x, y: visee.y };
     await this.ecrireRepere(repere);
     if (repere.localId !== existant.localId) await this.rangerPhotos(this.photosDuRepere(id));
     return repere;

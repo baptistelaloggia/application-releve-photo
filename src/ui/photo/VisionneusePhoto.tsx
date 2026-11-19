@@ -5,6 +5,7 @@ import type { EspaceProjet } from '../../projet/EspaceProjet';
 import { dureeLisible, mimeNote } from '../../photo/enregistrement';
 import { retirerPhotosExportees } from '../../stockage/registre';
 import { tailleLisible, texteErreur } from '../commun';
+import { ComparaisonPhotos } from './ComparaisonPhotos';
 import { EditeurAnnotations } from './EditeurAnnotations';
 import { BoutonNoteVocale } from './NoteVocale';
 
@@ -36,6 +37,8 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
   const [commentaire, setCommentaire] = useState(photo?.commentaire ?? '');
   const [erreur, setErreur] = useState<string | null>(null);
   const [annoter, setAnnoter] = useState(!!annoterDesLOuverture);
+  /** Comparaison avant / après avec une photo plus ancienne du même repère (lot 6). */
+  const [comparer, setComparer] = useState(false);
   const [original, setOriginal] = useState(false);
   const [taille, setTaille] = useState<{ l: number; h: number } | null>(null);
   const toucher = useRef<{ x: number; y: number } | null>(null);
@@ -118,6 +121,23 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
 
   /** Une photo modifiée après un envoi repart au prochain envoi, avec ses fichiers annexes. */
   const aRenvoyer = (id: string) => retirerPhotosExportees(espace.projet.id, [id]);
+
+  // Photos du même repère, pour la comparaison : la plus récente d'une date antérieure sert d'« avant ».
+  const duRepere = photo.repereId ? espace.photosDuRepere(photo.repereId).filter((p) => p.type !== 'video') : [];
+  const avantComparaison =
+    [...duRepere].reverse().find((p) => p.date < photo.date) ?? duRepere.find((p) => p.date !== photo.date);
+  if (comparer && !video && avantComparaison) {
+    return (
+      <ComparaisonPhotos
+        espace={espace}
+        photos={duRepere}
+        avantInitial={avantComparaison.id}
+        apresInitial={photo.id}
+        titre={`Repère ${repere?.numero ?? ''} · avant / après`}
+        surFermer={() => setComparer(false)}
+      />
+    );
+  }
 
   if (annoter && !video) {
     return (
@@ -202,6 +222,11 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
           {!video && (
             <button className="petit" onClick={() => setAnnoter(true)}>
               ✏️ {photo.annotations?.length ? 'Modifier les annotations' : 'Annoter'}
+            </button>
+          )}
+          {!video && avantComparaison && (
+            <button className="petit" onClick={() => setComparer(true)}>
+              ↔ Comparer
             </button>
           )}
           {!video && !!photo.annotations?.length && (

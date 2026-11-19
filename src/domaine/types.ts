@@ -117,6 +117,12 @@ export interface Repere {
    * Il n'est pas dessiné comme un repère : ses photos s'affichent sur l'étiquette du local.
    */
   surEtiquette?: boolean;
+  /**
+   * Direction de prise de vue (lot 6, 19/11/2026) : point du plan vers lequel regarde l'appareil,
+   * en coordonnées relatives. Dessinée en flèche sur le plan. Saisie à la main : la boussole du
+   * téléphone est peu fiable près des masses métalliques, et le nord du plan n'est pas connu.
+   */
+  visee?: { x: number; y: number };
   creeLe: string;
   creePar: string;
   modifieLe: string;
