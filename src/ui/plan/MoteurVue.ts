@@ -192,6 +192,12 @@ export class MoteurVue {
       const y = Number(e.dataset.y);
       if (Number.isNaN(x) || Number.isNaN(y)) continue;
       e.style.transform = `translate(${x * this.largeur * this.zoom + this.tx}px, ${y * this.hauteur * this.zoom + this.ty}px)`;
+      // Direction de prise de vue : angle à l'écran, d'après les dimensions de la page.
+      const vx = Number(e.dataset.vx);
+      const vy = Number(e.dataset.vy);
+      if (e.dataset.vx !== undefined && !Number.isNaN(vx) && !Number.isNaN(vy)) {
+        e.style.setProperty('--angle', `${Math.atan2((vy - y) * this.hauteur, (vx - x) * this.largeur)}rad`);
+      }
     }
   }
 

@@ -114,9 +114,9 @@ try {
   // la fiche du local, sans jamais quitter l'appli.
   await p.goBack();
   await p.locator('.camera').waitFor({ state: 'detached' });
-  await p.getByRole('button', { name: '📷 Photo du local' }).waitFor();
+  await p.getByRole('heading', { name: 'TGBT · R+1' }).waitFor();
   await p.goBack();
-  await p.getByRole('button', { name: '📷 Photo du local' }).waitFor({ state: 'detached' });
+  await p.getByRole('heading', { name: 'TGBT · R+1' }).waitFor({ state: 'detached' });
   await p.locator('.visionneuse[data-fond-pret]').waitFor();
   // Une photo importée dans le panier (image différente : la fausse caméra donne toujours la même).
   await p.getByRole('tab', { name: /Panier/ }).click();

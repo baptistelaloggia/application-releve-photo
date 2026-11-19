@@ -22,6 +22,8 @@ export interface Marqueur {
   style: StyleMarqueur;
   /** Local auquel est rattaché le repère sélectionné : entouré en rouge. */
   associe?: boolean;
+  /** Direction de prise de vue d'un repère : point visé (relatif), dessiné en cône. */
+  vers?: { x: number; y: number };
   /** Petit nombre affiché à côté de l'étiquette (nombre de photos d'un repère). */
   pastille?: number;
 }
@@ -133,6 +135,8 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
               data-marqueur={m.id}
               data-x={m.x}
               data-y={m.y}
+              data-vx={m.vers?.x}
+              data-vy={m.vers?.y}
               title={m.titre ?? m.libelle}
               onContextMenu={(e) => e.preventDefault()}
               onPointerDown={(e) => {
@@ -179,6 +183,7 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
                 };
               }}
             >
+              {m.vers && <span className="marqueur-direction" aria-hidden="true" />}
               <span className="marqueur-point" />
               {m.libelle && (
                 <span className="marqueur-libelle">

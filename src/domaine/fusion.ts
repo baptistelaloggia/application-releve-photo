@@ -249,7 +249,8 @@ export function controlerDonnees(d: DonneesProjet, codeAutorise: (code: string) 
   }
   for (const r of d.reperes) {
     verifier(
-      ID.test(r.id) && ID.test(r.planId) && (r.localId === null || ID.test(r.localId)) && NUMERO_REPERE.test(r.numero) && texte(r.libelle, 120) && dansLaPage(r.x) && dansLaPage(r.y),
+      ID.test(r.id) && ID.test(r.planId) && (r.localId === null || ID.test(r.localId)) && NUMERO_REPERE.test(r.numero) && texte(r.libelle, 120) && dansLaPage(r.x) && dansLaPage(r.y) &&
+        (r.visee === undefined || (typeof r.visee === 'object' && r.visee !== null && dansLaPage(r.visee.x) && dansLaPage(r.visee.y))),
       `repère ${String(r.numero).slice(0, 20)}`,
     );
   }

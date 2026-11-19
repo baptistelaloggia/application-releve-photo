@@ -158,41 +158,40 @@ try {
   await p.goBack();
   await voile.waitFor({ state: 'detached' });
   await p.goBack();
-  await p.getByRole('button', { name: '📷 Photo du local' }).waitFor({ state: 'detached' });
+  await p.getByRole('heading', { name: 'TGBT · R+1' }).waitFor({ state: 'detached' });
 
   // Appui long sur le plan, près du LOCAL CTA : nouveau repère, rattaché d'office au local le plus
-  // proche (entouré en rouge), choix proposé dans une fenêtre de la visée.
+  // proche (entouré en rouge) ; le choix est proposé une fois les prises de vue terminées (19/11/2026).
   const cta = await p.locator('.marqueur .marqueur-libelle', { hasText: 'LOCAL CTA' }).boundingBox();
   await p.mouse.move(cta.x + cta.width / 2 + 30, cta.y + 70);
   await p.mouse.down();
   await p.waitForTimeout(800);
   await p.mouse.up();
-  const fenetre = p.locator('.camera-rattachement.ouvert');
+  await p.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
+  assert.equal(await p.locator('.fenetre-rattachement').count(), 0, 'pas de fenêtre pendant la visée');
+  await p.getByRole('button', { name: 'Prendre la photo' }).click();
+  await p.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 60_000 });
+  await p.goBack(); // fin des prises de vue : retour au plan et fenêtre de rattachement
+  await p.locator('.camera').waitFor({ state: 'detached' });
+  const fenetre = p.locator('.fenetre-rattachement');
   await fenetre.waitFor();
-  assert.match(await fenetre.innerText(), /P002 → LOCAL CTA/);
+  assert.match(await fenetre.innerText(), /Repère P002 → LOCAL CTA/);
   assert.match(await p.locator('.marqueur-associe').innerText(), /LOCAL CTA/);
   await tel.capture('2d-rattachement');
   await fenetre.getByRole('button', { name: 'Hors local' }).click();
-  await p.locator('.camera-local', { hasText: 'hors local' }).waitFor();
+  await fenetre.getByText('hors local', { exact: true }).waitFor();
   assert.equal(await p.locator('.marqueur-associe').count(), 0);
   await fenetre.getByRole('button', { name: 'OK' }).click();
-  await p.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
-  await p.getByRole('button', { name: 'Prendre la photo' }).click();
-  await p.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 60_000 });
-  await p.goBack(); // retour au plan, fiche du repère ouverte
-  await p.locator('.camera').waitFor({ state: 'detached' });
+  await fenetre.waitFor({ state: 'detached' });
   await p.getByRole('heading', { name: 'Repère P002 · hors local' }).waitFor();
   await p.goBack(); // fiche fermée
   await p.getByRole('heading', { name: /Repère P002/ }).waitFor({ state: 'detached' });
-  // Menu « Affichage » : plus de choix numéro / nom ; le contenu reste dans la largeur de l'écran.
-  await p.getByText('Affichage', { exact: true }).click();
-  const menu = p.locator('.options-plan-contenu');
-  await menu.waitFor();
-  assert.equal(await menu.getByRole('button', { name: 'Numéro' }).count(), 0);
-  const bMenu = await menu.boundingBox();
-  assert.ok(bMenu.x >= 0 && bMenu.x + bMenu.width <= p.viewportSize().width + 1, 'menu Affichage dans l’écran');
-  await tel.capture('2e-affichage');
-  await p.getByText('Affichage', { exact: true }).click();
+  // Bascule photo / consultation à la place du menu « Affichage » (19/11/2026).
+  assert.equal(await p.getByText('Affichage', { exact: true }).count(), 0);
+  await p.locator('.bascule-appui').click();
+  await p.getByRole('button', { name: /Mode consultation/ }).waitFor();
+  await p.locator('.bascule-appui').click();
+  await p.getByRole('button', { name: /Mode photo/ }).waitFor();
 
   // Photos importées volumineuses (bruit, environ 1,3 Mo chacune) : le paquet dépasse 9,4 Mo,
   // ce qui impose l'envoi en plusieurs morceaux.

@@ -304,7 +304,7 @@ try {
   await declencher(1);
   await attendreEnregistrements();
   await page.getByRole('button', { name: '✕ Retour au plan' }).click();
-  await page.getByRole('button', { name: '📷 Photo du local' }).waitFor();
+  await page.getByRole('heading', { name: 'TGBT · R+1' }).waitFor();
 
   arbo = await arborescenceOpfs(page, `${dossierProjet}/01_PHOTOS`);
   const nb = arbo.filter((l) => l.startsWith('01_R+1/R+1.TGBT/') && l.endsWith('.jpg')).length;

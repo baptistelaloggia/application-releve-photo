@@ -249,6 +249,17 @@ describe('repères et photos', () => {
     expect(await s.existe('01_PHOTOS/01_R+1/R+1.BUREAUX/XXX_R+1.BUREAUX_P003_2026-10-30_01.jpg')).toBe(true);
   });
 
+  it('enregistre, garde et efface la direction de prise de vue d’un repère (lot 6)', async () => {
+    const { s, e, planId } = await projet();
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    await e.modifierRepere(r.id, { visee: { x: 0.8, y: 0.5 } }, 'BL');
+    await e.modifierRepere(r.id, { libelle: 'CTA face avant' }, 'BL');
+    expect((await EspaceProjet.ouvrir(s)).reperes[0].visee).toEqual({ x: 0.8, y: 0.5 });
+    await expect(e.modifierRepere(r.id, { visee: { x: 2, y: 0 } }, 'BL')).rejects.toThrow(/hors du plan/);
+    await e.modifierRepere(r.id, { visee: null }, 'BL');
+    expect(e.reperes[0].visee).toBeUndefined();
+  });
+
   it('classe une photo du panier, puis la renvoie au panier', async () => {
     const { s, e, planId } = await projet();
     const p = await e.ajouterPhoto(entree(null, 'x'), 'BL');
