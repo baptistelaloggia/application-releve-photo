@@ -7,6 +7,8 @@
  * à « normale », puisque l'image a déjà été redressée avant compression.
  */
 
+import type { PositionGps } from '../domaine/regroupement';
+
 const SOI = 0xd8;
 const SOS = 0xda;
 const APP0 = 0xe0;
@@ -110,6 +112,50 @@ export function lireInfosExif(app1: Uint8Array): InfosExif {
     return { orientation, dateOriginale };
   } catch {
     return { orientation: null, dateOriginale: null };
+  }
+}
+
+const TAG_GPS_IFD = 0x8825;
+
+/**
+ * Position GPS d'une photo (degrés décimaux, WGS 84 ; IFD GPS de l'EXIF), ou null s'il n'y en a pas.
+ * Attention : en sous-sol, le téléphone garde souvent la dernière position captée dehors.
+ */
+export function lirePositionGps(app1: Uint8Array): PositionGps | null {
+  try {
+    const t = new Tiff(app1);
+    const gps = t.entrees(t.u32(4)).find((e) => e.tag === TAG_GPS_IFD);
+    if (!gps) return null;
+    const rationnel = (decalage: number) => {
+      const d = t.u32(decalage + 4);
+      return d ? t.u32(decalage) / d : NaN;
+    };
+    let latRef = '';
+    let lonRef = '';
+    let lat = NaN;
+    let lon = NaN;
+    let precision: number | undefined;
+    for (const e of t.entrees(t.u32(gps.position + 8))) {
+      const valeur = e.position + 8;
+      if (e.tag === 1) latRef = String.fromCharCode(app1[t.base + valeur]);
+      if (e.tag === 3) lonRef = String.fromCharCode(app1[t.base + valeur]);
+      if (e.tag === 2 || e.tag === 4) {
+        const d = t.u32(valeur);
+        const v = rationnel(d) + rationnel(d + 8) / 60 + rationnel(d + 16) / 3600;
+        if (e.tag === 2) lat = v;
+        else lon = v;
+      }
+      if (e.tag === 31) precision = rationnel(t.u32(valeur));
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat === 0 && lon === 0) return null; // position absente, remplie de zéros
+    return {
+      lat: latRef === 'S' ? -lat : lat,
+      lon: lonRef === 'W' ? -lon : lon,
+      ...(precision !== undefined && Number.isFinite(precision) ? { precision } : {}),
+    };
+  } catch {
+    return null;
   }
 }
 

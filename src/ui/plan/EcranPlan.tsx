@@ -709,6 +709,17 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                   }
                 }}
                 surPlacer={(photos) => setMode({ type: 'classement', photoIds: photos.map((p) => p.id) })}
+                surVersLocal={(photos, r) =>
+                  void executer(async () => {
+                    const repere = await espace.repereEtiquette(r.local.id, auteur);
+                    await espace.classerPhotos(
+                      photos.map((p) => p.id),
+                      repere.id,
+                      auteur,
+                    );
+                    apresPlacement(photos.length, `le local ${r.local.nom} (${r.niveau.code})`);
+                  })
+                }
                 surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
               />
             ) : (

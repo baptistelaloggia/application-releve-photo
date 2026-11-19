@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Photo, Repere } from '../../domaine/types';
-import type { EspaceProjet } from '../../projet/EspaceProjet';
+import type { EspaceProjet, ResultatLocal } from '../../projet/EspaceProjet';
 import { Miniature } from '../photo/Miniature';
+import { RegroupementPanier } from '../photo/RegroupementPanier';
 
 /** Photos groupées par jour, du plus récent au plus ancien. */
 function parJour(photos: Photo[]): Array<[string, Photo[]]> {
@@ -209,6 +210,7 @@ export function PanneauPanier({
   surPhotoSansRepere,
   surImporter,
   surPlacer,
+  surVersLocal,
   surOuvrirPhoto,
 }: {
   espace: EspaceProjet;
@@ -216,9 +218,12 @@ export function PanneauPanier({
   surPhotoSansRepere: () => void;
   surImporter: (fichiers: File[]) => void;
   surPlacer: (photos: Photo[]) => void;
+  /** Rattache des photos à un local choisi par son nom (vue « Par groupes »). */
+  surVersLocal: (photos: Photo[], local: ResultatLocal) => void;
   surOuvrirPhoto: (photos: Photo[], index: number) => void;
 }) {
   const photos = espace.photosAClasser();
+  const [parGroupes, setParGroupes] = useState(false);
   const [choisies, setChoisies] = useState<Set<string>>(new Set());
   const selection = photos.filter((p) => choisies.has(p.id));
   // Dernière photo cochée ou décochée : avec la touche MAJ, toutes les photos entre les deux suivent.
@@ -260,8 +265,27 @@ export function PanneauPanier({
           />
         </label>
       </div>
+      {photos.length > 1 && (
+        <div className="onglets bascule-panier" role="tablist">
+          <button type="button" role="tab" aria-selected={!parGroupes} className={parGroupes ? undefined : 'actif'} onClick={() => setParGroupes(false)}>
+            Liste
+          </button>
+          <button type="button" role="tab" aria-selected={parGroupes} className={parGroupes ? 'actif' : undefined} onClick={() => setParGroupes(true)}>
+            Par groupes
+          </button>
+        </div>
+      )}
       {photos.length === 0 ? (
         <p className="discret">Le panier est vide.</p>
+      ) : parGroupes && photos.length > 1 ? (
+        <RegroupementPanier
+          espace={espace}
+          photos={photos}
+          occupe={occupe}
+          surPlacer={surPlacer}
+          surVersLocal={surVersLocal}
+          surOuvrirPhoto={surOuvrirPhoto}
+        />
       ) : (
         <>
           <div className="boutons barre-selection">

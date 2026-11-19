@@ -283,12 +283,42 @@ Règles issues du lot 1 (04/11/2026) :
   - **Position :** elle est affichée en haut (« 3/4 »).
 - **RGPD :** les notes vocales et le son des vidéos enregistrent aussi les voix alentour. À utiliser pour décrire l'installation, sans enregistrer de conversation.
 
+## A.6 nonies Regroupement des photos du panier (19/11/2026)
+
+**Besoin :** des photos prises **hors de l'appli** (appareil photo du téléphone, photos d'un collègue), donc sans repère, arrivent par l'import dans le panier à classer. Les rattacher une à une est long. L'appli les **regroupe par lieu probable** ; l'utilisateur vérifie chaque groupe et le rattache d'un coup à un local.
+
+- **Accès :** onglet Panier du plan, bascule **« Liste / Par groupes »** (dès 2 photos dans le panier).
+- **Indices utilisés :**
+  - **l'heure de prise de vue** (EXIF) : des photos prises à quelques secondes d'intervalle sont presque toujours dans le même local. Elle n'est retenue que si elle est sûre : photo de l'appli, ou date présente dans l'EXIF. Une photo importée **sans date EXIF** (transférée par messagerie, par exemple) ne porte que la date de son fichier, celle du transfert : son heure est alors **ignorée** ;
+  - **la ressemblance visuelle**, mesurée **sur l'appareil** par un petit réseau de neurones (voir ci-dessous) ;
+  - **la position GPS** (EXIF), **seulement comme indice contraire** : deux photos à plus de 80 m l'une de l'autre (précision annoncée comprise) ne sont pas dans le même local. Elle ne rapproche jamais deux photos, car en sous-sol le téléphone garde souvent la dernière position captée dehors.
+- **Calcul (règles pures, `src/domaine/regroupement.ts`, testées) :** affinité de deux photos = similarité visuelle (cosinus, de 0 à 1) + bonus de temps (0,35 × e^(−écart / 2 min)) + bonus de rafale (0,25 × e^(−écart / 15 s)) ; 1 de moins si les GPS sont incompatibles. Sans reconnaissance visuelle : e^(−écart / 225 s), soit 0,45 à 3 min d'écart. Puis **classification ascendante hiérarchique à lien moyen** : on réunit les deux groupes dont l'affinité moyenne est la plus forte, tant qu'elle dépasse le **seuil** (0,45 par défaut).
+- **Réglage « Groupes plus larges ↔ plus fins » :** curseur de 0,25 à 0,70, mémorisé sur l'appareil.
+- **Validation d'un groupe :** toutes ses photos sont cochées ; on **décoche les intruses**, qui restent au panier. Puis :
+  - **« Vers un local… »** : recherche du local par son nom, **dans tous les niveaux** ; les photos vont sur le repère d'étiquette du local (A.6 quater), puis sont renommées et rangées ;
+  - **« Placer sur le plan »** : même placement que depuis la liste (étiquette d'un local, repère existant, ou nouveau repère).
+- **Reconnaissance visuelle sur l'appareil (`src/photo/reconnaissance.ts`) :**
+  - **Modèle :** MobileNet V3 « large », version « image embedder » de **MediaPipe** (Google), qui transforme une image en un vecteur de 1 280 nombres. Il est calculé sur la miniature (320 px), puisque le modèle travaille en 224 px.
+  - **Aucun service extérieur** (A.4-7) : le moteur (WebAssembly, 15 Mo, recopié depuis le paquet npm `@mediapipe/tasks-vision` à la construction) et le modèle (11 Mo, `public/reconnaissance/`) sont **publiés avec l'appli**. Aucune photo ne quitte l'appareil.
+  - **Téléchargement à la première utilisation** du regroupement seulement, puis gardés par le Service Worker pour l'usage hors ligne. Ils ne sont pas dans le cache initial de l'appli, pour ne pas alourdir l'installation sur téléphone.
+  - **Repli :** sans réseau à la première utilisation, ou si le chargement échoue, le regroupement se fait sur l'heure et le GPS seuls, avec un message.
+  - **Licence :** Apache 2.0 pour la bibliothèque ; le modèle est publié par Google pour MediaPipe [À VÉRIFIER : licence exacte du modèle, annoncée Apache 2.0 sur sa fiche].
+  - **Écarté :** des mesures « simples » (histogrammes de couleurs, orientation des contours), essayées d'abord : elles ne distinguaient pas un local de comptage d'un local hydraulique (deux ambiances grises sous néons).
+- **Essais (19/11/2026) :**
+  - **5 vraies photos** (2 au local de comptage tarif jaune, 3 au local de distribution hydraulique), **sans heure EXIF**, donc le cas le plus défavorable, où seule la reconnaissance visuelle joue. Au réglage par défaut : 3 groupes, avec le comptage complet, deux vues hydrauliques ensemble, et la vue des échangeurs à part. Un cran plus large (0,30 à 0,35) : **exactement les 2 bons groupes**. Ces photos restent hors du dépôt.
+  - **Test automatique** `tests/e2e/regroupement-panier.mjs` : 7 photos fictives datées et géolocalisées, dont une sans EXIF, en 2 groupes justes en 1 s ; rattachement par la recherche ; photo décochée restée au panier ; moteur et modèle gardés hors ligne.
+  - [À VÉRIFIER sur téléphone : temps de calcul (environ 0,1 s par photo sur PC), et regroupement d'une vraie visite de 100 à 300 photos.]
+- **Suites possibles :**
+  - **proposer le local** d'un groupe en le comparant aux photos déjà classées du projet (« ressemble au local CTA du R+1 ») ;
+  - **retrouver le niveau par l'altitude GPS** [À VÉRIFIER : peu fiable en intérieur] ;
+  - **séparer ou fusionner un groupe à la main**, si l'usage le demande.
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
 - Toucher un repère existant ouvre l'appareil photo, on prend la photo, on revient au plan. Rafale possible.
 - Appui long sur le plan : nouveau repère, rattaché automatiquement au local, et ouverture de l'appareil photo.
-- « Panier à classer » : photo prise sans repère, placée plus tard.
+- « Panier à classer » : photo prise sans repère, placée plus tard. Photos importées regroupées par lieu probable (heure, ressemblance, GPS), puis rattachées par groupe à un local (A.6 nonies).
 - Commentaire par dictée vocale, facultatif.
 - Locaux déjà photographiés pendant la visite colorés sur le plan.
 - Compression des photos (autour de 1 à 1,5 Mo) en conservant les métadonnées EXIF. Stockage persistant demandé au navigateur (`navigator.storage.persist()`).

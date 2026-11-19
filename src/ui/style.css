@@ -227,6 +227,17 @@ button.projet .discret { font-size: 0.85rem; }
 .miniature-marques { position: absolute; left: 2px; bottom: 2px; display: flex; gap: 2px; pointer-events: none; }
 .miniature-marques span { background: rgb(0 0 0 / 0.65); color: #fff; font-size: 0.7rem; line-height: 1; padding: 2px 4px; border-radius: 4px; }
 .miniature img { width: 100%; height: 100%; object-fit: cover; }
+.bascule-panier { margin-top: 12px; }
+.regroupement-analyse progress { width: 100%; }
+.regroupement-seuil { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.regroupement-seuil input { flex: 1; min-width: 0; }
+.groupe-regroupement { border: 1px solid var(--bord); border-radius: 10px; padding: 10px; margin: 10px 0; background: var(--carte); }
+.groupe-entete { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.grille-groupe { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; margin-top: 8px; }
+.case-groupe { position: relative; line-height: 0; }
+.case-groupe .miniature { width: 100% !important; aspect-ratio: 1; height: auto !important; }
+.case-groupe input[type="checkbox"] { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; margin: 0; }
+.case-groupe.exclue img { opacity: 0.3; }
 .liste-panier { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .liste-panier li { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; }
 .petit-texte { font-size: 0.75rem; }

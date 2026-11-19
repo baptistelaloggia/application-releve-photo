@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exifOrientationNormale, extraireExif, insererExif, lireInfosExif } from './exif';
+import { exifOrientationNormale, extraireExif, insererExif, lireInfosExif, lirePositionGps } from './exif';
 
 /** Segment Exif minimal (petit-boutiste) : orientation 6 et date de prise de vue. */
 function exifFictif(): Uint8Array {
@@ -24,7 +24,40 @@ function exifFictif(): Uint8Array {
 /** JPEG fictif : SOI, APP0 JFIF, puis SOS et quelques octets. */
 const jpegCanevas = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x4a, 0x46, 0xff, 0xda, 0x00, 0x02, 1, 2, 3, 0xff, 0xd9]);
 
+/** Segment Exif (gros-boutiste, comme beaucoup de téléphones) avec une position GPS : 48°51'29,6" N, 2°17'40,2" E, ±6 m. */
+function exifGps(): Uint8Array {
+  const tiff: number[] = [];
+  const u16 = (v: number) => tiff.push(v >> 8, v & 0xff);
+  const u32 = (v: number) => tiff.push(v >>> 24, (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff);
+  tiff.push(0x4d, 0x4d); u16(42); u32(8);
+  u16(1); // IFD0 en 8 : 1 entrée
+  u16(0x8825); u16(4); u32(1); u32(26); // pointeur vers l'IFD GPS
+  u32(0); // fin IFD0 (position 22)
+  // IFD GPS en 26 : 5 entrées (2 + 5 × 12 + 4 = 66 octets), valeurs à partir de 92.
+  u16(5);
+  u16(1); u16(2); u32(2); tiff.push(0x4e, 0, 0, 0); // N
+  u16(2); u16(5); u32(3); u32(92); // latitude
+  u16(3); u16(2); u32(2); tiff.push(0x45, 0, 0, 0); // E
+  u16(4); u16(5); u32(3); u32(116); // longitude
+  u16(31); u16(5); u32(1); u32(140); // précision
+  u32(0);
+  u32(48); u32(1); u32(51); u32(1); u32(296); u32(10); // 48° 51' 29,6"
+  u32(2); u32(1); u32(17); u32(1); u32(402); u32(10); // 2° 17' 40,2"
+  u32(6); u32(1);
+  const charge = [...'Exif\u0000\u0000'].map((c) => c.charCodeAt(0)).concat(tiff);
+  const longueur = charge.length + 2;
+  return new Uint8Array([0xff, 0xe1, longueur >> 8, longueur & 0xff, ...charge]);
+}
+
 describe('EXIF', () => {
+  it('lit la position GPS et sa précision', () => {
+    const gps = lirePositionGps(exifGps())!;
+    expect(gps.lat).toBeCloseTo(48 + 51 / 60 + 29.6 / 3600, 8);
+    expect(gps.lon).toBeCloseTo(2 + 17 / 60 + 40.2 / 3600, 8);
+    expect(gps.precision).toBe(6);
+    expect(lirePositionGps(exifFictif())).toBeNull();
+  });
+
   it('lit orientation et date, puis les recopie dans le JPEG compressé', () => {
     const app1 = exifFictif();
     const original = insererExif(jpegCanevas, app1);
