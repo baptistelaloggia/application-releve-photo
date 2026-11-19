@@ -141,6 +141,13 @@ describe('contrôle des paquets reçus', () => {
     d.locaux.push(local('l-y', 'p-rdc', 'LT9', 'Hors page', 1.5, 0.5));
     expect(controlerDonnees(d, estCodeNiveauAutorise)).toHaveLength(5);
   });
+  it('contrôle la direction de prise de vue des repères', () => {
+    const d = reelles();
+    d.reperes[0] = { ...d.reperes[0], visee: { x: 0.3, y: 0.9 } };
+    expect(controlerDonnees(d, estCodeNiveauAutorise)).toEqual([]);
+    d.reperes[0] = { ...d.reperes[0], visee: { x: 'a' as unknown as number, y: 0 } };
+    expect(controlerDonnees(d, estCodeNiveauAutorise)).toHaveLength(1);
+  });
   it('accepte vidéos, annotations et notes vocales conformes ; refuse les autres', () => {
     const d = reelles();
     d.photos[0] = { ...d.photos[0], type: 'video', extension: 'mp4', duree: 12, annotations: [{ type: 'ok', x: 0.1, y: 0.1 }] };

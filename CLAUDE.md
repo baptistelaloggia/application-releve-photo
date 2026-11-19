@@ -95,6 +95,8 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   Vidéos et notes vocales : `src/photo/enregistrement.ts` (MediaRecorder) ; annotations dessinées : règles et dessin
   SVG `src/domaine/annotations.ts`, copie annotée `src/photo/annotation.ts`, éditeur `src/ui/photo/EditeurAnnotations.tsx`.
   Fichiers rangés à côté d'une photo (`_annote.jpg`, `_note.wav`) : CONCEPTION §A.6 octies.
+  Suivi dans le temps (lot 6) : calque dans la visée (`CameraTerrain`, prop `reference`), comparaison avant / après
+  et frise `src/ui/photo/ComparaisonPhotos.tsx`, direction de prise de vue `Repere.visee` (cône sur le plan).
   Synchronisation (lot 4) : règles de fusion `src/domaine/fusion.ts` (pures, testées), paquet .zip
   `src/projet/paquet.ts` (fflate, lecture et écriture en continu), écran `src/ui/Echanges.tsx`, import partagé
   `src/projet/importPaquet.ts`. Transit SharePoint (lot 5) : `src/transit/` (réglages, connexion MSAL, client
@@ -108,6 +110,7 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   dans Chromium (dont `terrain-lot3.mjs` : 300 photos en mode avion, fausse caméra ; `NB_PHOTOS` pour réduire).
   `synchro-lot4.mjs` : aller-retour PC ↔ téléphone par paquets (`NB_SYNCHRO` photos).
   `transit-lot5.mjs` : échanges par le transit, contre une imitation de Microsoft Graph (`tests/e2e/outils.mjs`).
+  `suivi-lot6.mjs` : calque, avant / après, direction (même cadrage à 2 dates).
   `regroupement-panier.mjs` : regroupement et rattachement des photos importées.
   `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
 - Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.

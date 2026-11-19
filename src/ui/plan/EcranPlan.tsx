@@ -7,6 +7,7 @@ import { compresserPhoto } from '../../photo/compression';
 import { extensionVideo, miniatureVideo } from '../../photo/enregistrement';
 import { CameraTerrain } from '../photo/CameraTerrain';
 import { VisionneusePhoto } from '../photo/VisionneusePhoto';
+import { ComparaisonPhotos } from '../photo/ComparaisonPhotos';
 import { FicheRepere, PanneauPanier, PanneauTerrain, PhotosDuLocal } from './PanneauxTerrain';
 import type { EspaceProjet, ResultatLocal, SaisieLocal } from '../../projet/EspaceProjet';
 import { proposerLocaux } from '../../pdf/pdf';
@@ -41,6 +42,7 @@ type Mode =
   | { type: 'deplacementRepere'; repereId: string }
   | { type: 'classement'; photoIds: string[] }
   | { type: 'rattachement'; repereId: string }
+  | { type: 'direction'; repereId: string }
   | { type: 'detection'; candidats: Candidat[]; sansTexte: boolean };
 
 const PREFIXE_REPERE = 'repere:';
@@ -74,16 +76,14 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const fermetureCamera = useRef<(() => void) | null>(null);
   useRetour(!!camera, () => (fermetureCamera.current ? fermetureCamera.current() : setCamera(null)), 3);
 
-  // Le menu « Affichage » se ferme dès qu'on touche ailleurs (le plan, le panneau…).
-  const menuAffichage = useRef<HTMLDetailsElement>(null);
-  useEffect(() => {
-    const fermer = (e: PointerEvent) => {
-      const m = menuAffichage.current;
-      if (m?.open && !m.contains(e.target as Node)) m.open = false;
-    };
-    document.addEventListener('pointerdown', fermer, true);
-    return () => document.removeEventListener('pointerdown', fermer, true);
-  }, []);
+  /**
+   * Nouveau repère dont on vient de terminer les prises de vue : sa fenêtre de rattachement à un
+   * local s'ouvre à la fermeture de la visée (19/11/2026), le plan restant visible derrière.
+   */
+  const [aRattacher, setARattacher] = useState<string | null>(null);
+  /** Comparaison avant / après ouverte sur un repère (lot 6). */
+  const [comparaison, setComparaison] = useState<string | null>(null);
+  useRetour(!!aRattacher, () => setARattacher(null), 3);
 
   /** Après un placement depuis le panier : retour au panier pour continuer le classement. */
   function apresPlacement(nb: number, cible: string) {
@@ -217,7 +217,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
 
   const marqueurs: Marqueur[] = [];
   // Repère sélectionné (ou en cours de prise de vue) : son local est entouré en rouge.
-  const repereAssocie = espace.reperes.find((r) => r.id === (repereSel ?? camera?.repereId) && !r.surEtiquette);
+  const repereAssocie = espace.reperes.find((r) => r.id === (aRattacher ?? repereSel ?? camera?.repereId) && !r.surEtiquette);
   const photographies = espace.locauxPhotographies(dateLocale(new Date()));
   for (const l of locaux) {
     if (mode.type === 'deplacement' && mode.localId === l.id) continue;
@@ -244,6 +244,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         titre: `${rep.numero}${rep.libelle ? ` · ${rep.libelle}` : ''}`,
         style: rep.id === repereSel ? 'repere-selection' : 'repere',
         pastille: espace.photosDuRepere(rep.id).length || undefined,
+        vers: rep.visee,
       });
     }
   }
@@ -282,6 +283,15 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
 
   function surAppuiPlan(x: number, y: number) {
     if (mode.type === 'rattachement') return; // on attend un appui sur un local
+    if (mode.type === 'direction') {
+      const id = mode.repereId;
+      void executer(async () => {
+        await espace.modifierRepere(id, { visee: { x, y } }, auteur);
+        setMode({ type: 'consultation' });
+        setRepereSel(id);
+      });
+      return;
+    }
     if (mode.type === 'classement') {
       const photoIds = mode.photoIds;
       void executer(async () => {
@@ -431,21 +441,14 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   }
 
   /**
-   * Rattachement d'un repère, proposé dans la visée (18/11/2026) : le local associé par défaut
-   * (le plus proche), les autres locaux proches et « hors local ». Déplié d'office pour un nouveau repère.
+   * Calque de la visée (lot 6) : la photo la plus récente du repère prise un jour précédent, à défaut
+   * la plus récente du jour. Les vidéos sont écartées.
    */
-  function rattachementCamera(repereId: string | null, nouveau: boolean) {
-    const rep = repereId ? espace.reperes.find((x) => x.id === repereId) : undefined;
-    if (!rep || rep.surEtiquette) return undefined;
-    const local = rep.localId ? espace.locaux.find((l) => l.id === rep.localId) : undefined;
-    return {
-      repere: rep.numero,
-      local: local?.nom ?? null,
-      localId: rep.localId,
-      proches: espace.locauxProches(planId, rep.x, rep.y, 4).map((l) => ({ id: l.id, nom: l.nom })),
-      ouvert: nouveau,
-      surChoisir: (localId: string | null) => executer(async () => void (await espace.modifierRepere(rep.id, { localId }, auteur))),
-    };
+  function referenceCalque(repereId: string | null): Photo | null {
+    if (!repereId) return null;
+    const photos = espace.photosDuRepere(repereId).filter((p) => p.type !== 'video');
+    const aujourdhui = dateLocale(new Date());
+    return [...photos].reverse().find((p) => p.date < aujourdhui) ?? photos[photos.length - 1] ?? null;
   }
 
   const detecter = () =>
@@ -479,7 +482,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   const selectionne = selection ? espace.locaux.find((l) => l.id === selection) : undefined;
   const repereSelectionne = repereSel ? espace.reperes.find((x) => x.id === repereSel) : undefined;
   const nbPanier = espace.photosAClasser().length;
-  const modePlacement = ['ajout', 'brouillon', 'deplacement', 'deplacementRepere', 'classement', 'rattachement'].includes(mode.type);
+  const modePlacement = ['ajout', 'brouillon', 'deplacement', 'deplacementRepere', 'classement', 'rattachement', 'direction'].includes(mode.type);
 
   return (
     <div className="ecran-plan">
@@ -499,27 +502,20 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         <span className="discret mono">
           {plan.fichier.split('/').pop()} · ind. {plan.indice}
         </span>
-        <details className="options-plan" ref={menuAffichage}>
-          <summary>Affichage</summary>
-          <div className="options-plan-contenu">
-            <div className="bascule" role="group" aria-label="Appui sur un repère ou une étiquette">
-              <span className="discret">Appui sur repère ou étiquette :</span>
-              {(['photo', 'fiche'] as const).map((v) => (
-                <button
-                  key={v}
-                  className={appuiRepere === v ? 'actif' : undefined}
-                  aria-pressed={appuiRepere === v}
-                  onClick={() => {
-                    setAppuiRepere(v);
-                    void ecrireReglage('appuiRepere', v);
-                  }}
-                >
-                  {v === 'photo' ? 'Photo' : 'Fiche'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </details>
+        {/* Appui sur un repère ou une étiquette : photo (📷) ou consultation (👁). Un appui bascule (19/11/2026). */}
+        <button
+          className={`bascule-appui ${appuiRepere}`}
+          aria-label={appuiRepere === 'photo' ? 'Mode photo : un appui sur un repère ou une étiquette ouvre l’appareil photo. Toucher pour passer en consultation.' : 'Mode consultation : un appui ouvre la fiche. Toucher pour passer en mode photo.'}
+          title={appuiRepere === 'photo' ? 'Appui = photo (toucher pour passer en consultation)' : 'Appui = consultation (toucher pour passer en photo)'}
+          onClick={() => {
+            const v = appuiRepere === 'photo' ? 'fiche' : 'photo';
+            setAppuiRepere(v);
+            void ecrireReglage('appuiRepere', v);
+          }}
+        >
+          <span aria-hidden="true">{appuiRepere === 'photo' ? '📷' : '👁'}</span>
+          <span className="bascule-appui-texte">{appuiRepere === 'photo' ? 'Photo' : 'Consultation'}</span>
+        </button>
         {enAttente > 0 && <span className="enregistrement">Enregistrement de {enAttente} photo{enAttente > 1 ? 's' : ''}…</span>}
         <div className="barre-recherche-plan">
           <BarreRecherche espace={espace} surChoix={choisirResultat} />
@@ -556,7 +552,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
           ) : (
             <div className="vue-etat">Lecture du plan…</div>
           )}
-          {(mode.type === 'ajout' || mode.type === 'deplacement' || mode.type === 'deplacementRepere' || mode.type === 'classement' || mode.type === 'rattachement') && (
+          {(mode.type === 'ajout' || mode.type === 'deplacement' || mode.type === 'deplacementRepere' || mode.type === 'classement' || mode.type === 'rattachement' || mode.type === 'direction') && (
             <div className="consigne">
               {mode.type === 'ajout'
                 ? 'Touchez le plan à l’emplacement du local.'
@@ -564,6 +560,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                   ? `${mode.photoIds.length > 1 ? `${mode.photoIds.length} photos` : '1 photo'} : touchez l’étiquette d’un local, un repère, ou le plan pour créer un repère.`
                   : mode.type === 'rattachement'
                     ? 'Touchez l’étiquette du local auquel rattacher le repère.'
+                    : mode.type === 'direction'
+                    ? 'Touchez le plan dans la direction où regarde l’appareil photo.'
                     : mode.type === 'deplacementRepere'
                       ? 'Touchez la nouvelle position du repère.'
                       : 'Touchez la nouvelle position du local.'}
@@ -617,6 +615,9 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
               surFermer={() => setRepereSel(null)}
               surChoisirLocalSurPlan={() => setMode({ type: 'rattachement', repereId: repereSelectionne.id })}
+              surDirection={() => setMode({ type: 'direction', repereId: repereSelectionne.id })}
+              surEffacerDirection={() => executer(async () => void (await espace.modifierRepere(repereSelectionne.id, { visee: null }, auteur)))}
+              surComparer={() => setComparaison(repereSelectionne.id)}
             />
           ) : mode.type === 'brouillon' ? (
             <FicheLocal
@@ -644,13 +645,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                     key={`photos-${selectionne.id}`}
                     espace={espace}
                     localId={selectionne.id}
-                    occupe={occupe}
-                    surPhoto={() =>
-                      void executer(async () => {
-                        const r = await espace.repereEtiquette(selectionne.id, auteur);
-                        ouvrirCamera(r.id);
-                      })
-                    }
+                    appuiPhoto={appuiRepere === 'photo'}
                     surOuvrirPhoto={(photos, index) => setPhotoOuverte({ photos, index })}
                   />
                 ) : undefined
@@ -748,12 +743,36 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
           espace={espace}
           auteur={auteur}
           titre={titreCamera(camera.repereId)}
-          rattachement={rattachementCamera(camera.repereId, !!camera.nouveau)}
           fermeture={fermetureCamera}
+          reference={referenceCalque(camera.repereId)}
           enAttente={enAttente}
           surCapture={(photo, source, prisLe) => enregistrerPhoto(photo, source, prisLe, camera.repereId)}
           surVideo={(fichier, source, prisLe, nom) => enregistrerVideo(fichier, source, prisLe, camera.repereId, nom)}
-          surFermer={() => setCamera(null)}
+          surFermer={() => {
+            if (camera.nouveau && camera.repereId) setARattacher(camera.repereId);
+            setCamera(null);
+          }}
+        />
+      )}
+      {comparaison && (
+        <ComparaisonPhotos
+          espace={espace}
+          photos={espace.photosDuRepere(comparaison)}
+          titre={`Repère ${espace.reperes.find((r) => r.id === comparaison)?.numero ?? ''} · avant / après`}
+          surFermer={() => setComparaison(null)}
+        />
+      )}
+      {aRattacher && !camera && (
+        <FenetreRattachement
+          espace={espace}
+          repereId={aRattacher}
+          occupe={occupe}
+          surChoisir={(localId) => executer(async () => void (await espace.modifierRepere(aRattacher, { localId }, auteur)))}
+          surChoisirSurPlan={() => {
+            setARattacher(null);
+            setMode({ type: 'rattachement', repereId: aRattacher });
+          }}
+          surFermer={() => setARattacher(null)}
         />
       )}
       {photoOuverte && (
@@ -771,6 +790,63 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
 }
 
 // ------------------------------------------------------------------ panneaux
+
+/**
+ * Rattachement d'un nouveau repère, proposé une fois ses prises de vue terminées (19/11/2026) :
+ * le local associé par défaut (le plus proche, entouré en rouge sur le plan), les autres locaux
+ * proches, « hors local » ou « choisir sur le plan ». Le bouton Retour vaut OK.
+ */
+function FenetreRattachement({
+  espace,
+  repereId,
+  occupe,
+  surChoisir,
+  surChoisirSurPlan,
+  surFermer,
+}: {
+  espace: EspaceProjet;
+  repereId: string;
+  occupe: boolean;
+  surChoisir: (localId: string | null) => void;
+  surChoisirSurPlan: () => void;
+  surFermer: () => void;
+}) {
+  const rep = espace.reperes.find((r) => r.id === repereId);
+  if (!rep) return null;
+  const local = rep.localId ? espace.locaux.find((l) => l.id === rep.localId) : undefined;
+  const proches = espace.locauxProches(rep.planId, rep.x, rep.y, 4).filter((l) => l.id !== rep.localId);
+  const nb = espace.photosDuRepere(rep.id).length;
+  return (
+    <div className="fenetre-rattachement" role="dialog" aria-label="Local du repère">
+      <div>
+        <strong>
+          📍 Repère {rep.numero} → <span className={local ? 'local-associe' : 'discret'}>{local ? local.nom : 'hors local'}</span>
+        </strong>
+        <div className="discret petit-texte">
+          {nb} prise{nb > 1 ? 's' : ''} de vue · associé par défaut au local le plus proche (entouré en rouge). Autre choix :
+        </div>
+      </div>
+      <div className="boutons">
+        {proches.map((l) => (
+          <button key={l.id} className="petit" disabled={occupe} onClick={() => surChoisir(l.id)}>
+            {l.nom}
+          </button>
+        ))}
+        {rep.localId && (
+          <button className="petit" disabled={occupe} onClick={() => surChoisir(null)}>
+            Hors local
+          </button>
+        )}
+        <button className="petit" disabled={occupe} onClick={surChoisirSurPlan}>
+          Choisir sur le plan
+        </button>
+        <button className="principal" onClick={surFermer}>
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ListeLocaux({
   locaux,
