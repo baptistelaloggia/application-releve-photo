@@ -74,3 +74,42 @@ export async function retirerPhotosExportees(projetId: string, ids: Iterable<str
   for (const id of ids) change = deja.delete(id) || change;
   if (change) await ecrireReglage(`photosExportees:${projetId}`, [...deja]);
 }
+
+/**
+ * Tags (20/11/2026) : favoris, tags récents et tags personnels, mémorisés sur l'appareil.
+ * Les tags eux-mêmes sont enregistrés dans le JSON de chaque photo.
+ */
+export interface MemoireTags {
+  favoris: string[];
+  recents: string[];
+  perso: string[];
+}
+
+const RECENTS_MAX = 30;
+
+export async function lireMemoireTags(): Promise<MemoireTags> {
+  return (await lireReglage<MemoireTags>('tags')) ?? { favoris: [], recents: [], perso: [] };
+}
+
+async function ecrireMemoireTags(m: MemoireTags): Promise<MemoireTags> {
+  await ecrireReglage('tags', m);
+  return m;
+}
+
+/** Tags utilisés : ils passent en tête des récents. */
+export async function noterTagsUtilises(tags: string[]): Promise<MemoireTags> {
+  const m = await lireMemoireTags();
+  const recents = [...tags, ...m.recents.filter((t) => !tags.includes(t))].slice(0, RECENTS_MAX);
+  return ecrireMemoireTags({ ...m, recents });
+}
+
+export async function basculerTagFavori(tag: string): Promise<MemoireTags> {
+  const m = await lireMemoireTags();
+  const favoris = m.favoris.includes(tag) ? m.favoris.filter((t) => t !== tag) : [...m.favoris, tag];
+  return ecrireMemoireTags({ ...m, favoris });
+}
+
+export async function ajouterTagPerso(tag: string): Promise<MemoireTags> {
+  const m = await lireMemoireTags();
+  return m.perso.includes(tag) ? m : ecrireMemoireTags({ ...m, perso: [...m.perso, tag] });
+}

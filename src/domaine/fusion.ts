@@ -17,6 +17,7 @@
  */
 import { ANNOTATIONS_MAX, annotationValide } from './annotations';
 import { proposerNumeroLocal } from './locaux';
+import { tagsValides } from './tags';
 import { numeroRepere } from './nommage';
 import type { Local, Niveau, Photo, Plan, Repere } from './types';
 
@@ -186,10 +187,13 @@ export function fusionner(cible: DonneesProjet, paquet: DonneesProjet): Resultat
     const p: Photo = { ...brut, repereId: brut.repereId ? (idRepere.get(brut.repereId) ?? null) : null };
     const meme = cible.photos.find((x) => x.id === p.id);
     if (meme) {
-      if (dateModifPhoto(p) > dateModifPhoto(meme) && (p.repereId !== meme.repereId || p.commentaire !== meme.commentaire || annexesChangees(meme, p))) {
+      const tagsChanges = JSON.stringify(p.tags ?? []) !== JSON.stringify(meme.tags ?? []);
+      if (dateModifPhoto(p) > dateModifPhoto(meme) && (p.repereId !== meme.repereId || p.commentaire !== meme.commentaire || tagsChanges || annexesChangees(meme, p))) {
         const maj: Photo = { ...meme, repereId: p.repereId, commentaire: p.commentaire, modifieLe: p.modifieLe };
         delete maj.annotations;
         delete maj.noteVocale;
+        delete maj.tags;
+        if (p.tags?.length) maj.tags = p.tags;
         if (p.annotations?.length) maj.annotations = p.annotations;
         if (p.noteVocale) maj.noteVocale = p.noteVocale;
         r.photosModifiees.push(maj);
@@ -250,7 +254,8 @@ export function controlerDonnees(d: DonneesProjet, codeAutorise: (code: string) 
   for (const r of d.reperes) {
     verifier(
       ID.test(r.id) && ID.test(r.planId) && (r.localId === null || ID.test(r.localId)) && NUMERO_REPERE.test(r.numero) && texte(r.libelle, 120) && dansLaPage(r.x) && dansLaPage(r.y) &&
-        (r.visee === undefined || (typeof r.visee === 'object' && r.visee !== null && dansLaPage(r.visee.x) && dansLaPage(r.visee.y))),
+        (r.visee === undefined || (typeof r.visee === 'object' && r.visee !== null && dansLaPage(r.visee.x) && dansLaPage(r.visee.y))) &&
+        (r.suivi === undefined || typeof r.suivi === 'boolean'),
       `repère ${String(r.numero).slice(0, 20)}`,
     );
   }
@@ -259,6 +264,7 @@ export function controlerDonnees(d: DonneesProjet, codeAutorise: (code: string) 
     verifier(
       ID.test(ph.id) && (ph.repereId === null || ID.test(ph.repereId)) && DATE.test(ph.date) && Number.isInteger(ph.rang) && ph.rang >= 0 && ph.rang < 10000 && texte(ph.commentaire, 2000) && /^[0-9a-f]{64}$/.test(ph.empreinte) &&
         (ph.type === undefined || ph.type === 'video') &&
+        (ph.tags === undefined || tagsValides(ph.tags)) &&
         (ph.extension === undefined || (ph.type === 'video' && (ph.extension === 'mp4' || ph.extension === 'webm'))) &&
         (ph.duree === undefined || (typeof ph.duree === 'number' && ph.duree >= 0 && ph.duree < 36000)) &&
         (ph.annotations === undefined || (Array.isArray(ph.annotations) && ph.annotations.length <= ANNOTATIONS_MAX && ph.annotations.every(annotationValide))) &&

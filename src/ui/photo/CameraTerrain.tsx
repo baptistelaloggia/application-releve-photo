@@ -15,7 +15,9 @@ import {
 import { retirerPhotosExportees } from '../../stockage/registre';
 import { texteErreur } from '../commun';
 import { EditeurAnnotations } from './EditeurAnnotations';
-import { BoutonNoteVocale } from './NoteVocale';
+import { BarreTags } from './BarreTags';
+import { Miniature } from './Miniature';
+import { appliquerPhrase, BoutonNoteVocale } from './NoteVocale';
 
 interface Props {
   espace: EspaceProjet;
@@ -24,17 +26,18 @@ interface Props {
   titre: string;
   /** Photos en cours de compression et d'enregistrement. */
   enAttente: number;
-  /** Enregistre une photo ; renvoie la photo enregistrée (null en cas d'échec). */
-  surCapture: (photo: Blob, source: 'appli' | 'appareil', prisLe: Date) => Promise<Photo | null>;
-  /** Enregistre une vidéo. */
-  surVideo: (video: Blob, source: 'appli' | 'appareil', prisLe: Date, nomOrigine?: string) => Promise<Photo | null>;
+  /** Enregistre une photo avec les tags actifs ; renvoie la photo enregistrée (null en cas d'échec). */
+  surCapture: (photo: Blob, source: 'appli' | 'appareil', prisLe: Date, tags: string[]) => Promise<Photo | null>;
+  /** Enregistre une vidéo avec les tags actifs. */
+  surVideo: (video: Blob, source: 'appli' | 'appareil', prisLe: Date, tags: string[], nomOrigine?: string) => Promise<Photo | null>;
   surFermer: () => void;
   /** Reçoit la fonction de fermeture (pour le bouton Retour du téléphone). */
   fermeture?: MutableRefObject<(() => void) | null>;
   /**
-   * Suivi dans le temps (lot 6) : photo précédente du repère, affichée en transparence par-dessus
-   * la visée pour reprendre le même cadrage.
+   * Suivi dans le temps (lot 6), sur les repères de suivi seulement (20/11/2026) : photos du repère
+   * proposées en calque, et celle affichée d'office (la plus récente d'un jour précédent).
    */
+  calques?: Photo[];
   reference?: Photo | null;
 }
 
@@ -44,7 +47,7 @@ type Mode = 'photo' | 'video';
  * Visée plein écran : déclencheur, rafale, mode vidéo, retour au plan.
  * Après une prise de vue, deux raccourcis sur la dernière : « Annoter » et « Note vocale ».
  */
-export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, surVideo, surFermer, fermeture, reference }: Props) {
+export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, surVideo, surFermer, fermeture, calques = [], reference }: Props) {
   const video = useRef<HTMLVideoElement>(null);
   const flux = useRef<MediaStream | null>(null);
   const micro = useRef<MediaStream | null>(null);
@@ -54,17 +57,23 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
   const [eclair, setEclair] = useState(false);
   const [mode, setMode] = useState<Mode>('photo');
   const [derniere, setDerniere] = useState<Photo | null>(null);
-  // Calque : photo précédente en transparence (activé d'office quand il y en a une).
+  // Tags actifs (20/11/2026) : appliqués à toutes les prises suivantes (groupe de photos).
+  const [tagsActifs, setTagsActifs] = useState<string[]>([]);
+  const [barreTags, setBarreTags] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  // Calque (repère de suivi) : photo choisie en transparence, la plus récente d'un jour précédent d'office.
+  const [calqueId, setCalqueId] = useState<string | null>(reference?.id ?? null);
+  const [choixCalque, setChoixCalque] = useState(false);
+  const photoCalque = calques.find((p) => p.id === calqueId) ?? null;
   const [calque, setCalque] = useState<string | null>(null);
-  const [calqueVisible, setCalqueVisible] = useState(true);
   const [opacite, setOpacite] = useState(0.4);
   useEffect(() => {
     setCalque(null);
-    if (!reference) return;
+    if (!photoCalque) return;
     let url: string | null = null;
     let annule = false;
     espace
-      .lirePhoto(reference)
+      .lirePhoto(photoCalque)
       .then((b) => {
         if (annule) return;
         url = URL.createObjectURL(b);
@@ -75,7 +84,7 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
       annule = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [espace, reference?.id]);
+  }, [espace, photoCalque?.id]);
   const [annoter, setAnnoter] = useState<Photo | null>(null);
   const [tournage, setTournage] = useState<{ debut: number; secondes: number } | null>(null);
   const enregistreur = useRef<{ rec: Enregistreur; prisLe: Date; minuteur: number } | null>(null);
@@ -121,7 +130,7 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
       try {
         if (!flux.current || !video.current) return;
         const photo = await prendrePhoto(flux.current, video.current);
-        suivre(surCapture(photo, 'appli', prisLe));
+        suivre(surCapture(photo, 'appli', prisLe, tagsActifs));
         setPrises((n) => n + 1);
       } catch (e) {
         setErreur(texteErreurCamera(e));
@@ -183,7 +192,7 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
     try {
       const { fichier } = await e.rec.arreter();
       if (fichier.size) {
-        const p = surVideo(fichier, 'appli', e.prisLe);
+        const p = surVideo(fichier, 'appli', e.prisLe, tagsActifs);
         file.current = file.current.then(() => p.then(() => undefined));
         suivre(p);
         setPrises((n) => n + 1);
@@ -210,7 +219,7 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
   return (
     <div className="camera" role="dialog" aria-label="Appareil photo">
       <video ref={video} playsInline muted className="camera-video" />
-      {calque && calqueVisible && <img src={calque} alt="" className="camera-calque" style={{ opacity: opacite }} />}
+      {calque && <img src={calque} alt="" className="camera-calque" style={{ opacity: opacite }} />}
       {eclair && <div className="camera-eclair" />}
       <div className="camera-haut">
         <button className="camera-fermer" onClick={() => void fermer()}>
@@ -219,29 +228,63 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
         <div className="camera-titre">{titre}</div>
         {tournage && <div className="camera-tournage">● {dureeLisible(tournage.secondes)}</div>}
       </div>
-      {calque && reference && (
-        <div className="camera-calque-commandes">
+      <div className="camera-outils">
+        <button
+          className={`petit${tagsActifs.length ? ' actif' : ''}`}
+          aria-pressed={barreTags}
+          onClick={() => setBarreTags(!barreTags)}
+          title="Tags appliqués aux prochaines prises de vue"
+        >
+          🏷 {tagsActifs.length ? tagsActifs.join(', ') : 'Tags'}
+        </button>
+        {calques.length > 0 && (
           <button
             className="petit"
-            aria-pressed={calqueVisible}
-            onClick={() => setCalqueVisible(!calqueVisible)}
+            aria-pressed={choixCalque}
+            onClick={() => setChoixCalque(!choixCalque)}
             title="Photo précédente en transparence, pour reprendre le même cadrage"
           >
-            {calqueVisible ? '◐' : '○'} Calque du {new Date(reference.prisLe).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+            {photoCalque ? '◐' : '○'} Calque{photoCalque ? ` du ${new Date(photoCalque.prisLe).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}` : ''}
           </button>
-          {calqueVisible && (
-            <input
-              type="range"
-              min={0.1}
-              max={0.8}
-              step={0.05}
-              value={opacite}
-              aria-label="Transparence du calque"
-              onChange={(e) => setOpacite(Number(e.target.value))}
-            />
-          )}
+        )}
+        {photoCalque && (
+          <input
+            type="range"
+            min={0.1}
+            max={0.8}
+            step={0.05}
+            value={opacite}
+            aria-label="Transparence du calque"
+            onChange={(e) => setOpacite(Number(e.target.value))}
+          />
+        )}
+      </div>
+      {barreTags && (
+        <div className="camera-tags">
+          <BarreTags sombre selection={tagsActifs} surChange={setTagsActifs} />
+          <span className="petit-texte">Ces tags s'appliquent aux prochaines prises de vue.</span>
         </div>
       )}
+      {choixCalque && (
+        <div className="camera-choix-calque" role="group" aria-label="Photo en calque">
+          <button className={`petit${calqueId === null ? ' actif' : ''}`} onClick={() => setCalqueId(null)}>
+            Aucun
+          </button>
+          {[...calques].reverse().map((p) => (
+            <button
+              key={p.id}
+              className={`vignette-calque${p.id === calqueId ? ' actif' : ''}`}
+              aria-label={`Calque : photo du ${new Date(p.prisLe).toLocaleString('fr-FR')}`}
+              aria-pressed={p.id === calqueId}
+              onClick={() => setCalqueId(p.id)}
+            >
+              <Miniature espace={espace} photo={p} taille={56} />
+              <span>{new Date(p.prisLe).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {info && <div className="camera-info" role="status">{info}</div>}
       {erreur && <div className="camera-erreur">{erreur}</div>}
       {derniere && !tournage && (
         <div className="camera-derniere">
@@ -253,9 +296,13 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
           )}
           <BoutonNoteVocale
             libelle={espace.photos.find((p) => p.id === derniere.id)?.noteVocale ? '🎤 Note ✓' : '🎤 Note vocale'}
-            surEnregistre={async (note) => {
+            surEnregistre={async (note, phrase) => {
               try {
-                setDerniere(await espace.enregistrerNoteVocale(derniere.id, note, auteur));
+                await espace.enregistrerNoteVocale(derniere.id, note, auteur);
+                // Phrase transcrite : commentaire de la photo, et tags reconnus ajoutés.
+                const reconnus = await appliquerPhrase(espace, derniere.id, phrase);
+                setDerniere(espace.photos.find((p) => p.id === derniere.id) ?? derniere);
+                if (phrase) setInfo(`« ${phrase} »${reconnus.length ? ` · tags : ${reconnus.join(', ')}` : ''}`);
                 await retirerPhotosExportees(espace.projet.id, [derniere.id]);
               } catch (e) {
                 setErreur(texteErreur(e));
@@ -307,7 +354,9 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
               const f = e.target.files?.[0];
               if (f) {
                 const prisLe = new Date(f.lastModified || Date.now());
-                suivre(enVideo || f.type.startsWith('video/') ? surVideo(f, 'appareil', prisLe, f.name) : surCapture(f, 'appareil', prisLe));
+                suivre(
+                  enVideo || f.type.startsWith('video/') ? surVideo(f, 'appareil', prisLe, tagsActifs, f.name) : surCapture(f, 'appareil', prisLe, tagsActifs),
+                );
                 setPrises((n) => n + 1);
               }
               e.target.value = '';

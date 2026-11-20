@@ -1,7 +1,9 @@
 // Test de bout en bout du lot 6 (suivi dans le temps), dans Chromium avec une fausse caméra.
 // Critère de validation du lot (CONCEPTION §A.8) : « même cadrage à 2 dates ».
 //   1. Une photo ancienne (30/10/2026, date lue dans l'EXIF) est placée sur un repère.
-//   2. En reprenant ce repère, la visée affiche cette photo en transparence (calque réglable).
+//   2. Sans « repère de suivi », pas de calque ; une fois le repère désigné, la visée affiche
+//      cette photo en transparence (calque réglable, photo au choix). Tags actifs dans la visée,
+//      note vocale transcrite (reconnaissance vocale simulée) : commentaire et tags.
 //   3. La comparaison avant / après (rideau, côte à côte, frise des dates) s'ouvre depuis la fiche
 //      du repère et depuis la visionneuse ; le bouton Retour la ferme.
 //   4. La direction de prise de vue se saisit d'un appui sur le plan et se dessine en flèche.
@@ -34,10 +36,24 @@ function exifDate(date) {
 const serveur = await servir(join(racine, 'dist'));
 const url = `http://localhost:${serveur.address().port}/`;
 const navigateur = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
-const contexte = await navigateur.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['camera'] });
+const contexte = await navigateur.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['camera', 'microphone'] });
 await contexte.addInitScript(() => {
   delete window.showDirectoryPicker;
   delete Window.prototype.showDirectoryPicker;
+  // Reconnaissance vocale simulée (Chromium sans interface n'en a pas d'utilisable) : elle rend une
+  // phrase fixe. L'accord pour la transcription en ligne est donné (dialogue accepté).
+  class ReconnaissanceFictive {
+    static available = async () => 'available';
+    start() {}
+    stop() {
+      setTimeout(() => {
+        this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'VC non conforme, calorifuge absent' } }] });
+        this.onend?.();
+      }, 50);
+    }
+    abort() {}
+  }
+  window.SpeechRecognition = ReconnaissanceFictive;
 });
 const page = await contexte.newPage();
 const erreurs = [];
@@ -95,8 +111,18 @@ try {
   await page.mouse.click(tgbt.x + tgbt.width / 2 + 10, tgbt.y + 80);
   await page.getByText(/1 photo placée sur le nouveau repère P001/).waitFor();
 
-  // 2. Nouvelle visite : appui sur P001 (mode photo) ; la photo du 30/10 est en transparence dans la visée.
+  // 2. Repère ordinaire : pas de calque dans la visée (20/11/2026).
   await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P001' }).click();
+  await page.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator('.camera-calque').count(), 0);
+  assert.equal(await page.getByRole('button', { name: /Calque/ }).count(), 0);
+  await page.goBack();
+  await page.locator('.camera').waitFor({ state: 'detached' });
+  // Le repère est désigné « repère de suivi » ; la photo du 30/10 est alors en calque, d'office.
+  await page.getByRole('button', { name: '📌 Repère de suivi' }).click();
+  await page.getByRole('button', { name: '📌 Repère de suivi ✓' }).waitFor();
+  await page.locator('.marqueur .marqueur-libelle', { hasText: '📌 P001' }).waitFor();
+  await page.getByRole('button', { name: '📷 Prendre une photo' }).click();
   await page.locator('.camera-declencheur:not([disabled])').waitFor({ timeout: 30_000 });
   const calque = page.locator('.camera-calque');
   await calque.waitFor();
@@ -104,9 +130,33 @@ try {
   await page.getByRole('button', { name: /Calque du 30\/10\/26/ }).waitFor();
   await page.getByLabel('Transparence du calque').fill('0.6');
   assert.equal(await calque.evaluate((e) => getComputedStyle(e).opacity), '0.6');
+  // Choix de la photo en calque : « Aucun », puis de nouveau celle du 30/10.
+  await page.getByRole('button', { name: /Calque du 30\/10\/26/ }).click();
+  await page.locator('.camera-choix-calque').getByRole('button', { name: 'Aucun' }).click();
+  await calque.waitFor({ state: 'detached' });
+  await page.locator('.camera-choix-calque .vignette-calque').first().click();
+  await calque.waitFor();
   await capture('1-calque');
+  await page.getByRole('button', { name: /Calque du/ }).click(); // referme le choix
+
+  // Tags actifs : une puce, puis la liste complète (recherche « cal ») ; ils s'appliquent à la prise.
+  await page.getByRole('button', { name: /🏷 Tags/ }).click();
+  const barre = page.locator('.camera-tags');
+  await barre.getByRole('button', { name: 'Non conforme' }).click();
+  await barre.getByRole('button', { name: 'Tous les tags' }).click();
+  await page.getByLabel('Rechercher un tag').fill('cal');
+  await page.locator('.liste-tags').getByRole('button', { name: '☐ Calorifuge' }).click();
+  await capture('1b-liste-tags');
+  await page.locator('.liste-tags').getByRole('button', { name: 'OK' }).click();
+  await page.getByRole('button', { name: '🏷 Non conforme, Calorifuge' }).waitFor();
   await page.getByRole('button', { name: 'Prendre la photo' }).click();
   await page.waitForFunction(() => !/enregistrement/.test(document.querySelector('.camera-compteur')?.textContent ?? ''), null, { timeout: 60_000 });
+  // Note vocale sur la dernière photo : la phrase devient commentaire, « VC » s'ajoute aux tags.
+  await page.locator('.camera-derniere').getByRole('button', { name: '🎤 Note vocale' }).click();
+  await page.waitForTimeout(800);
+  await page.locator('.camera-derniere').getByRole('button', { name: /Arrêter/ }).click();
+  await page.locator('.camera-info', { hasText: '« VC non conforme, calorifuge absent » · tags : Non conforme, Calorifuge, VC' }).waitFor({ timeout: 15_000 });
+  await capture('1c-tags-note');
   await page.goBack(); // bouton Retour : fin des prises de vue
   await page.locator('.camera').waitFor({ state: 'detached' });
   // Repère existant : pas de fenêtre de rattachement (réservée aux nouveaux repères).
@@ -158,6 +208,19 @@ try {
   await voile.waitFor();
   await page.goBack();
   await voile.waitFor({ state: 'detached' });
+
+  // Données : tags et commentaire de la photo du jour.
+  const photoDuJour = await page.evaluate(async () => {
+    let d = await navigator.storage.getDirectory();
+    for (const m of ['projets', `${new Date().getFullYear()}-T06_Suivi-fictif`, '_data', 'photos']) d = await d.getDirectoryHandle(m);
+    for await (const [, h] of d.entries()) {
+      const p = JSON.parse(await (await h.getFile()).text());
+      if (p.source === 'appli') return p;
+    }
+  });
+  assert.deepEqual(photoDuJour.tags, ['Non conforme', 'Calorifuge', 'VC']);
+  assert.equal(photoDuJour.commentaire, 'VC non conforme, calorifuge absent');
+  assert.equal(photoDuJour.noteVocale.extension, 'wav');
 
   // Données : la direction est enregistrée dans le JSON du repère.
   const visee = await page.evaluate(async () => {

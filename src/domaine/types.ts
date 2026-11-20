@@ -123,6 +123,11 @@ export interface Repere {
    * téléphone est peu fiable près des masses métalliques, et le nord du plan n'est pas connu.
    */
   visee?: { x: number; y: number };
+  /**
+   * Repère de suivi (20/11/2026) : désigné par l'utilisateur pour le suivi dans le temps. Seuls ces
+   * repères proposent le calque dans la visée et la comparaison avant / après.
+   */
+  suivi?: boolean;
   creeLe: string;
   creePar: string;
   modifieLe: string;
@@ -195,4 +200,6 @@ export interface Photo {
    */
   annotations?: Annotation[];
   noteVocale?: NoteVocale;
+  /** Tags (20/11/2026) : « CTA », « Non conforme », « Avant fermeture »… (CONCEPTION §A.6 decies). */
+  tags?: string[];
 }

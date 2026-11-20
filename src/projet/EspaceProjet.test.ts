@@ -260,6 +260,21 @@ describe('repères et photos', () => {
     expect(e.reperes[0].visee).toBeUndefined();
   });
 
+  it('enregistre les tags d’une prise de vue, sans doublon, et le drapeau « repère de suivi »', async () => {
+    const { s, e, planId } = await projet();
+    const r = await e.creerRepere(planId, 0.5, 0.5, 'BL');
+    const p = await e.ajouterPhoto({ ...entree(r.id, 't'), tags: ['CTA', ' cta ', 'Non   conforme'] }, 'BL');
+    expect(p.tags).toEqual(['CTA', 'Non conforme']);
+    await e.etiqueterPhoto(p.id, ['Calorifuge']);
+    expect((await EspaceProjet.ouvrir(s)).photos[0].tags).toEqual(['Calorifuge']);
+    await e.etiqueterPhoto(p.id, []);
+    expect(e.photos[0].tags).toBeUndefined();
+    await e.modifierRepere(r.id, { suivi: true }, 'BL');
+    expect(e.reperes[0].suivi).toBe(true);
+    await e.modifierRepere(r.id, { suivi: false }, 'BL');
+    expect(e.reperes[0].suivi).toBeUndefined();
+  });
+
   it('classe une photo du panier, puis la renvoie au panier', async () => {
     const { s, e, planId } = await projet();
     const p = await e.ajouterPhoto(entree(null, 'x'), 'BL');

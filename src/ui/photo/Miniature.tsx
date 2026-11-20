@@ -31,11 +31,12 @@ export function Miniature({ espace, photo, taille = 96 }: { espace: EspaceProjet
   return (
     <span className="miniature" style={{ width: taille, height: taille }}>
       {src ? <img src={src} alt="" loading="lazy" /> : null}
-      {(photo.type === 'video' || photo.annotations?.length || photo.noteVocale) && (
+      {(photo.type === 'video' || photo.annotations?.length || photo.noteVocale || photo.tags?.length) && (
         <span className="miniature-marques">
           {photo.type === 'video' && <span title="Vidéo">▶ {dureeLisible(photo.duree ?? 0)}</span>}
           {!!photo.annotations?.length && <span title="Annotée">✏️</span>}
           {photo.noteVocale && <span title="Note vocale">🎤</span>}
+          {!!photo.tags?.length && <span title={photo.tags.join(', ')}>🏷{photo.tags.length}</span>}
         </span>
       )}
     </span>

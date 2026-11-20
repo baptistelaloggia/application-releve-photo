@@ -114,7 +114,7 @@ export function FicheRepere({
   surPhoto: () => void;
   surDeplacer: () => void;
   surSupprimer: () => void;
-  surModifier: (maj: { libelle?: string; localId?: string | null }) => void;
+  surModifier: (maj: { libelle?: string; localId?: string | null; suivi?: boolean }) => void;
   surOuvrirPhoto: (photos: Photo[], index: number) => void;
   surFermer: () => void;
 }) {
@@ -200,7 +200,17 @@ export function FicheRepere({
         />
       </label>
       <div className="boutons">
-        {comparable(photos) && (
+        {/* Suivi dans le temps : réservé aux repères désignés (20/11/2026). */}
+        <button
+          className={`petit${repere.suivi ? ' actif' : ''}`}
+          aria-pressed={!!repere.suivi}
+          onClick={() => surModifier({ suivi: !repere.suivi })}
+          disabled={occupe}
+          title="Repère de suivi : calque de la photo précédente dans la visée, comparaison avant / après"
+        >
+          📌 {repere.suivi ? 'Repère de suivi ✓' : 'Repère de suivi'}
+        </button>
+        {repere.suivi && comparable(photos) && (
           <button className="petit" onClick={surComparer} disabled={occupe}>
             ↔ Avant / après
           </button>

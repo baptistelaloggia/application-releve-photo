@@ -97,6 +97,15 @@ describe('fusion de deux exemplaires d’un projet', () => {
     expect(r.compteRendu).toContain('1 photo déjà présente (même contenu), ignorée.');
   });
 
+  it('reprend les tags plus récents, et contrôle les tags reçus', () => {
+    const cible = serveur();
+    const paquet = serveur();
+    paquet.photos[0] = { ...paquet.photos[0], tags: ['CTA', 'Non conforme'], modifieLe: t(9) };
+    expect(fusionner(cible, paquet).photosModifiees[0].tags).toEqual(['CTA', 'Non conforme']);
+    paquet.photos[0] = { ...paquet.photos[0], empreinte: 'ab'.repeat(32), tags: ['x'.repeat(200)] };
+    expect(controlerDonnees(paquet, estCodeNiveauAutorise)).toHaveLength(1);
+  });
+
   it('reprend les annotations et la note vocale plus récentes', () => {
     const cible = serveur();
     const paquet = serveur();

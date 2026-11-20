@@ -277,10 +277,39 @@ button.projet .discret { font-size: 0.85rem; }
 .camera-annoter { position: absolute; inset: 0; z-index: 60; }
 /* Calque (lot 6) : photo précédente en transparence, cadrée comme la visée. */
 .camera-calque { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-.camera-calque-commandes { position: absolute; right: 12px; top: 72px; z-index: 4; display: flex; flex-direction: column;
-  align-items: flex-end; gap: 6px; }
-.camera-calque-commandes button { background: rgb(0 0 0 / 0.55); color: #fff; border-color: rgb(255 255 255 / 0.6); }
-.camera-calque-commandes input { width: 150px; }
+/* Outils de la visée (20/11/2026) : tags actifs, calque (repère de suivi), transparence. */
+.camera-outils { position: absolute; right: 12px; top: 72px; z-index: 4; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 6px; max-width: 60%; }
+.camera-outils button { background: rgb(0 0 0 / 0.55); color: #fff; border-color: rgb(255 255 255 / 0.6); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.camera-outils button.actif { border-color: #ffd54f; color: #ffd54f; }
+.camera-outils input { width: 150px; }
+.camera-tags, .camera-choix-calque { position: absolute; left: 8px; right: 8px; bottom: 180px; z-index: 6; padding: 8px;
+  background: rgb(0 0 0 / 0.75); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: #fff; }
+.camera-choix-calque { overflow-x: auto; flex-wrap: nowrap; }
+.camera-choix-calque button.actif { border-color: #ffd54f; }
+.vignette-calque { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px; background: none;
+  border: 2px solid transparent; border-radius: 8px; color: #fff; font-size: 0.75rem; min-height: 0; }
+.camera-info { position: absolute; left: 12px; right: 12px; top: 130px; z-index: 5; background: rgb(0 0 0 / 0.7);
+  color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 0.85rem; }
+/* Barre de tags : 6 puces, « ＋ Tous » pour la liste complète. */
+.barre-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.puce-tag { min-height: 36px; padding: 4px 12px; border-radius: 18px; font-size: 0.9rem; }
+.puce-tag.active { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); }
+.puce-tag.tous { border-style: dashed; }
+.barre-tags.sombre .puce-tag { background: rgb(255 255 255 / 0.12); color: #fff; border-color: rgb(255 255 255 / 0.5); }
+.barre-tags.sombre .puce-tag.active { background: #ffd54f; color: #000; border-color: #ffd54f; }
+.liste-tags { position: fixed; inset: 0; z-index: 70; background: var(--carte); color: var(--texte); display: flex; flex-direction: column; }
+.liste-tags-haut { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid var(--bord); }
+.liste-tags-haut input { flex: 1; font-size: 16px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--bord); }
+.creer-tag { margin: 12px 0 0; }
+.liste-tags-corps { flex: 1; overflow-y: auto; padding: 0 10px 16px; }
+.liste-tags-corps h3 { font-size: 0.85rem; color: var(--discret); margin: 12px 0 4px; }
+.liste-tags-corps ul { list-style: none; margin: 0; padding: 0; }
+.liste-tags-corps li { display: flex; border-bottom: 1px solid var(--bord); }
+.ligne-tag { flex: 1; text-align: left; border: none; background: none; min-height: 44px; border-radius: 0; }
+.ligne-tag.active { font-weight: 600; color: var(--accent); }
+.favori-tag { border: none; background: none; font-size: 1.2rem; min-width: 44px; color: #e0a800; }
 /* Comparaison avant / après (lot 6). */
 .comparaison { position: fixed; inset: 0; z-index: 45; background: #111; color: #fff; display: flex; flex-direction: column; }
 .comparaison-haut, .comparaison-bas { padding: 8px 12px; background: #1d1d1d; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
