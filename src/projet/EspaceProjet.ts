@@ -28,6 +28,7 @@ import {
 import { VERSION_SCHEMA, type Annotation, type Local, type NoteVocale, type Niveau, type Photo, type Plan, type Projet, type Repere } from '../domaine/types';
 import { nomDeBase, numeroterNomsEnDouble, proposerNumeroLocal, type LocalDetecte } from '../domaine/locaux';
 import { rechercher } from '../domaine/recherche';
+import { cleTag, nettoyerTag, TAGS_PAR_PHOTO_MAX } from '../domaine/tags';
 import type { DonneesProjet, ResultatFusion } from '../domaine/fusion';
 import { ecrireJson, enParallele, lireJson, type Stockage } from '../stockage/Stockage';
 
@@ -39,6 +40,19 @@ const DOSSIER_REPERES = `${DOSSIERS.donnees}/reperes`;
 const DOSSIER_PHOTOS = `${DOSSIERS.donnees}/photos`;
 const DOSSIER_MINIATURES = `${DOSSIERS.donnees}/miniatures`;
 const DOSSIER_A_CLASSER = `${DOSSIERS.photos}/${DOSSIERS.aClasser}`;
+
+/** Tags nettoyés, sans doublon (comparaison sans accents ni casse), 30 au plus. */
+function preparerTags(tags: string[]): string[] {
+  const vus = new Set<string>();
+  const liste: string[] = [];
+  for (const t of tags.map(nettoyerTag)) {
+    const k = cleTag(t);
+    if (!t || vus.has(k)) continue;
+    vus.add(k);
+    liste.push(t);
+  }
+  return liste.slice(0, TAGS_PAR_PHOTO_MAX);
+}
 
 /** Extension du fichier d'une prise de vue. */
 export const extensionPhoto = (p: Pick<Photo, 'type' | 'extension'>) => (p.type === 'video' ? (p.extension ?? 'mp4') : 'jpg');
@@ -855,7 +869,7 @@ export class EspaceProjet {
 
   async modifierRepere(
     id: string,
-    maj: Partial<Pick<Repere, 'libelle' | 'localId' | 'x' | 'y'>> & { visee?: { x: number; y: number } | null },
+    maj: Partial<Pick<Repere, 'libelle' | 'localId' | 'x' | 'y' | 'suivi'>> & { visee?: { x: number; y: number } | null },
     auteur: string,
   ): Promise<Repere> {
     const existant = this.reperes.find((r) => r.id === id);
@@ -866,6 +880,7 @@ export class EspaceProjet {
     const repere: Repere = { ...existant, ...reste, libelle: (maj.libelle ?? existant.libelle).trim(), modifieLe: maintenant(), modifiePar: auteur };
     // Direction : null l'efface ; absente, elle est conservée.
     if (visee === null) delete repere.visee;
+    if (repere.suivi === false) delete repere.suivi;
     else if (visee) repere.visee = { x: visee.x, y: visee.y };
     await this.ecrireRepere(repere);
     if (repere.localId !== existant.localId) await this.rangerPhotos(this.photosDuRepere(id));
@@ -928,6 +943,8 @@ export class EspaceProjet {
       commentaire?: string;
       /** Vidéo : extension du fichier et durée en secondes. */
       video?: { extension: 'mp4' | 'webm'; duree: number };
+      /** Tags actifs au moment de la prise de vue (groupe de photos). */
+      tags?: string[];
     },
     auteur: string,
   ): Promise<Photo> {
@@ -953,6 +970,7 @@ export class EspaceProjet {
       source: entree.source,
       ...(entree.nomOrigine ? { nomOrigine: entree.nomOrigine } : {}),
       ...(entree.video ? { type: 'video' as const, extension: entree.video.extension, duree: Math.round(entree.video.duree * 10) / 10 } : {}),
+      ...(entree.tags?.length ? { tags: preparerTags(entree.tags) } : {}),
     };
     photo.fichier = this.cheminAttendu(photo);
     if (await this.stockage.existe(photo.fichier)) throw new Error(`Le fichier ${photo.fichier} existe déjà.`);
@@ -986,6 +1004,18 @@ export class EspaceProjet {
   /** Classe plusieurs photos d'un coup sur le même repère. */
   async classerPhotos(photoIds: string[], repereId: string | null, auteur: string): Promise<void> {
     for (const id of photoIds) await this.classerPhoto(id, repereId, auteur);
+  }
+
+  /** Remplace les tags d'une prise de vue (liste vide : plus de tags). */
+  async etiqueterPhoto(photoId: string, tags: string[]): Promise<Photo> {
+    const photo = this.photos.find((p) => p.id === photoId);
+    if (!photo) throw new Error('Photo introuvable.');
+    const maj: Photo = { ...photo, modifieLe: maintenant() };
+    delete maj.tags;
+    const propres = preparerTags(tags);
+    if (propres.length) maj.tags = propres;
+    await this.ecrirePhoto(maj);
+    return maj;
   }
 
   async commenterPhoto(photoId: string, commentaire: string): Promise<void> {

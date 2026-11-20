@@ -96,7 +96,11 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   SVG `src/domaine/annotations.ts`, copie annotée `src/photo/annotation.ts`, éditeur `src/ui/photo/EditeurAnnotations.tsx`.
   Fichiers rangés à côté d'une photo (`_annote.jpg`, `_note.wav`) : CONCEPTION §A.6 octies.
   Suivi dans le temps (lot 6) : calque dans la visée (`CameraTerrain`, prop `reference`), comparaison avant / après
-  et frise `src/ui/photo/ComparaisonPhotos.tsx`, direction de prise de vue `Repere.visee` (cône sur le plan).
+  et frise `src/ui/photo/ComparaisonPhotos.tsx`, direction de prise de vue `Repere.visee` (cône sur le plan) ; calque et
+  avant / après seulement sur les **repères de suivi** (`Repere.suivi`).
+  Tags (CONCEPTION §A.6 decies) : catalogue et reconnaissance dans une phrase `src/domaine/tags.ts`, barre de puces
+  `src/ui/photo/BarreTags.tsx`, mémoire sur l'appareil (`registre.ts`) ; transcription des notes vocales
+  `src/photo/transcription.ts` (service vocal de Chrome, **avec accord de l'utilisateur** : écart à §A.4 signalé).
   Synchronisation (lot 4) : règles de fusion `src/domaine/fusion.ts` (pures, testées), paquet .zip
   `src/projet/paquet.ts` (fflate, lecture et écriture en continu), écran `src/ui/Echanges.tsx`, import partagé
   `src/projet/importPaquet.ts`. Transit SharePoint (lot 5) : `src/transit/` (réglages, connexion MSAL, client

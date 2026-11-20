@@ -98,7 +98,14 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   // se fait en arrière-plan, pour pouvoir enchaîner les prises de vue sans attendre.
   const file = useRef<Promise<void>>(Promise.resolve());
   const [enAttente, setEnAttente] = useState(0);
-  function enregistrerPhoto(original: Blob, source: Photo['source'], prisLe: Date, repereId: string | null, nomOrigine?: string): Promise<Photo | null> {
+  function enregistrerPhoto(
+    original: Blob,
+    source: Photo['source'],
+    prisLe: Date,
+    repereId: string | null,
+    nomOrigine?: string,
+    tags: string[] = [],
+  ): Promise<Photo | null> {
     setEnAttente((n) => n + 1);
     const tache = file.current.then(async () => {
       try {
@@ -113,6 +120,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
             source,
             prisLe: source !== 'appli' && c.dateExif ? c.dateExif : prisLe,
             nomOrigine,
+            tags,
           },
           auteur,
         );
@@ -129,7 +137,14 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   }
 
   /** Vidéo : pas de recompression (le fichier est gardé tel quel) ; miniature tirée de la vidéo. */
-  function enregistrerVideo(fichier: Blob, source: Photo['source'], prisLe: Date, repereId: string | null, nomOrigine?: string): Promise<Photo | null> {
+  function enregistrerVideo(
+    fichier: Blob,
+    source: Photo['source'],
+    prisLe: Date,
+    repereId: string | null,
+    nomOrigine?: string,
+    tags: string[] = [],
+  ): Promise<Photo | null> {
     setEnAttente((n) => n + 1);
     const tache = file.current.then(async () => {
       try {
@@ -146,6 +161,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
             prisLe,
             nomOrigine,
             video: { extension, duree: m.duree },
+            tags,
           },
           auteur,
         );
@@ -240,7 +256,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         id: PREFIXE_REPERE + rep.id,
         x: rep.x,
         y: rep.y,
-        libelle: rep.libelle ? court(rep.libelle, 22) : rep.numero,
+        libelle: (rep.suivi ? '📌 ' : '') + (rep.libelle ? court(rep.libelle, 22) : rep.numero),
         titre: `${rep.numero}${rep.libelle ? ` · ${rep.libelle}` : ''}`,
         style: rep.id === repereSel ? 'repere-selection' : 'repere',
         pastille: espace.photosDuRepere(rep.id).length || undefined,
@@ -441,12 +457,16 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
   }
 
   /**
-   * Calque de la visée (lot 6) : la photo la plus récente du repère prise un jour précédent, à défaut
-   * la plus récente du jour. Les vidéos sont écartées.
+   * Calque de la visée (lot 6) : seulement sur un repère de suivi (20/11/2026). Photos proposées :
+   * celles du repère (sans les vidéos) ; affichée d'office : la plus récente d'un jour précédent.
    */
+  function photosCalque(repereId: string | null): Photo[] {
+    const rep = repereId ? espace.reperes.find((r) => r.id === repereId) : undefined;
+    return rep?.suivi ? espace.photosDuRepere(rep.id).filter((p) => p.type !== 'video') : [];
+  }
   function referenceCalque(repereId: string | null): Photo | null {
-    if (!repereId) return null;
-    const photos = espace.photosDuRepere(repereId).filter((p) => p.type !== 'video');
+    const photos = photosCalque(repereId);
+    if (!photos.length) return null;
     const aujourdhui = dateLocale(new Date());
     return [...photos].reverse().find((p) => p.date < aujourdhui) ?? photos[photos.length - 1] ?? null;
   }
@@ -744,10 +764,11 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
           auteur={auteur}
           titre={titreCamera(camera.repereId)}
           fermeture={fermetureCamera}
+          calques={photosCalque(camera.repereId)}
           reference={referenceCalque(camera.repereId)}
           enAttente={enAttente}
-          surCapture={(photo, source, prisLe) => enregistrerPhoto(photo, source, prisLe, camera.repereId)}
-          surVideo={(fichier, source, prisLe, nom) => enregistrerVideo(fichier, source, prisLe, camera.repereId, nom)}
+          surCapture={(photo, source, prisLe, tags) => enregistrerPhoto(photo, source, prisLe, camera.repereId, undefined, tags)}
+          surVideo={(fichier, source, prisLe, tags, nom) => enregistrerVideo(fichier, source, prisLe, camera.repereId, nom, tags)}
           surFermer={() => {
             if (camera.nouveau && camera.repereId) setARattacher(camera.repereId);
             setCamera(null);

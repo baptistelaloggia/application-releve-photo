@@ -7,7 +7,8 @@ import { retirerPhotosExportees } from '../../stockage/registre';
 import { tailleLisible, texteErreur } from '../commun';
 import { ComparaisonPhotos } from './ComparaisonPhotos';
 import { EditeurAnnotations } from './EditeurAnnotations';
-import { BoutonNoteVocale } from './NoteVocale';
+import { BarreTags } from './BarreTags';
+import { appliquerPhrase, BoutonNoteVocale } from './NoteVocale';
 
 interface Props {
   espace: EspaceProjet;
@@ -123,7 +124,8 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
   const aRenvoyer = (id: string) => retirerPhotosExportees(espace.projet.id, [id]);
 
   // Photos du même repère, pour la comparaison : la plus récente d'une date antérieure sert d'« avant ».
-  const duRepere = photo.repereId ? espace.photosDuRepere(photo.repereId).filter((p) => p.type !== 'video') : [];
+  // Comparaison réservée aux repères de suivi (20/11/2026).
+  const duRepere = photo.repereId && repere?.suivi ? espace.photosDuRepere(photo.repereId).filter((p) => p.type !== 'video') : [];
   const avantComparaison =
     [...duRepere].reverse().find((p) => p.date < photo.date) ?? duRepere.find((p) => p.date !== photo.date);
   if (comparer && !video && avantComparaison) {
@@ -236,15 +238,28 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
           )}
           <BoutonNoteVocale
             libelle={photo.noteVocale ? '🎤 Réenregistrer la note' : '🎤 Note vocale'}
-            surEnregistre={(note) =>
+            surEnregistre={(note, phrase) =>
               agir(async () => {
                 await espace.enregistrerNoteVocale(photo.id, note, auteur ?? photo.prisPar);
+                // Phrase transcrite : ajoutée au commentaire ; les tags qu'elle cite sont ajoutés.
+                await appliquerPhrase(espace, photo.id, phrase);
+                setCommentaire(espace.photos.find((p) => p.id === photo.id)?.commentaire ?? commentaire);
                 await aRenvoyer(photo.id);
               })
             }
           />
         </div>
         {!video && !!photo.annotations?.length && <p className="discret petit-texte">Annotations : {resumeAnnotations(photo.annotations)}</p>}
+        <BarreTags
+          key={photo.id}
+          selection={photo.tags ?? []}
+          surChange={(tags) =>
+            void agir(async () => {
+              await espace.etiqueterPhoto(photo.id, tags);
+              await aRenvoyer(photo.id);
+            })
+          }
+        />
         {photo.noteVocale && (
           <div className="note-vocale">
             {audio === 'absente' ? (

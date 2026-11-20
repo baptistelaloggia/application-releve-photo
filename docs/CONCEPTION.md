@@ -323,6 +323,39 @@ Règles issues du lot 1 (04/11/2026) :
   - **retrouver le niveau par l'altitude GPS** [À VÉRIFIER : peu fiable en intérieur] ;
   - **séparer ou fusionner un groupe à la main**, si l'usage le demande.
 
+## A.6 decies Tags des photos et transcription des notes vocales (20/11/2026)
+
+- **Tags** : chaque prise de vue (photo ou vidéo) peut porter des tags (`tags` dans son JSON : « CTA », « Non conforme », « Avant fermeture »…).
+  - **Catalogue :** celui fourni par l'utilisateur, par lot technique, dans `src/domaine/tags.ts` :
+    - commun : statut (Conforme, À vérifier, Non conforme) et chantier (Avant fermeture, Calorifuge, VC) ;
+    - CVC ;
+    - plomberie ;
+    - électricité.
+  - **Tags personnels :** on peut en créer depuis la liste complète.
+- **Prise de vue** : le bouton « 🏷 Tags » de la visée ouvre une **barre de 6 puces**.
+  - **Contenu des puces :** les tags favoris, puis les plus récents, puis les tags par défaut (statut et chantier).
+  - **Effet :** les tags cochés restent **actifs** et s'appliquent à **toutes les prises suivantes** (groupe de photos). Le bouton les rappelle (« 🏷 Non conforme, Calorifuge »).
+- **Liste complète** (« ＋ Tous ») : en dernier recours. On y fait une recherche par les **premières lettres** d'un mot (« cal » → Calorifuge, « va ex » → Vase d'expansion).
+  - **Favoris :** l'étoile ★ en fait un favori, toujours en tête des puces.
+  - **Création :** « ＋ Créer le tag » ajoute un tag personnel.
+  - **Mémoire :** favoris, récents et tags personnels sont mémorisés sur l'appareil.
+- **Après la prise** : la visionneuse affiche la même barre pour les tags de la photo ; la miniature porte « 🏷 n ».
+- **Synchronisation :** les tags voyagent dans les paquets et par le transit (le plus récent l'emporte). Ils sont contrôlés à l'import : 30 au plus, 40 caractères au plus.
+- **Transcription des notes vocales** : pendant l'enregistrement d'une note vocale, la phrase dictée est reconnue.
+  - **Commentaire :** elle s'ajoute au commentaire de la photo.
+  - **Tags :** les tags qu'elle cite sont ajoutés à ceux de la photo. Exemple : « VC non conforme, calorifuge absent » donne VC, Non conforme, Calorifuge.
+  - **Règles de reconnaissance :**
+    - comparaison sans accents ni casse, sur des mots entiers, pluriel accepté ;
+    - « A / B » est reconnu par A ou par B ;
+    - « Non conforme » l'emporte sur « Conforme » ;
+    - les sigles qui sont aussi des mots courants (« pas », « regard »…) ne comptent que seuls.
+  - **⚠️ Écart signalé par rapport à CONCEPTION §A.4 (pas de service cloud tiers)** : la reconnaissance passe par le service vocal de Chrome (serveurs Google), qui reçoit le son de la note.
+    - **Accord :** elle n'est donc utilisée qu'avec l'**accord explicite** de l'utilisateur, demandé à la première note et mémorisé sur l'appareil.
+    - **Sans accord ou sans réseau :** la note est enregistrée sans transcription.
+    - **Mode sur l'appareil :** la reconnaissance sur l'appareil (`processLocally`) éviterait l'envoi, mais elle fait planter la page dans le Chromium des tests ; elle est désactivée [À VÉRIFIER sur un vrai téléphone].
+    - **Avis à demander :** DSI et DPO.
+- **Lisibilité sans l'appli** : les tags ne sont pas dans les noms de fichiers ; ils figureront dans les exports (lot 7 : rapport PDF, liste Excel).
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
@@ -340,11 +373,15 @@ Règles issues du lot 1 (04/11/2026) :
 - Changement d'indice : report des repères, avec recalage par 2 points si le cadrage a changé.
 
 **Suivi dans le temps** (lot 6, réalisé le 19/11/2026)
-- **Calque** : la photo précédente du repère est affichée **en transparence** dans la visée, pour refaire le même cadrage.
-  - **Photo retenue :** la plus récente prise un jour précédent, à défaut la plus récente du jour ; les vidéos sont écartées.
-  - **Commandes :** activé d'office (40 %), avec un bouton « ◐ Calque du jj/mm/aa » pour le masquer et un curseur de transparence (10 à 80 %).
+- **Repères de suivi** (20/11/2026) : le calque et l'avant / après ne sont proposés que sur les repères désignés par le bouton « 📌 Repère de suivi » de leur fiche (`suivi: true` dans le JSON du repère).
+  - **Sur le plan :** ces repères portent un 📌 devant leur numéro.
+  - **Ailleurs :** les autres repères n'ont ni calque ni comparaison, pour garder la visée et la visionneuse simples.
+- **Calque** : sur un repère de suivi, une photo du repère est affichée **en transparence** dans la visée, pour refaire le même cadrage.
+  - **Photo affichée d'office :** la plus récente prise un jour précédent, à défaut la plus récente du jour ; les vidéos sont écartées.
+  - **Choix de la photo :** le bouton « ◐ Calque du jj/mm/aa » ouvre une bande de vignettes des photos du repère, plus « Aucun ».
+  - **Transparence :** un curseur la règle de 10 à 80 % (40 % au départ).
   - **Limite :** l'image est calée comme la visée (« contain ») ; si la proportion de la photo diffère de celle de la caméra, le calque ne couvre pas exactement la visée [À VÉRIFIER sur téléphone].
-- **Avant / après** : bouton « ↔ Avant / après » dans la fiche du repère (s'il a des photos à au moins deux dates), et « ↔ Comparer » dans la visionneuse (avant = photo d'une date antérieure).
+- **Avant / après** (repères de suivi seulement) : bouton « ↔ Avant / après » dans la fiche du repère (s'il a des photos à au moins deux dates), et « ↔ Comparer » dans la visionneuse (avant = photo d'une date antérieure).
   - **Affichage :** **rideau** à glisser entre les deux photos, ou **côte à côte** (l'une sous l'autre sur un téléphone en portrait).
   - **Frise chronologique :** en bas, elle montre les photos du repère groupées par date ; une photo touchée remplace l'image « Avant » ou « Après ».
   - **Fermeture :** par le bouton Retour.
