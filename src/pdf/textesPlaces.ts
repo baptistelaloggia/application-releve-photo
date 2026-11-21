@@ -27,7 +27,7 @@ export async function lireTextesPlaces(page: PagePdf): Promise<{ textes: TextePl
   const contenu = await page.getTextContent();
   const textes: TextePlace[] = [];
   for (const brut of contenu.items) {
-    const it = brut as { str?: string; transform?: number[]; width?: number };
+    const it = brut as { str?: string; transform?: number[]; width?: number; fontName?: string };
     if (!it.str || !it.transform) continue;
     const [a, b, c, d, e, f] = produit(vue.transform, it.transform);
     textes.push({
@@ -37,6 +37,7 @@ export async function lireTextesPlaces(page: PagePdf): Promise<{ textes: TextePl
       largeur: it.width ?? 0,
       hauteur: Math.hypot(c, d),
       angle: (Math.atan2(b, a) * 180) / Math.PI,
+      ...(it.fontName ? { police: it.fontName } : {}),
     });
   }
   return { textes, largeur: vue.width, hauteur: vue.height };

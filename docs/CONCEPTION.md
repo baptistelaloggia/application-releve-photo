@@ -155,6 +155,17 @@ Règles issues du lot 1 (04/11/2026) :
   - **pas de local en dessous de 4 m²** (gaines techniques, placards) ;
   - une étiquette nettement plus petite que les étiquettes avec surface est écartée (étiquettes de portes « RDC-P34 / 1UP / PF30 », annotations).
   - Résultat : sur le second carnet, la « Salle de réunion SDR-RDC-42 » et l'« ERP Espace Coupole » sont trouvées, sans gaines ni portes. Sur le premier carnet, seules des annotations ont disparu.
+- **Cartouche, légende et style des étiquettes** (21/11/2026) :
+  - **Cartouche :** il est repéré à son vocabulaire. Il faut au moins 4 mots groupés parmi « Phase », « Indice », « Échelle », « Dessiné par », « Vérifié par », « Maître d'ouvrage », « Architecte », « N° projet », « Titre du dessin », « Émetteur », « Bureau de contrôle »… La zone qui les entoure, prolongée jusqu'au bord de la page, ne reçoit aucun local.
+  - **Légende :** sous le titre « LÉGENDE », le bloc des lignes qui le suivent ne reçoit aucun local.
+  - **Style :** sur un plan, tous les noms de locaux ont la **même police, la même taille et la même casse**. La référence est celle des étiquettes sûres (avec numéro ou surface).
+    - **Nom seul :** il doit suivre ce style en tout. Il peut donc être en minuscules si les noms sûrs le sont (« Open Space »). Sans référence, la majuscule reste exigée.
+    - **Étiquette sûre :** elle n'est écartée que si elle diffère à la fois par la police et par la taille.
+  - **Extérieur du bâtiment :** les cours et dessertes extérieures, écrites dans un autre style, sont écartées par la règle de style. Le contour réel du bâtiment n'est pas calculé (les cloisons sont des traits sans notion de pièce) : il est approché par la zone des étiquettes sûres, élargie de 10 % [À VÉRIFIER sur d'autres plans].
+  - **Nombre en fin de nom :** un nombre court sous le nom, dans la même police, en fait partie (« Open Space » / « 2 » → « Open Space 2 »). Avant, il coupait l'étiquette en deux.
+  - **Résultat sur les deux carnets d'essai :**
+    - carnet 1 : 220 → 191 propositions. Plus de textes du cartouche ni de la légende, ni de cours extérieures ;
+    - carnet 2 : 182 → 221 propositions. 39 « Open Space n » réels trouvés en plus, cartouche écarté.
 - **Le nom seul** (décision du 17/11/2026, **modifie** la règle précédente qui gardait aussi le numéro et la surface lus sur le plan) :
   - **Lecture du plan :** le numéro et la surface servent encore à **reconnaître** une étiquette sur le plan, mais ne sont plus enregistrés. Seul le nom l'est.
   - **Doublons :** un nom porté par plusieurs locaux d'un même plan reçoit un numéro d'ordre : « LT 01 », « LT 02 »… Ils sont numérotés de haut en bas, puis de gauche à droite, en sautant les numéros déjà pris sur le plan. Un local déjà enregistré n'est jamais renommé.
@@ -168,6 +179,9 @@ Règles issues du lot 1 (04/11/2026) :
 - **Détection sur tous les plans** : un récapitulatif par niveau (locaux sûrs, noms seuls à vérifier, déjà présents) est présenté avant l'enregistrement.
 - **Recherche** : par nom, numéro et code de niveau, sans tenir compte des accents ni de la casse (« tgbt », « 012 », « cta ss1 »). Le numéro exact passe en premier.
 - **Affichage des plans** : image de fond de la page entière, puis tuiles de 512 px calculées à la demande pour le zoom courant (jusqu'à 8 pixels par point PDF). Le zoom se fait à la molette, au pincement ou au double appui.
+  - **Pincement sur les étiquettes** (21/11/2026) : il fonctionne même quand les doigts se posent sur des étiquettes, ce qui arrive sur un plan chargé. Avant, un doigt sur une étiquette était ignoré.
+  - **Étiquette sous un doigt :** un doigt seul sur une étiquette reste un appui sur l'étiquette. Dès qu'un second doigt arrive, c'est un pincement, et l'appui sur l'étiquette est annulé.
+- **Tableau des niveaux** (21/11/2026) : chaque ligne entière est un bouton qui ouvre le plan du niveau (survol, clavier). Le texte n'est plus un lien souligné, et le bouton « Ouvrir » est remplacé par un chevron ›.
 - **Locaux sans numéro** : tranché le 18/11/2026. Plus aucun numéro de local dans les noms : voir §A.6.
 
 ## A.6 quater Repères et photos (lot 3, 10/11/2026)
@@ -286,6 +300,7 @@ Règles issues du lot 1 (04/11/2026) :
 - **Visionneuse :**
   - **Navigation :** le passage d'une photo à l'autre se fait par des **flèches sur les côtés gauche et droit de la photo**, par un balayage du doigt, ou par les touches ← → (Échap ferme).
   - **Position :** elle est affichée en haut (« 3/4 »).
+  - **Suppression par glisser-déposer** (21/11/2026) : un appui long sur la photo la saisit, et elle suit le doigt. Une corbeille 🗑 apparaît en bas de l'écran ; relâchée dessus (la corbeille passe au rouge), la photo est supprimée après confirmation. La visionneuse reste ouverte sur la photo suivante.
 - **RGPD :** les notes vocales et le son des vidéos enregistrent aussi les voix alentour. À utiliser pour décrire l'installation, sans enregistrer de conversation.
 
 ## A.6 nonies Regroupement des photos du panier (19/11/2026)
@@ -354,6 +369,21 @@ Règles issues du lot 1 (04/11/2026) :
     - **Sans accord ou sans réseau :** la note est enregistrée sans transcription.
     - **Mode sur l'appareil :** la reconnaissance sur l'appareil (`processLocally`) éviterait l'envoi, mais elle fait planter la page dans le Chromium des tests ; elle est désactivée [À VÉRIFIER sur un vrai téléphone].
     - **Avis à demander :** DSI et DPO.
+- **Dictée et correction des sigles** (21/11/2026) : la dictée du clavier du téléphone (Gboard) ne peut pas recevoir de dictionnaire. L'appli propose donc sa propre dictée.
+  - **Bouton « 🎙 Dicter » :** dans la visée (sur la dernière photo) et dans la visionneuse, à côté du commentaire. Un appui, on parle, l'écoute s'arrête à la fin de la phrase.
+  - **Correcteur des sigles** (`src/domaine/dictee.ts`), appliqué à la dictée et aux notes vocales :
+    - **lettres épelées :** « c t a », « cé té a » ou « c.t.a. » deviennent « CTA » ; de même « vé cé » → VC, « gé effe » → GF, « v c f t » → VCFT ;
+    - **sigles en minuscules :** « tgbt » devient « TGBT », d'après les sigles du catalogue des tags et une liste du métier (CVC, plomberie, électricité) ;
+    - **mots courants préservés :** « pas », « eu », « a », « de »… restent tels quels.
+  - **Biais de vocabulaire :** ces sigles sont aussi proposés à la reconnaissance vocale quand Chrome le permet [À VÉRIFIER].
+- **Notes vocales sans tags (constat du 21/11/2026)** : sur le téléphone, les notes vocales ne produisaient ni commentaire ni tags.
+  - **Cause probable** [À VÉRIFIER] : Android n'ouvre pas le micro deux fois, une fois pour l'enregistrement et une fois pour la reconnaissance. Les erreurs de reconnaissance étaient ignorées.
+  - **Corrections :**
+    - la piste du micro de l'enregistrement est passée à la reconnaissance (`start(piste)`, versions récentes de Chrome) ;
+    - les résultats provisoires sont gardés ;
+    - l'attente de la fin passe à 8 s ;
+    - la cause d'un échec est affichée (« micro indisponible », « pas de réseau »…).
+  - **Repli :** la dictée « 🎙 Dicter » n'enregistre pas de son ; elle n'a donc pas ce conflit.
 - **Lisibilité sans l'appli** : les tags ne sont pas dans les noms de fichiers ; ils figureront dans les exports (lot 7 : rapport PDF, liste Excel).
 
 ## A.7 Fonctions prévues

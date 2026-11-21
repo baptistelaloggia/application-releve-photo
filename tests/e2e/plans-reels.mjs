@@ -87,7 +87,7 @@ try {
   await capture('2-projet');
 
   // Lot 2 : ouverture du plan SS1, détection des locaux, enregistrement.
-  await page.locator('tr:has(strong:text-is("SS1"))').getByRole('button', { name: 'Ouvrir' }).click();
+  await page.locator('tr:has(strong:text-is("SS1"))').locator('td').first().click(); // la ligne entière ouvre le plan
   await page.locator('.visionneuse[data-fond-pret]').waitFor({ timeout: 60_000 });
   await capture('3-plan-SS1');
   const t1 = Date.now();
