@@ -29,6 +29,8 @@ export interface EvenementsMoteur {
   surAppuiLong?: (x: number, y: number) => void;
   /** Le zoom a changé (pour l'affichage du pourcentage, par exemple). */
   surVue?: (zoom: number, zoomAjuste: number) => void;
+  /** Début d'un pincement : l'appui en cours sur une étiquette est annulé. */
+  surPincement?: () => void;
 }
 
 interface Tuile {
@@ -51,6 +53,8 @@ export class MoteurVue {
   private minuterieTuiles = 0;
   private detruit = false;
   private readonly pointeurs = new Map<number, { x: number; y: number }>();
+  /** Doigts posés sur une étiquette : suivis, sans geste, tant qu'un second doigt n'arrive pas. */
+  private readonly surEtiquette = new Set<number>();
   private geste: null | {
     debut: number;
     deplace: boolean;
@@ -334,9 +338,27 @@ export class MoteurVue {
   };
 
   private surPointeurBas = (e: PointerEvent) => {
-    if ((e.target as HTMLElement).closest('[data-marqueur], button, input')) return;
-    this.conteneur.setPointerCapture(e.pointerId);
+    const cible = e.target as HTMLElement;
+    // Boutons de l'interface (zoom…) : pas de geste.
+    if (cible.closest('button:not([data-marqueur]), input')) return;
+    const surMarqueur = !!cible.closest('[data-marqueur]');
     this.pointeurs.set(e.pointerId, this.positionLocale(e));
+    if (surMarqueur) this.surEtiquette.add(e.pointerId);
+    // Un seul doigt, sur une étiquette : c'est un appui sur l'étiquette (géré par elle), pas un geste.
+    // Un second doigt, où qu'il soit (21/11/2026) : pincement, même si les deux doigts sont sur des
+    // étiquettes, nombreuses sur un plan chargé.
+    if (this.pointeurs.size === 1 && surMarqueur) return;
+    if (this.pointeurs.size >= 2) {
+      for (const id of this.pointeurs.keys()) {
+        try {
+          this.conteneur.setPointerCapture(id);
+        } catch {
+          /* doigt déjà levé */
+        }
+      }
+      window.clearTimeout(this.minuterieLong);
+      this.evenements.surPincement?.();
+    } else this.conteneur.setPointerCapture(e.pointerId);
     this.demarrerGeste();
     window.clearTimeout(this.minuterieLong);
     if (this.pointeurs.size === 1 && this.evenements.surAppuiLong) {
@@ -403,6 +425,7 @@ export class MoteurVue {
   private surPointeurHaut = (e: PointerEvent) => {
     if (!this.pointeurs.has(e.pointerId)) return;
     this.pointeurs.delete(e.pointerId);
+    this.surEtiquette.delete(e.pointerId);
     const g = this.geste;
     window.clearTimeout(this.minuterieLong);
     if (this.pointeurs.size === 0) {

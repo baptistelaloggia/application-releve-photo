@@ -150,3 +150,48 @@ describe('noms des locaux détectés (17/11/2026)', () => {
     expect(nomDeBase('  Local   CTA ')).toBe('Local CTA');
   });
 });
+
+describe('détection : cartouche, légende et style des étiquettes (21/11/2026)', () => {
+  /** Étiquette dont chaque ligne a sa police. */
+  const avecPolice = (cx: number, y: number, lignes: Array<[string, string]>, h = 6.6): TextePlace[] =>
+    etiquette(cx, y, lignes.map(([t]) => t), h).map((t, i) => ({ ...t, police: lignes[i][1] }));
+  const salle = (cx: number, y: number, nom: string, num: string, surf: string) =>
+    avecPolice(cx, y, [[nom, 'nom'], [num, 'autre'], [surf, 'autre']]);
+  const plan = [
+    ...salle(500, 300, 'Bureau', 'BR-01', '12.5 m²'),
+    ...salle(800, 300, 'Sanitaires F.', 'SAN-01', '16.7 m²'),
+    ...salle(500, 700, 'Circulation A', 'CRC-01', '108.2 m²'),
+    ...salle(800, 700, 'Palier D', 'PLR-01', '10.9 m²'),
+  ];
+
+  it('écarte le texte du cartouche, repéré à son vocabulaire', () => {
+    const cartouche = [
+      ...etiquette(2150, 800, ['Phase'], 6.9), ...etiquette(2250, 800, ['Indice'], 6.9), ...etiquette(2150, 900, ['Echelle'], 6.9),
+      ...etiquette(2250, 900, ['Dessiné par'], 6.9), ...etiquette(2150, 1000, ["Maître d'ouvrage"], 6.9),
+      ...avecPolice(2150, 1010, [['BUREAU DE CONTROLE', 'nom']]),
+    ];
+    const noms = detecterLocaux([...plan, ...cartouche], L, H).map((l) => l.nom);
+    expect(noms).not.toContain('BUREAU DE CONTROLE');
+    expect(noms).toHaveLength(4);
+  });
+
+  it('écarte les lignes de la légende', () => {
+    const legende = [...etiquette(60, 1450, ['LÉGENDE'], 9.9), ...avecPolice(160, 1480, [['EXUTOIRE ESCALIER', 'nom']])];
+    expect(detecterLocaux([...plan, ...legende], L, H).map((l) => l.nom)).not.toContain('EXUTOIRE ESCALIER');
+  });
+
+  it('garde un nom seul s’il suit le style des étiquettes sûres (police, taille), même en minuscules', () => {
+    const noms = detecterLocaux(
+      [...plan, ...avecPolice(650, 500, [['Open Space', 'nom']]), ...avecPolice(650, 560, [['COUR CENTRALE', 'autre']], 9)],
+      L,
+      H,
+    ).map((l) => l.nom);
+    expect(noms).toContain('Open Space');
+    expect(noms).not.toContain('COUR CENTRALE');
+  });
+
+  it('ajoute au nom le nombre qui le termine (« Open Space 2 »)', () => {
+    const t = avecPolice(650, 500, [['Open Space', 'nom'], ['2', 'nom'], ['BR.A-R02-02', 'autre'], ['41.5 m²', 'autre']]);
+    expect(detecterLocaux([...plan, ...t], L, H).find((l) => l.numero === 'BR.A-R02-02')?.nom).toBe('Open Space 2');
+  });
+});

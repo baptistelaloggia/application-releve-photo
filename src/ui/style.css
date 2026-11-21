@@ -420,10 +420,14 @@ button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
 .rattachement { background: var(--fond); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
 .puce { border-radius: 999px; }
 .ecran-plan > .bandeau-info { margin: 8px 12px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
-.lien-niveau { border: none; background: none; padding: 4px 0; min-height: 44px; text-align: left; color: var(--accent);
-  display: inline-flex; gap: 6px; align-items: baseline; cursor: pointer; }
-.lien-niveau span { text-decoration: underline; text-underline-offset: 3px; }
-.lien-niveau:hover span { text-decoration-thickness: 2px; }
+/* Niveaux : la ligne entière est un bouton qui ouvre le plan (21/11/2026). */
+.lien-niveau { display: inline-flex; gap: 6px; align-items: baseline; }
+.tableau tr.ligne-ouvrable { cursor: pointer; transition: background 0.12s; }
+.tableau tr.ligne-ouvrable:hover, .tableau tr.ligne-ouvrable:focus-visible { background: var(--info-fond); outline: none; }
+.tableau tr.ligne-ouvrable:active { background: var(--bord); }
+.tableau tr.ligne-ouvrable td:first-child { border-left: 3px solid transparent; }
+.tableau tr.ligne-ouvrable:hover td:first-child, .tableau tr.ligne-ouvrable:focus-visible td:first-child { border-left-color: var(--accent); }
+.chevron-ligne { font-size: 1.6rem; line-height: 1; color: var(--discret); padding: 0 6px; }
 .bouton-fichier.grand { min-height: 64px; font-size: 1.05rem; justify-content: center; }
 .bouton-fichier.desactive { opacity: 0.5; pointer-events: none; }
 .resultat-export, .apercu-import { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--fond); }
@@ -431,3 +435,16 @@ button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
 .alertes-import { color: var(--erreur); margin: 8px 0; padding-left: 20px; }
 .etat-transit { margin: 8px 0; padding-left: 20px; }
 .petit-bouton { min-height: 40px; font-size: 0.9rem; margin-top: 8px; }
+
+/* Commentaire : bouton « 🎙 Dicter » à côté du titre (21/11/2026). */
+.titre-commentaire { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* Visionneuse : appui long puis glisser la photo sur la corbeille pour la supprimer (21/11/2026). */
+.photo-deplacable { display: flex; align-items: center; justify-content: center; max-width: 100%; max-height: 100%;
+  width: 100%; height: 100%; touch-action: pan-y pinch-zoom; -webkit-touch-callout: none; user-select: none; }
+.photo-deplacable img { -webkit-user-drag: none; }
+.photo-deplacable.en-deplacement { transition: none; opacity: 0.85; touch-action: none; z-index: 5; filter: drop-shadow(0 8px 20px rgb(0 0 0 / 0.6)); }
+.corbeille { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 60; display: flex; flex-direction: column;
+  align-items: center; gap: 4px; font-size: 2.6rem; color: #fff; background: rgb(0 0 0 / 0.7); border: 2px dashed #fff;
+  border-radius: 18px; padding: 10px 26px; pointer-events: none; }
+.corbeille span { font-size: 0.8rem; }
+.corbeille.active { background: #b3261e; border-style: solid; transform: translateX(-50%) scale(1.15); }

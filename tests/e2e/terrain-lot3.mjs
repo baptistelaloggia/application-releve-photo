@@ -94,7 +94,7 @@ try {
   });
   await page.getByRole('button', { name: 'Importer 1 plan' }).click();
   await page.getByText(/Plan importé/).waitFor();
-  await page.locator('tr:has(strong:text-is("R+1"))').getByRole('button', { name: 'Ouvrir' }).click();
+  await page.locator('tr:has(strong:text-is("R+1"))').locator('td').first().click(); // la ligne entière ouvre le plan
   await page.locator('.visionneuse[data-fond-pret]').waitFor();
   await page.getByRole('tab', { name: /Locaux/ }).click();
   await page.getByRole('button', { name: 'Détecter les locaux' }).click();
@@ -141,7 +141,7 @@ try {
   await contexte.setOffline(true);
   await page.reload();
   await page.getByRole('button', { name: /Visite fictive/ }).click();
-  await page.locator('tr:has(strong:text-is("R+1"))').getByRole('button', { name: 'Ouvrir' }).click();
+  await page.locator('tr:has(strong:text-is("R+1"))').locator('td').first().click(); // la ligne entière ouvre le plan
   await page.locator('.visionneuse[data-fond-pret]').waitFor();
   await page.locator('.marqueur-repere .marqueur-libelle', { hasText: 'P001' }).click(); // appui sur un repère : photo
   const t0 = Date.now();

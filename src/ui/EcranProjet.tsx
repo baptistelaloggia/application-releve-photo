@@ -170,16 +170,29 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
               {[...espace.niveaux].reverse().map((n, i, liste) => {
                 const plan = espace.planDuNiveau(n.id);
                 return (
-                  <tr key={n.id}>
+                  // Ligne entière cliquable (21/11/2026) : elle ouvre le plan du niveau.
+                  <tr
+                    key={n.id}
+                    className={plan ? 'ligne-ouvrable' : undefined}
+                    tabIndex={plan ? 0 : undefined}
+                    aria-label={plan ? `Ouvrir le plan ${n.code} ${espace.libelle(n)}` : undefined}
+                    title={plan ? 'Ouvrir le plan de ce niveau' : undefined}
+                    onClick={plan ? () => setPlanOuvert({ planId: plan.id, localId: null }) : undefined}
+                    onKeyDown={
+                      plan
+                        ? (e) => {
+                            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                            e.preventDefault();
+                            setPlanOuvert({ planId: plan.id, localId: null });
+                          }
+                        : undefined
+                    }
+                  >
                     <td>
                       {plan ? (
-                        <button
-                          className="lien-niveau"
-                          title="Ouvrir le plan de ce niveau"
-                          onClick={() => setPlanOuvert({ planId: plan.id, localId: null })}
-                        >
+                        <span className="lien-niveau">
                           <strong>{n.code}</strong> <span>{espace.libelle(n)}</span>
-                        </button>
+                        </span>
                       ) : (
                         <>
                           <strong>{n.code}</strong> <span className="discret">{espace.libelle(n)}</span>
@@ -213,7 +226,7 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
                     </td>
                     <td>{plan ? espace.locauxDuPlan(plan.id).length : ''}</td>
                     <td>{plan ? espace.photosDuPlan(plan.id).length : ''}</td>
-                    <td className="actions-ligne">
+                    <td className="actions-ligne" onClick={(e) => e.stopPropagation()}>
                       <button
                         className="petit"
                         aria-label={`Monter le niveau ${n.code}`}
@@ -233,11 +246,11 @@ export function EcranProjet({ espace, connu, auteur, paquetInitial, surFermer }:
                         ↓
                       </button>
                     </td>
-                    <td className="actions-ligne">
+                    <td className="actions-ligne" onClick={(e) => plan === undefined && e.stopPropagation()}>
                       {plan && (
-                        <button className="petit" onClick={() => setPlanOuvert({ planId: plan.id, localId: null })}>
-                          Ouvrir
-                        </button>
+                        <span className="chevron-ligne" aria-hidden="true">
+                          ›
+                        </span>
                       )}
                       {!plan && (
                         <button

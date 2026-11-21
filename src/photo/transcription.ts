@@ -51,44 +51,103 @@ export async function transcriptionLocale(): Promise<boolean> {
   return false;
 }
 
+export interface ResultatTranscription {
+  /** Phrase reconnue ('' si rien). */
+  texte: string;
+  /** Cause d'un échec (« audio-capture », « network », « no-speech »…), pour l'expliquer. */
+  erreur?: string;
+}
+
 export interface Transcripteur {
-  /** Arrête l'écoute et renvoie la phrase reconnue ('' si rien). */
-  arreter(): Promise<string>;
+  /** Arrête l'écoute et renvoie la phrase reconnue. */
+  arreter(): Promise<ResultatTranscription>;
+  /** Fin de l'écoute, d'elle-même (dictée : fin de la phrase) ou après arreter(). */
+  termine: Promise<ResultatTranscription>;
   annuler(): void;
 }
 
-/** Démarre l'écoute (français). locale : reconnaissance sur l'appareil uniquement. */
-export function demarrerTranscription(locale: boolean): Transcripteur | null {
+/** Explication lisible d'un code d'erreur de la reconnaissance vocale. */
+export function texteErreurTranscription(code: string): string {
+  switch (code) {
+    case 'audio-capture':
+      return 'micro indisponible pour la reconnaissance (déjà utilisé par l’enregistrement de la note ?)';
+    case 'network':
+      return 'pas de réseau (la reconnaissance vocale de Chrome est en ligne)';
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'reconnaissance vocale refusée par le navigateur';
+    case 'no-speech':
+      return 'aucune parole entendue';
+    case 'language-not-supported':
+      return 'français non pris en charge';
+    default:
+      return code;
+  }
+}
+
+/**
+ * Démarre l'écoute (français).
+ * - continu : false pour une dictée (fin automatique à la fin de la phrase), true pendant une note vocale ;
+ * - piste : piste du micro déjà ouverte pour l'enregistrement de la note. Les versions récentes de
+ *   Chrome acceptent de l'écouter (start(piste)), ce qui évite le conflit d'accès au micro sur
+ *   Android [À VÉRIFIER : version de Chrome du téléphone] ;
+ * - sigles : vocabulaire du métier, proposé à la reconnaissance quand elle le permet.
+ */
+export function demarrerTranscription(options: { locale?: boolean; continu: boolean; piste?: MediaStreamTrack; sigles?: string[] }): Transcripteur | null {
   const C = constructeur();
   if (!C) return null;
   const rec = new C();
   rec.lang = 'fr-FR';
-  rec.continuous = true;
-  rec.interimResults = false;
-  if (locale) rec.processLocally = true;
-  const morceaux: string[] = [];
-  let fini: (texte: string) => void = () => undefined;
-  const termine = new Promise<string>((ok) => (fini = ok));
-  rec.onresult = (e) => {
-    for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) morceaux.push(e.results[i][0].transcript.trim());
-  };
-  // Erreur (pas de réseau, micro déjà pris par l'enregistrement…) : la note reste, sans transcription.
-  rec.onerror = () => undefined;
-  rec.onend = () => fini(morceaux.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim());
+  rec.continuous = options.continu;
+  // Résultats provisoires gardés : sur Android, le résultat définitif arrive parfois après l'arrêt.
+  rec.interimResults = true;
+  if (options.locale) rec.processLocally = true;
+  // Vocabulaire du métier (« biais contextuel » des versions récentes de Chrome), si disponible.
   try {
-    rec.start();
+    const Phrase = (window as unknown as { SpeechRecognitionPhrase?: new (p: string, poids: number) => unknown }).SpeechRecognitionPhrase;
+    if (Phrase && options.sigles?.length) (rec as unknown as { phrases: unknown[] }).phrases = options.sigles.map((p) => new Phrase(p, 5));
+  } catch {
+    /* non pris en charge */
+  }
+  const definitifs: string[] = [];
+  let provisoire = '';
+  let erreur: string | undefined;
+  const texte = () => [...definitifs, provisoire].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  let fini: (r: ResultatTranscription) => void = () => undefined;
+  const termine = new Promise<ResultatTranscription>((ok) => (fini = ok));
+  rec.onresult = (e) => {
+    provisoire = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript.trim();
+      if (e.results[i].isFinal) definitifs.push(t);
+      else provisoire = `${provisoire} ${t}`.trim();
+    }
+  };
+  rec.onerror = (e) => {
+    if (e.error !== 'aborted') erreur = e.error;
+  };
+  rec.onend = () => fini({ texte: texte(), ...(erreur && !texte() ? { erreur } : {}) });
+  try {
+    if (options.piste) {
+      try {
+        (rec.start as (piste?: MediaStreamTrack) => void).call(rec, options.piste);
+      } catch {
+        rec.start();
+      }
+    } else rec.start();
   } catch {
     return null;
   }
   return {
+    termine,
     arreter() {
       try {
         rec.stop();
       } catch {
-        fini(morceaux.join(' '));
+        fini({ texte: texte() });
       }
-      // Garde-fou : on n'attend pas plus de 4 s la fin de la reconnaissance.
-      return Promise.race([termine, new Promise<string>((ok) => window.setTimeout(() => ok(morceaux.join(' ').trim()), 4000))]);
+      // Garde-fou : on n'attend pas plus de 8 s la fin de la reconnaissance (réseau mobile lent).
+      return Promise.race([termine, new Promise<ResultatTranscription>((ok) => window.setTimeout(() => ok({ texte: texte(), ...(erreur ? { erreur } : {}) }), 8000))]);
     },
     annuler() {
       try {
