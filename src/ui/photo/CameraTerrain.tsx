@@ -17,7 +17,7 @@ import { texteErreur } from '../commun';
 import { EditeurAnnotations } from './EditeurAnnotations';
 import { BarreTags } from './BarreTags';
 import { Miniature } from './Miniature';
-import { appliquerPhrase, BoutonNoteVocale } from './NoteVocale';
+import { appliquerPhrase, BoutonDicter, BoutonNoteVocale, compteRenduPhrase } from './NoteVocale';
 
 interface Props {
   espace: EspaceProjet;
@@ -296,13 +296,25 @@ export function CameraTerrain({ espace, auteur, titre, enAttente, surCapture, su
           )}
           <BoutonNoteVocale
             libelle={espace.photos.find((p) => p.id === derniere.id)?.noteVocale ? '🎤 Note ✓' : '🎤 Note vocale'}
-            surEnregistre={async (note, phrase) => {
+            surEnregistre={async (note, transcription) => {
               try {
                 await espace.enregistrerNoteVocale(derniere.id, note, auteur);
                 // Phrase transcrite : commentaire de la photo, et tags reconnus ajoutés.
-                const reconnus = await appliquerPhrase(espace, derniere.id, phrase);
+                const r = await appliquerPhrase(espace, derniere.id, transcription.texte);
                 setDerniere(espace.photos.find((p) => p.id === derniere.id) ?? derniere);
-                if (phrase) setInfo(`« ${phrase} »${reconnus.length ? ` · tags : ${reconnus.join(', ')}` : ''}`);
+                if (r.phrase || transcription.erreur) setInfo(compteRenduPhrase(r, transcription.erreur));
+                await retirerPhotosExportees(espace.projet.id, [derniere.id]);
+              } catch (e) {
+                setErreur(texteErreur(e));
+              }
+            }}
+          />
+          <BoutonDicter
+            surPhrase={async (texte, erreurDictee) => {
+              try {
+                const r = await appliquerPhrase(espace, derniere.id, texte);
+                setDerniere(espace.photos.find((p) => p.id === derniere.id) ?? derniere);
+                setInfo(compteRenduPhrase(r, erreurDictee));
                 await retirerPhotosExportees(espace.projet.id, [derniere.id]);
               } catch (e) {
                 setErreur(texteErreur(e));

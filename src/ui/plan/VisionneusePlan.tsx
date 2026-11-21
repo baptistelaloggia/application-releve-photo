@@ -85,6 +85,8 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
   const appuiLongMarqueur = useRef<{ minuterie: number; declenche: boolean; x: number; y: number } | null>(null);
   // Distinction simple appui / double appui sur un marqueur.
   const dernierAppui = useRef<{ id: string; minuterie: number } | null>(null);
+  /** Heure du dernier pincement : l'appui sur une étiquette qui l'a commencé ne compte pas. */
+  const pincement = useRef(-Infinity);
   const annulerAppuiLong = () => {
     if (appuiLongMarqueur.current) window.clearTimeout(appuiLongMarqueur.current.minuterie);
   };
@@ -104,6 +106,10 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
           surAppui: (x, y) => appuiPlan.current?.(x, y),
           surAppuiLong: (x, y) => appuiLong.current?.(x, y),
           surVue: (z, ajuste) => setZoom(Math.round((z / ajuste) * 100)),
+          surPincement: () => {
+            annulerAppuiLong();
+            pincement.current = performance.now();
+          },
         });
         if (focus) moteur.current.centrerSur(focus.x, focus.y);
         setEtat('pret');
@@ -158,6 +164,8 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
               onPointerLeave={annulerAppuiLong}
               onClick={(e) => {
                 e.stopPropagation();
+                // Étiquette touchée au début d'un pincement : ce n'est pas un appui.
+                if (performance.now() - pincement.current < 800) return;
                 if (appuiLongMarqueur.current?.declenche) {
                   appuiLongMarqueur.current = null;
                   return;

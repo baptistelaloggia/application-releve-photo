@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { elementsSvg, resumeAnnotations } from '../../domaine/annotations';
 import type { Photo } from '../../domaine/types';
 import type { EspaceProjet } from '../../projet/EspaceProjet';
@@ -8,7 +8,7 @@ import { tailleLisible, texteErreur } from '../commun';
 import { ComparaisonPhotos } from './ComparaisonPhotos';
 import { EditeurAnnotations } from './EditeurAnnotations';
 import { BarreTags } from './BarreTags';
-import { appliquerPhrase, BoutonNoteVocale } from './NoteVocale';
+import { appliquerPhrase, BoutonDicter, BoutonNoteVocale, compteRenduPhrase } from './NoteVocale';
 
 interface Props {
   espace: EspaceProjet;
@@ -27,7 +27,10 @@ interface Props {
  * Photo ou vidéo en grand. On passe à la précédente ou à la suivante par les flèches sur les côtés,
  * en balayant du doigt, ou par les touches ← → du clavier.
  */
-export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surModifie, annoterDesLOuverture, auteur }: Props) {
+export function VisionneusePhoto({ espace, photos: photosRecues, indexInitial, surFermer, surModifie, annoterDesLOuverture, auteur }: Props) {
+  // Photos supprimées depuis la visionneuse : retirées de la liste, on reste sur la suivante.
+  const [supprimees, setSupprimees] = useState<Set<string>>(new Set());
+  const photos = photosRecues.filter((p) => !supprimees.has(p.id));
   const [index, setIndex] = useState(indexInitial);
   const [, setVersion] = useState(0);
   const base = photos[Math.min(index, photos.length - 1)];
@@ -40,6 +43,65 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
   const [annoter, setAnnoter] = useState(!!annoterDesLOuverture);
   /** Comparaison avant / après avec une photo plus ancienne du même repère (lot 6). */
   const [comparer, setComparer] = useState(false);
+  /**
+   * Suppression par glisser-déposer (21/11/2026) : un appui long saisit la photo, qui suit le doigt ;
+   * relâchée sur la corbeille (en bas de l'écran), elle est supprimée après confirmation.
+   */
+  const [deplacement, setDeplacement] = useState<{ dx: number; dy: number; surCorbeille: boolean } | null>(null);
+  const glisser = useRef<{ x: number; y: number; minuteur: number; actif: boolean } | null>(null);
+  const surLaCorbeille = (x: number, y: number) => y > window.innerHeight - 130 && Math.abs(x - window.innerWidth / 2) < 140;
+  function appuiPhoto(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    const cible = e.currentTarget;
+    const id = e.pointerId;
+    const g = { x: e.clientX, y: e.clientY, actif: false, minuteur: 0 };
+    g.minuteur = window.setTimeout(() => {
+      g.actif = true;
+      try {
+        cible.setPointerCapture(id);
+      } catch {
+        /* doigt levé */
+      }
+      navigator.vibrate?.(40);
+      setDeplacement({ dx: 0, dy: 0, surCorbeille: false });
+    }, 450);
+    glisser.current = g;
+  }
+  function glissePhoto(e: PointerEvent<HTMLDivElement>) {
+    const g = glisser.current;
+    if (!g) return;
+    if (!g.actif) {
+      // Le doigt bouge avant l'appui long : c'est un balayage (photo suivante), pas une saisie.
+      if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 10) annulerGlisser();
+      return;
+    }
+    setDeplacement({ dx: e.clientX - g.x, dy: e.clientY - g.y, surCorbeille: surLaCorbeille(e.clientX, e.clientY) });
+  }
+  function relachePhoto(e: PointerEvent<HTMLDivElement>) {
+    const g = glisser.current;
+    const supprimer = !!g?.actif && surLaCorbeille(e.clientX, e.clientY);
+    annulerGlisser();
+    if (supprimer && photo && confirm(`Supprimer définitivement cette ${photo.type === 'video' ? 'vidéo' : 'photo'} ?`)) {
+      void supprimerCourante();
+    }
+  }
+  function annulerGlisser() {
+    if (glisser.current) window.clearTimeout(glisser.current.minuteur);
+    // Laisser passer la fin du toucher avant d'autoriser de nouveau le balayage.
+    window.setTimeout(() => (glisser.current = null), 0);
+    setDeplacement(null);
+  }
+
+  async function supprimerCourante() {
+    if (!photo) return;
+    const id = photo.id;
+    await agir(() => espace.supprimerPhoto(id), photos.length <= 1);
+    setSupprimees((s) => new Set([...s, id]));
+    setIndex((i) => Math.min(i, Math.max(0, photos.length - 2)));
+  }
+
+  /** Compte rendu de la dernière dictée ou note vocale transcrite. */
+  const [infoDictee, setInfoDictee] = useState<string | null>(null);
   const [original, setOriginal] = useState(false);
   const [taille, setTaille] = useState<{ l: number; h: number } | null>(null);
   const toucher = useRef<{ x: number; y: number } | null>(null);
@@ -53,6 +115,7 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
     setSrc(null);
     setTaille(null);
     setErreur(null);
+    setInfoDictee(null);
     let url: string | null = null;
     let annule = false;
     espace
@@ -166,7 +229,7 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
         onTouchEnd={(e) => {
           const d = toucher.current;
           toucher.current = null;
-          if (!d || e.changedTouches.length !== 1) return;
+          if (!d || e.changedTouches.length !== 1 || glisser.current) return;
           const dx = e.changedTouches[0].clientX - d.x;
           const dy = e.changedTouches[0].clientY - d.y;
           if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) aller(index + (dx < 0 ? 1 : -1));
@@ -174,7 +237,18 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
       >
         {!src ? (
           <span>Chargement…</span>
-        ) : video ? (
+        ) : (
+          // Appui long sur la photo, puis glisser sur la corbeille en bas de l'écran : suppression (21/11/2026).
+          <div
+            className={`photo-deplacable${deplacement ? ' en-deplacement' : ''}`}
+            style={deplacement ? { transform: `translate(${deplacement.dx}px, ${deplacement.dy}px) scale(0.55)` } : undefined}
+            onPointerDown={appuiPhoto}
+            onPointerMove={glissePhoto}
+            onPointerUp={relachePhoto}
+            onPointerCancel={annulerGlisser}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+        {video ? (
           <video key={src} src={src} controls playsInline className="photo-media" />
         ) : (
           <div className="photo-cadre">
@@ -189,6 +263,14 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
                 <g dangerouslySetInnerHTML={{ __html: elementsSvg(annotations, taille.l, taille.h) }} />
               </svg>
             )}
+          </div>
+        )}
+          </div>
+        )}
+        {deplacement && (
+          <div className={`corbeille${deplacement.surCorbeille ? ' active' : ''}`} aria-hidden="true">
+            🗑
+            <span>{deplacement.surCorbeille ? 'Relâcher pour supprimer' : 'Glisser ici pour supprimer'}</span>
           </div>
         )}
         {index > 0 && (
@@ -238,12 +320,13 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
           )}
           <BoutonNoteVocale
             libelle={photo.noteVocale ? '🎤 Réenregistrer la note' : '🎤 Note vocale'}
-            surEnregistre={(note, phrase) =>
+            surEnregistre={(note, transcription) =>
               agir(async () => {
                 await espace.enregistrerNoteVocale(photo.id, note, auteur ?? photo.prisPar);
                 // Phrase transcrite : ajoutée au commentaire ; les tags qu'elle cite sont ajoutés.
-                await appliquerPhrase(espace, photo.id, phrase);
+                const r = await appliquerPhrase(espace, photo.id, transcription.texte);
                 setCommentaire(espace.photos.find((p) => p.id === photo.id)?.commentaire ?? commentaire);
+                if (r.phrase || transcription.erreur) setInfoDictee(compteRenduPhrase(r, transcription.erreur));
                 await aRenvoyer(photo.id);
               })
             }
@@ -287,7 +370,19 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
           </div>
         )}
         <label>
-          Commentaire (la dictée vocale du clavier du téléphone fonctionne ici)
+          <span className="titre-commentaire">
+            Commentaire
+            <BoutonDicter
+              surPhrase={(texte, erreurDictee) =>
+                agir(async () => {
+                  const r = await appliquerPhrase(espace, photo.id, texte);
+                  setCommentaire(espace.photos.find((p) => p.id === photo.id)?.commentaire ?? commentaire);
+                  setInfoDictee(compteRenduPhrase(r, erreurDictee));
+                  await aRenvoyer(photo.id);
+                })
+              }
+            />
+          </span>
           <textarea
             value={commentaire}
             rows={2}
@@ -296,6 +391,7 @@ export function VisionneusePhoto({ espace, photos, indexInitial, surFermer, surM
             onBlur={() => commentaire !== photo.commentaire && void agir(() => espace.commenterPhoto(photo.id, commentaire))}
           />
         </label>
+        {infoDictee && <p className="discret petit-texte" role="status">{infoDictee}</p>}
         <div className="boutons">
           {repere && (
             <button className="petit" onClick={() => void agir(() => espace.classerPhoto(photo.id, null, photo.prisPar), true)}>

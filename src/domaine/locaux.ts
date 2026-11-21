@@ -22,6 +22,8 @@ export interface TextePlace {
   hauteur: number;
   /** Angle en degrés (0 = horizontal, lisible). */
   angle: number;
+  /** Police (identifiant du PDF) : les noms de locaux d'un plan partagent la même (21/11/2026). */
+  police?: string;
 }
 
 export type Confiance = 'forte' | 'moyenne';
@@ -96,6 +98,7 @@ interface Ligne {
   cx: number;
   cy: number;
   h: number;
+  police?: string;
 }
 
 /**
@@ -138,10 +141,12 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
       cx: t.x + t.largeur / 2,
       cy: t.y - t.hauteur * 0.35,
       h: t.hauteur,
+      ...(t.police ? { police: t.police } : {}),
     }))
-    .filter((l) => !estBruit(l.texte) || estSurface(l.texte) || MOTIF_NUMERO_CHIFFRES.test(l.texte));
+    // Les nombres courts restent : « Open Space » / « 2 » / « BR.A-R02-02 » / « 41.5 m² » (21/11/2026).
+    .filter((l) => !estBruit(l.texte) || estSurface(l.texte) || MOTIF_NUMERO_CHIFFRES.test(l.texte) || /^\d{1,3}$/.test(l.texte));
 
-  const candidats: Array<LocalDetecte & { h: number }> = [];
+  const candidats: Array<LocalDetecte & { h: number; hNom: number; police?: string; majuscules: boolean }> = [];
   for (const groupe of regrouper(lignes)) {
     const avecSurface = groupe.some((l) => estSurface(l.texte));
     let surface: number | null = null;
@@ -150,18 +155,27 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
     const indexNumero = groupe.findLastIndex((l) => estNumero(l.texte, avecSurface) && !contientMotLocal(l.texte));
     const numero = indexNumero >= 0 ? groupe[indexNumero].texte : null;
     const noms: string[] = [];
+    let policeNom: string | undefined;
+    // Nombre court sous le nom, dans la même police : il termine le nom (« Open Space 2 »), sauf
+    // si une autre ligne du nom le suit (« TECHNIQUE / 100 / ORANGE » : 100 est une cote).
+    let chiffre: string | null = null;
     groupe.forEach((l, i) => {
       if (i === indexNumero) return;
       if (surface === null && estSurface(l.texte)) surface = lireSurface(l.texte);
-      else if (!estBruit(l.texte) && !estMention(l.texte)) noms.push(l.texte);
+      else if (!estBruit(l.texte) && !estMention(l.texte)) {
+        noms.push(l.texte);
+        policeNom ??= l.police;
+        chiffre = null;
+      } else if (/^\d{1,3}$/.test(l.texte) && noms.length > 0 && l.police === policeNom) chiffre = l.texte;
     });
+    if (chiffre && noms.length < 3) noms.push(chiffre);
     if (noms.length === 0 || noms.length > 3) continue;
     // Gaines techniques, placards… : pas de local en dessous de SURFACE_MINIMALE.
     if (surface !== null && surface < SURFACE_MINIMALE) continue;
     const nom = noms.join(' ');
-    // Nom seul : il doit désigner un local, être en majuscules et rester court
-    // (« Bureau de Contrôle » dans le cartouche, longues légendes : écartés).
-    const nomPlausible = contientMotLocal(nom) && nom === nom.toUpperCase() && nom.length <= 30;
+    // Nom seul : il doit désigner un local et rester court (longues légendes écartées). La casse
+    // (majuscules ou non) est comparée plus bas à celle des étiquettes sûres du plan.
+    const nomPlausible = contientMotLocal(nom) && nom.length <= 30;
     const confiance: Confiance | null = numero !== null || surface !== null ? 'forte' : nomPlausible ? 'moyenne' : null;
     if (!confiance) continue;
     const cx = groupe.reduce((s, l) => s + l.cx, 0) / groupe.length;
@@ -175,6 +189,10 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
       confiance,
       lignes: groupe.map((l) => l.texte),
       h: groupe[0].h,
+      // Style du nom : police et hauteur de sa première ligne.
+      hNom: groupe.find((l) => noms.includes(l.texte))?.h ?? groupe[0].h,
+      police: groupe.find((l) => noms.includes(l.texte))?.police,
+      majuscules: nom === nom.toUpperCase(),
     });
   }
 
@@ -187,11 +205,36 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
   if (refSurfaces !== null) {
     for (let i = candidats.length - 1; i >= 0; i--) if (candidats[i].h < 0.6 * refSurfaces) candidats.splice(i, 1);
   }
-  const hauteursFortes = candidats.filter((c) => c.confiance === 'forte').map((c) => c.h).sort((a, b) => a - b);
+
+  // Zones sans locaux (21/11/2026) : cartouche et légende, reconnus à leur vocabulaire.
+  const exclues = zonesExclues(lignes, largeurPage, hauteurPage);
+  const horsZones = (c: { x: number; y: number }) => !exclues.some((z) => c.x >= z.x1 && c.x <= z.x2 && c.y >= z.y1 && c.y <= z.y2);
+  for (let i = candidats.length - 1; i >= 0; i--) if (!horsZones(candidats[i])) candidats.splice(i, 1);
+
+  // Style des noms de locaux (21/11/2026) : sur un plan, ils sont tous écrits avec la même police,
+  // la même hauteur et la même casse. La référence est celle des étiquettes sûres (numéro ou surface).
+  const fortes = candidats.filter((c) => c.confiance === 'forte');
+  const style = styleDeReference(fortes);
+  const conformeAuStyle = (c: (typeof candidats)[number]) =>
+    !style ||
+    ((style.police === undefined || c.police === undefined || c.police === style.police) &&
+      c.hNom >= 0.8 * style.hauteur &&
+      c.hNom <= 1.25 * style.hauteur);
+  // Une étiquette sûre n'est écartée que si elle diffère à la fois par la police et par la taille
+  // (titres, textes du cartouche) ; une étiquette réduite au nom doit suivre le style en tout.
+  const forteAberrante = (c: (typeof candidats)[number]) =>
+    !!style &&
+    style.part >= 0.7 &&
+    fortes.length >= 5 &&
+    c.police !== undefined &&
+    style.police !== undefined &&
+    c.police !== style.police &&
+    (c.hNom < 0.75 * style.hauteur || c.hNom > 1.35 * style.hauteur);
+
+  const hauteursFortes = fortes.map((c) => c.h).sort((a, b) => a - b);
   const reference = hauteursFortes.length ? hauteursFortes[Math.floor(hauteursFortes.length / 2)] : null;
   // Elles doivent aussi se trouver dans la zone dessinée, c'est-à-dire près des étiquettes sûres,
   // et non dans le cartouche ou la légende, en général en marge du dessin.
-  const fortes = candidats.filter((c) => c.confiance === 'forte');
   const zone = fortes.length >= 3
     ? {
         x1: Math.min(...fortes.map((c) => c.x)) - 0.1,
@@ -200,14 +243,106 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
         y2: Math.max(...fortes.map((c) => c.y)) + 0.1,
       }
     : null;
+  // Casse : sans référence, ou si les noms sûrs sont en majuscules, un nom seul doit l'être aussi.
+  const majusculesExigees = !style || style.majuscules;
   return candidats
-    .filter(
-      (c) =>
-        c.confiance === 'forte' ||
-        ((reference === null || (c.h >= 0.7 * reference && c.h <= 1.6 * reference)) &&
-          (zone === null || (c.x >= zone.x1 && c.x <= zone.x2 && c.y >= zone.y1 && c.y <= zone.y2))),
+    .filter((c) =>
+      c.confiance === 'forte'
+        ? !forteAberrante(c)
+        : (reference === null || (c.h >= 0.7 * reference && c.h <= 1.6 * reference)) &&
+          (zone === null || (c.x >= zone.x1 && c.x <= zone.x2 && c.y >= zone.y1 && c.y <= zone.y2)) &&
+          conformeAuStyle(c) &&
+          (!majusculesExigees || c.majuscules),
     )
-    .map(({ h: _h, ...c }) => c);
+    .map(({ h: _h, hNom: _hNom, police: _police, majuscules: _majuscules, ...c }) => c);
+}
+
+/**
+ * Style des noms des étiquettes sûres : police la plus fréquente (et sa part), hauteur médiane,
+ * casse dominante. null s'il y a moins de 2 étiquettes sûres.
+ */
+function styleDeReference(fortes: Array<{ hNom: number; police?: string; majuscules: boolean }>) {
+  if (fortes.length < 2) return null;
+  const compte = new Map<string | undefined, number>();
+  for (const c of fortes) compte.set(c.police, (compte.get(c.police) ?? 0) + 1);
+  const [police, n] = [...compte].sort((a, b) => b[1] - a[1])[0];
+  const memes = fortes.filter((c) => c.police === police);
+  const hauteurs = memes.map((c) => c.hNom).sort((a, b) => a - b);
+  return {
+    police,
+    part: n / fortes.length,
+    hauteur: hauteurs[Math.floor(hauteurs.length / 2)],
+    majuscules: memes.filter((c) => c.majuscules).length >= 0.7 * memes.length,
+  };
+}
+
+/** Mots du cartouche (comparés sans accents ni casse, en début de ligne). */
+const MOTS_CARTOUCHE = [
+  'phase', 'indice', 'echelle', 'scale', 'dessine par', 'drawn by', 'verifie par', 'checked by', 'maitre d ouvrage',
+  'maitrise d ouvrage', 'architecte', 'n projet', 'nprojet', 'project no', 'titre du dessin', 'emetteur', 'issued by',
+  'copyright', 'nom de fichier', 'file name', 'bureau de controle', 'economiste', 'preventionniste', 'paysagiste',
+  'amo ', 'bet ', 'maitre d oeuvre', 'moe ', 'date de creation', 'revision', 'modifications', 'n plan', 'numero de plan',
+];
+
+interface Zone {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/**
+ * Zones du plan où il n'y a pas de locaux, en coordonnées relatives (0 à 1) :
+ * - le cartouche : au moins 4 mots du cartouche (« Phase », « Indice », « Échelle », « Dessiné par »…)
+ *   groupés ; la zone qui les entoure est prolongée jusqu'au bord de la page le plus proche ;
+ * - la légende : sous le titre « LÉGENDE », le bloc des lignes qui le suivent.
+ * [À VÉRIFIER sur d'autres modèles de cartouche]
+ */
+export function zonesExclues(lignes: Array<{ texte: string; cx: number; cy: number }>, largeurPage: number, hauteurPage: number): Zone[] {
+  const cle = (t: string) =>
+    sansAccents(t)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  const pts = lignes.map((l) => ({ ...l, x: l.cx / largeurPage, y: l.cy / hauteurPage, k: `${cle(l.texte)} ` }));
+  const zones: Zone[] = [];
+
+  // Cartouche.
+  const mots = pts.filter((p) => MOTS_CARTOUCHE.some((m) => p.k.startsWith(m.endsWith(' ') ? m : `${m} `)));
+  if (mots.length >= 4) {
+    const mx = mots.map((p) => p.x).sort((a, b) => a - b)[Math.floor(mots.length / 2)];
+    const my = mots.map((p) => p.y).sort((a, b) => a - b)[Math.floor(mots.length / 2)];
+    const proches = mots.filter((p) => Math.abs(p.x - mx) <= 0.25 && Math.abs(p.y - my) <= 0.35);
+    if (proches.length >= 4) {
+      const z = {
+        x1: Math.min(...proches.map((p) => p.x)) - 0.015,
+        x2: Math.max(...proches.map((p) => p.x)) + 0.015,
+        y1: Math.min(...proches.map((p) => p.y)) - 0.02,
+        y2: Math.max(...proches.map((p) => p.y)) + 0.02,
+      };
+      // Le cartouche touche un bord de la page : la zone y est prolongée.
+      if (z.x2 > 0.75) z.x2 = 1;
+      if (z.x1 < 0.25) z.x1 = 0;
+      if (z.y2 > 0.75) z.y2 = 1;
+      if (z.y1 < 0.25) z.y1 = 0;
+      zones.push(z);
+    }
+  }
+
+  // Légende : le titre, puis les lignes situées dessous, à sa droite, jusqu'à un vide.
+  for (const titre of pts.filter((p) => /^(legende|legend)$/.test(cle(p.texte)))) {
+    const z = { x1: titre.x - 0.015, x2: titre.x + 0.02, y1: titre.y - 0.015, y2: titre.y + 0.015 };
+    const dessous = pts
+      .filter((p) => p !== titre && p.y > titre.y && p.y < titre.y + 0.25 && p.x >= titre.x - 0.02 && p.x <= titre.x + 0.4)
+      .sort((a, b) => a.y - b.y);
+    for (const p of dessous) {
+      if (p.y - z.y2 > 0.05) break; // vide : fin de la légende
+      z.x2 = Math.max(z.x2, p.x + 0.02);
+      z.y2 = Math.max(z.y2, p.y + 0.015);
+    }
+    zones.push(z);
+  }
+  return zones;
 }
 
 function arrondir(v: number) {
