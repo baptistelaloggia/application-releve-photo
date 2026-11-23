@@ -79,9 +79,29 @@ export async function creerProjetDepuisPaquet(
     if (!(e instanceof DOMException && e.name === 'NotFoundError')) throw e;
   }
   if (existant) {
-    throw new Error(
-      `Un dossier « ${projet.dossier} » existe déjà à cet emplacement : ouvrez-le comme projet, puis utilisez « Importer un paquet ».`,
-    );
+    // Dossier déjà là (24/11/2026) : c'est souvent le reste d'un import interrompu.
+    const stockage = new StockageDossier(existant, libelle(type, projet.dossier));
+    let idExistant: string | null = null;
+    try {
+      idExistant = JSON.parse(await (await stockage.lireFichier(`${DOSSIERS.donnees}/projet.json`)).text()).id ?? null;
+    } catch {
+      idExistant = null;
+    }
+    if (idExistant === projet.id) {
+      // Même projet : on l'ouvre, et l'import du paquet le complète (rien n'est recréé).
+      return ouvrirProjet(existant, type);
+    }
+    if (idExistant === null && type === 'appareil') {
+      // Stockage interne du téléphone, sans projet complet dedans : reste d'une création interrompue,
+      // invisible de l'utilisateur ; on le remplace.
+      await parent.removeEntry(projet.dossier, { recursive: true });
+    } else {
+      throw new Error(
+        idExistant
+          ? `Un autre projet occupe déjà le dossier « ${projet.dossier} » à cet emplacement.`
+          : `Un dossier « ${projet.dossier} » existe déjà à cet emplacement, sans projet complet dedans. Supprimez-le ou renommez-le, puis recommencez.`,
+      );
+    }
   }
   const handle = await parent.getDirectoryHandle(projet.dossier, { create: true });
   const espace = await EspaceProjet.creerDepuisPaquet(new StockageDossier(handle, libelle(type, projet.dossier)), projet);
