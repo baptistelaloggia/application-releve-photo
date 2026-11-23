@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { StockageMemoire } from '../stockage/StockageMemoire';
 import { EspaceProjet, ErreurPasUnProjet } from './EspaceProjet';
+import { nomLocalPourFichier } from '../domaine/nommage';
 
 const infos = { annee: 2026, codeAffaire: 'XXX', nom: 'Mairie test', niveaux: ['RDC', 'R+1', 'TT'] };
 const pdf = (texte: string) => new Blob([`%PDF-1.4 ${texte}`], { type: 'application/pdf' });
@@ -166,6 +167,25 @@ describe('locaux', () => {
     expect(e.reperes[0].localId).toBe(cta.id);
     expect(e.photos[0].fichier).toBe('01_PHOTOS/01_R+1/R+1.CTA-01/XXX_R+1.CTA-01_P001_2026-11-23_01.jpg');
     expect(await s.existe(e.photos[0].fichier)).toBe(true);
+  });
+
+  it('enregistre sans se bloquer des noms longs en double (boucle sans fin du 24/11/2026)', async () => {
+    const { e, planId } = await projetAvecPlan();
+    const d = (nom: string, x: number) => ({ nom, numero: null, surface: 12, x, y: 0.5, confiance: 'forte' as const, lignes: [] });
+    const cr = await e.enregistrerDetection(
+      planId,
+      [
+        d("Point d'eau / zone tisanerie Open Space", 0.2),
+        d("Point d'eau / zone tisanerie Open Space", 0.6),
+        d('Salle de réunion du comité de direction A', 0.3),
+        d('Salle de réunion du comité de direction B', 0.7),
+      ],
+      'BL',
+    );
+    expect(cr[0]).toMatch(/^4 locaux enregistrés/);
+    const dossiers = e.locauxDuPlan(planId).map((l) => nomLocalPourFichier(l.nom));
+    expect(new Set(dossiers).size).toBe(4);
+    expect(dossiers).toContain("Point-d'eau-zone-tisanerie-01");
   });
 
   it('trouve le TGBT par la recherche', async () => {

@@ -45,3 +45,13 @@ describe('nommage des photos', () => {
     expect(nomFichierPhotoAClasser('XXX', d, 'abcdef')).toBe('XXX_A-CLASSER_2026-10-30_140509_abcd.jpg');
   });
 });
+
+describe('nom de local raccourci (24/11/2026)', () => {
+  it('garde le numéro final au-delà de 30 caractères', async () => {
+    const { nomLocalPourFichier } = await import('./nommage');
+    expect(nomLocalPourFichier("Point d'eau / zone tisanerie Open Space 01")).toBe("Point-d'eau-zone-tisanerie-01");
+    expect(nomLocalPourFichier("Point d'eau / zone tisanerie Open Space 02")).toBe("Point-d'eau-zone-tisanerie-02");
+    expect(nomLocalPourFichier('Local TGBT')).toBe('Local-TGBT');
+    expect(nomLocalPourFichier('Salle de réunion du comité de direction')).toBe('Salle-de-reunion-du-comite-de');
+  });
+});
