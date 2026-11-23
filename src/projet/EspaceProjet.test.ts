@@ -149,6 +149,25 @@ describe('locaux', () => {
     expect(e.locauxDuPlan(planId).map((l) => l.nom)).toContain('LT 03');
   });
 
+  it('supprime plusieurs locaux, puis annule : locaux, repères et photos reviennent', async () => {
+    const { s, e, planId } = await projetAvecPlan();
+    const d = (nom: string, x: number) => ({ nom, numero: null, surface: null, x, y: 0.5, confiance: 'forte' as const, lignes: [] });
+    await e.enregistrerDetection(planId, [d('CTA 01', 0.2), d('WC 01', 0.6), d('ESC 01', 0.9)], 'BL');
+    expect(e.dernieresCreations).toHaveLength(3);
+    const cta = e.locaux.find((l) => l.nom === 'CTA 01')!;
+    const r = await e.creerRepere(planId, 0.21, 0.5, 'BL');
+    const jpeg = new Blob(['x']);
+    await e.ajouterPhoto({ repereId: r.id, jpeg, miniature: jpeg, largeur: 1, hauteur: 1, source: 'appli', prisLe: new Date(2026, 10, 23) }, 'BL');
+    const instantane = await e.supprimerLocaux(e.locaux.map((l) => l.id), 'BL');
+    expect(e.locaux).toHaveLength(0);
+    expect(e.photos[0].fichier).toBe('01_PHOTOS/01_R+1/R+1.Hors-local/XXX_R+1_P001_2026-11-23_01.jpg');
+    await e.restaurerLocaux(instantane);
+    expect(e.locaux.map((l) => l.nom).sort()).toEqual(['CTA 01', 'ESC 01', 'WC 01']);
+    expect(e.reperes[0].localId).toBe(cta.id);
+    expect(e.photos[0].fichier).toBe('01_PHOTOS/01_R+1/R+1.CTA-01/XXX_R+1.CTA-01_P001_2026-11-23_01.jpg');
+    expect(await s.existe(e.photos[0].fichier)).toBe(true);
+  });
+
   it('trouve le TGBT par la recherche', async () => {
     const { e, planId } = await projetAvecPlan();
     await e.creerLocal(planId, { nom: 'TGBT', numero: 'lt1105', surface: null, x: 0.5, y: 0.5 }, 'BL');

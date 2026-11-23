@@ -31,6 +31,8 @@ export interface Marqueur {
 export interface CommandesVisionneuse {
   centrerSur(x: number, y: number, facteurZoom?: number): void;
   ajuster(): void;
+  /** Point de l'écran en coordonnées relatives de la page (null si le plan n'est pas prêt). */
+  relatifDepuisEcran(clientX: number, clientY: number): { x: number; y: number } | null;
 }
 
 interface Props {
@@ -94,6 +96,7 @@ export const VisionneusePlan = forwardRef<CommandesVisionneuse, Props>(function 
   useImperativeHandle(ref, () => ({
     centrerSur: (x, y, f) => moteur.current?.centrerSur(x, y, f),
     ajuster: () => moteur.current?.ajuster(),
+    relatifDepuisEcran: (x, y) => moteur.current?.relatifDepuisEcran(x, y) ?? null,
   }));
 
   useEffect(() => {

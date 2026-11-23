@@ -196,7 +196,8 @@ export function devinerNiveauPage(texte: string): string | null {
   }
   // Titre du plan, en bas de page ou dans le cartouche : « PLAN - R+2 MARCHE », « PLAN R02 »,
   // « PLAN R06M », « PLAN TOITURE », « PLAN SS1 ».
-  const titre = /PLAN ?[-–:]? ?(R ?\+ ?\d{1,2}[A-Z]{0,3}|R0\d[A-Z]{0,3}|R\d{1,2}[A-Z]{0,3}|RDC|SS ?\d?|ES|ENTRESOL|TT|TOIT(?:URE)?|REZ[- ]DE[- ]CHAUSSEE|SOUS[- ]SOL ?\d?)(?=$|[^A-Z0-9+])/g;
+  // Jusqu'à trois mots entre « PLAN » et le niveau : « Plan projet R+6 », « Plan état existant R+2 » (23/11/2026).
+  const titre = /PLAN(?: (?:PROJET|PROJETE|EXISTANT|ETAT|ACTUEL|DEMOLITION|DEMOL|ARCHITECTE|ARCHI|DE|DU|D'|NIVEAU|EXE|DCE|APD|APS|PRO)){0,3} ?[-–:]? ?(R ?\+ ?\d{1,2}[A-Z]{0,3}|R0\d[A-Z]{0,3}|R\d{1,2}[A-Z]{0,3}|RDC|SS ?\d?|ES|ENTRESOL|TT|TOIT(?:URE)?|REZ[- ]DE[- ]CHAUSSEE|SOUS[- ]SOL ?\d?)(?=$|[^A-Z0-9+])/g;
   for (const m of t.matchAll(titre)) {
     let code = m[1].replace(/ /g, '');
     if (/^REZ/.test(code)) code = 'RDC';

@@ -75,6 +75,12 @@ const PAS_ORDRE = 10;
 /** Écritures simultanées pour les enregistrements groupés (détection des locaux…). */
 const ECRITURES_SIMULTANEES = 8;
 
+/** Locaux et repères tels qu'ils étaient avant une suppression : de quoi l'annuler. */
+export interface InstantaneLocaux {
+  locaux: Local[];
+  reperes: Repere[];
+}
+
 export class ErreurPasUnProjet extends Error {
   constructor() {
     super(`Ce dossier n'est pas un projet : le fichier ${FICHIER_PROJET} est absent.`);
@@ -153,6 +159,9 @@ export function controlerNouveauProjet(infos: InfosNouveauProjet): string[] {
  * Toutes les écritures passent par ici, pour garantir l'arborescence normalisée.
  */
 export class EspaceProjet {
+  /** Identifiants des locaux créés par la dernière détection enregistrée (pour l'annuler). */
+  dernieresCreations: string[] = [];
+
   private constructor(
     readonly stockage: Stockage,
     public projet: Projet,
@@ -705,6 +714,38 @@ export class EspaceProjet {
   }
 
   /**
+   * Supprime plusieurs locaux (sélection, « tout supprimer », 23/11/2026) et renvoie de quoi annuler :
+   * les locaux et les repères tels qu'ils étaient. Leurs repères deviennent « hors local ».
+   */
+  async supprimerLocaux(ids: string[], auteur = '?'): Promise<InstantaneLocaux> {
+    const a = new Set(ids);
+    const instantane: InstantaneLocaux = {
+      locaux: this.locaux.filter((l) => a.has(l.id)),
+      reperes: this.reperes.filter((r) => r.localId !== null && a.has(r.localId)),
+    };
+    await enParallele(instantane.locaux, ECRITURES_SIMULTANEES, (l) => this.stockage.supprimer(`${DOSSIER_LOCAUX}/${l.id}.json`));
+    this.locaux = this.locaux.filter((l) => !a.has(l.id));
+    for (const r of instantane.reperes) {
+      const { surEtiquette: _surEtiquette, ...ordinaire } = r;
+      await this.ecrireRepere({ ...ordinaire, localId: null, modifieLe: maintenant(), modifiePar: auteur });
+    }
+    if (instantane.reperes.length) await this.rangerPhotos(this.photos.filter((p) => p.repereId && !this.repereDe(p)?.localId));
+    return instantane;
+  }
+
+  /**
+   * Annulation (bouton « ↶ Annuler ») : remet les locaux et les repères d'un instantané tels qu'ils
+   * étaient (même identifiant), puis range leurs photos. Les locaux créés depuis (dernieresCreations
+   * d'une détection) sont supprimés par supprimerLocaux.
+   */
+  async restaurerLocaux(instantane: InstantaneLocaux): Promise<void> {
+    await enParallele(instantane.locaux, ECRITURES_SIMULTANEES, (l) => this.ecrireLocal(l));
+    for (const r of instantane.reperes) await this.ecrireRepere(r);
+    const ids = new Set(instantane.reperes.map((r) => r.id));
+    if (ids.size) await this.rangerPhotos(this.photos.filter((p) => p.repereId && ids.has(p.repereId)));
+  }
+
+  /**
    * Indique si un local détecté existe déjà sur ce plan : même numéro dans le projet,
    * ou même nom à la même place. Sert à relancer la détection sans créer de doublons.
    */
@@ -753,6 +794,8 @@ export class EspaceProjet {
       }
     });
     this.locaux = this.locaux.filter((l) => !echecs.has(l.id));
+    // Pour l'annulation : les locaux que cette détection vient de créer.
+    this.dernieresCreations = nouveaux.filter((l) => !echecs.has(l.id)).map((l) => l.id);
     const crees = nouveaux.length - echecs.size;
     const plan = this.planParId(planId);
     compteRendu.unshift(`${crees} ${crees > 1 ? 'locaux' : 'local'} enregistré${crees > 1 ? 's' : ''} sur le plan ${plan?.fichier.split('/').pop() ?? ''}`);

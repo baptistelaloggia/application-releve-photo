@@ -166,6 +166,14 @@ Règles issues du lot 1 (04/11/2026) :
   - **Résultat sur les deux carnets d'essai :**
     - carnet 1 : 220 → 191 propositions. Plus de textes du cartouche ni de la légende, ni de cours extérieures ;
     - carnet 2 : 182 → 221 propositions. 39 « Open Space n » réels trouvés en plus, cartouche écarté.
+- **Détection d'après un exemple** (23/11/2026) : sur certains plans, les noms de locaux sont en gras sans surface (« Open space flex office 01 »). Le mobilier y est désigné en maigre, avec une surface (« Bureau / 12,6 m² »). Le PDF ne dit pas lequel est en gras : les deux polices portent le même nom.
+  - **L'encadré :** « ▭ D'après un exemple » (liste des locaux), ou « Propositions fausses ? Encadrer une étiquette de local » (pendant la détection). On trace un cadre au doigt autour du nom d'un local.
+  - **Effet :** l'appli relève la police et la taille de ce texte. Elle ne propose alors que les étiquettes de même police et de même taille (à 15 % près), même sans numéro ni surface. Cartouche et légende restent exclus.
+  - **Résultat sur le carnet d'essai concerné :** 31 locaux, tous les noms en gras, et plus aucune désignation de mobilier.
+- **Supprimer et annuler** (23/11/2026) :
+  - **Supprimer plusieurs locaux :** dans la liste des locaux, « ☑ Sélectionner » (cases à cocher, « Supprimer la sélection ») et « Tout supprimer ».
+  - **Annuler :** « ↶ Annuler » défait la dernière action sur les locaux (détection enregistrée, suppression). Les locaux reviennent avec le même identifiant, les repères retrouvent leur local, et les photos reprennent leur rangement.
+  - **Portée :** une seule action est annulable, pendant la session sur le plan.
 - **Le nom seul** (décision du 17/11/2026, **modifie** la règle précédente qui gardait aussi le numéro et la surface lus sur le plan) :
   - **Lecture du plan :** le numéro et la surface servent encore à **reconnaître** une étiquette sur le plan, mais ne sont plus enregistrés. Seul le nom l'est.
   - **Doublons :** un nom porté par plusieurs locaux d'un même plan reçoit un numéro d'ordre : « LT 01 », « LT 02 »… Ils sont numérotés de haut en bas, puis de gauche à droite, en sautant les numéros déjà pris sur le plan. Un local déjà enregistré n'est jamais renommé.
@@ -178,6 +186,7 @@ Règles issues du lot 1 (04/11/2026) :
 - **Étiquettes sur le plan** : placées au-dessus de l'étiquette du local dessinée sur le plan, pour la laisser lisible. Elles affichent au choix le numéro ou le nom (choix mémorisé sur l'appareil).
 - **Détection sur tous les plans** : un récapitulatif par niveau (locaux sûrs, noms seuls à vérifier, déjà présents) est présenté avant l'enregistrement.
 - **Recherche** : par nom, numéro et code de niveau, sans tenir compte des accents ni de la casse (« tgbt », « 012 », « cta ss1 »). Le numéro exact passe en premier.
+- **Niveau lu dans le titre de la page** (23/11/2026) : jusqu'à trois mots sont admis entre « Plan » et le niveau, par exemple « Plan projet R+6 » ou « Plan état existant SS1 ».
 - **Affichage des plans** : image de fond de la page entière, puis tuiles de 512 px calculées à la demande pour le zoom courant (jusqu'à 8 pixels par point PDF). Le zoom se fait à la molette, au pincement ou au double appui.
   - **Pincement sur les étiquettes** (21/11/2026) : il fonctionne même quand les doigts se posent sur des étiquettes, ce qui arrive sur un plan chargé. Avant, un doigt sur une étiquette était ignoré.
   - **Étiquette sous un doigt :** un doigt seul sur une étiquette reste un appui sur l'étiquette. Dès qu'un second doigt arrive, c'est un pincement, et l'appui sur l'étiquette est annulé.

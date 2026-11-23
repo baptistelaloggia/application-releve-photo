@@ -318,6 +318,12 @@ export class MoteurVue {
 
   // ------------------------------------------------------------ gestes
 
+  /** Point de l'écran (clientX, clientY) en coordonnées relatives de la page (encadré, 23/11/2026). */
+  relatifDepuisEcran(clientX: number, clientY: number) {
+    const p = this.positionLocale({ clientX, clientY });
+    return this.versRelatif(p.x, p.y);
+  }
+
   private positionLocale(e: { clientX: number; clientY: number }) {
     const r = this.conteneur.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
