@@ -8,6 +8,7 @@ import { TransitGraph } from '../transit/TransitGraph';
 import { avecDelai, choisirDossier, choixDeDossierDisponible, dossierAppareil, dossierProjetAppareil, verifierPermission } from '../stockage/acces';
 import { listerProjetsConnus, oublierProjet, type ProjetConnu } from '../stockage/registre';
 import { dateLisible, Message, texteErreur } from './commun';
+import { StockageAppareil } from './StockageAppareil';
 
 interface Props {
   surNouveau: () => void;
@@ -106,8 +107,8 @@ export function Accueil({ surNouveau, surDiagnostic, surReglagesTransit, surOuve
     <>
       {!surPC && (
         <Message type="info">
-          Sur téléphone, les projets sont rangés dans le stockage interne de l'application. Le transfert vers le serveur
-          partagé arrivera avec l'export .zip (lot 4).
+          Sur téléphone, les projets sont rangés dans le stockage interne de l'application (section « Stockage du
+          téléphone », plus bas). Ils sont envoyés au serveur partagé par paquet .zip ou par le transit SharePoint.
         </Message>
       )}
       {etape && <Message type="info">{etape}</Message>}
@@ -170,6 +171,8 @@ export function Accueil({ surNouveau, surDiagnostic, surReglagesTransit, surOuve
           </ul>
         )}
       </section>
+
+      {!surPC && <StockageAppareil surModifie={actualiser} />}
 
       <section className="carte">
         <h2>Transit SharePoint</h2>

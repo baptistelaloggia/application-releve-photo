@@ -122,6 +122,8 @@ Lot 0 Cadrage → 1 Socle → 2 Plans et locaux → 3 Terrain → 4 Synchro zip 
   `regroupement-panier.mjs` : regroupement et rattachement des photos importées.
   `ergonomie.mjs` : pincement sur des étiquettes, ligne de niveau cliquable, dictée corrigée, corbeille de la visionneuse.
   `locaux-exemple.mjs` : niveau lu dans le titre, détection d'après un encadré, suppression et annulation.
+  `stockage-telephone.mjs` : import par-dessus un dossier incomplet, suppression depuis « Stockage du téléphone »
+  (`src/ui/StockageAppareil.tsx`).
   `tests/e2e/plans-reels.mjs` : essai sur un vrai carnet fourni à part (variable `PLANS`).
 - Les vrais plans de test se rangent dans le dossier de travail temporaire, jamais dans le dépôt.
 - Les réglages SharePoint (tenant ID, client ID, site) se saisissent dans l'appli et restent sur l'appareil :

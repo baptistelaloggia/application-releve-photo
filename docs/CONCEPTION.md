@@ -406,6 +406,20 @@ Règles issues du lot 1 (04/11/2026) :
   - **Repli :** la dictée « 🎙 Dicter » n'enregistre pas de son ; elle n'a donc pas ce conflit.
 - **Lisibilité sans l'appli** : les tags ne sont pas dans les noms de fichiers ; ils figureront dans les exports (lot 7 : rapport PDF, liste Excel).
 
+## A.6 undecies Stockage du téléphone (24/11/2026)
+
+- Sur téléphone, les projets sont rangés dans le stockage interne de l'appli (OPFS), invisible dans le gestionnaire de fichiers.
+- **Section « Stockage du téléphone »** (accueil, sur téléphone) : elle liste chaque dossier avec son projet, son nombre de photos et ses photos **jamais envoyées** au serveur (par paquet ou transit).
+  - **Dossiers incomplets :** les restes d'une création ou d'un import interrompus sont signalés.
+  - **Suppression :** le bouton « Supprimer » efface le dossier et retire le projet des projets récents. Le projet sur le serveur partagé n'est pas touché.
+  - **Garde-fou :** s'il reste des photos non envoyées, une alerte en donne le nombre et une seconde confirmation est demandée.
+- **Import d'un paquet quand le dossier existe déjà :**
+  - **même projet** (même identifiant) : il est ouvert et le paquet le complète ;
+  - **dossier incomplet** dans le stockage interne (reste d'un import interrompu) : il est remplacé ;
+  - **sinon** : un message explique le conflit.
+
+  Avant, l'import s'arrêtait sur « Un dossier … existe déjà à cet emplacement », sans moyen de supprimer ce dossier depuis le téléphone.
+
 ## A.7 Fonctions prévues
 
 **Terrain (priorité absolue : 2 appuis maximum par photo)**
