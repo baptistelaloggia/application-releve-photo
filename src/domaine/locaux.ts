@@ -139,7 +139,24 @@ function regrouper(lignes: Ligne[]): Ligne[][] {
 export interface StyleEtiquette {
   police?: string;
   hauteur: number;
+  /**
+   * Pour retrouver le style sur un autre plan (24/11/2026), dont la police peut porter un autre
+   * préfixe de sous-ensemble (« ABCDEF+Poppins ») : famille de la police (« Poppins ») et chasse
+   * (largeur moyenne d'un caractère rapportée à la hauteur), qui distingue le gras du maigre.
+   */
+  famille?: string;
+  chasse?: number;
+  /** Texte encadré, pour le rappeler à l'utilisateur. */
+  texte?: string;
 }
+
+/** Famille d'une police, sans le préfixe de sous-ensemble : « WLGMLB+Poppins » → « Poppins ». */
+export const famillePolice = (police?: string) => police?.replace(/^[A-Z]{6}\+/, '');
+
+const chasseDe = (t: { texte: string; largeur: number; hauteur: number }) => {
+  const n = t.texte.trim().length;
+  return n && t.hauteur > 0 && t.largeur > 0 ? t.largeur / (n * t.hauteur) : undefined;
+};
 
 /**
  * Style du nom de local encadré par l'utilisateur : le texte le plus long dans le cadre (coordonnées
@@ -159,12 +176,27 @@ export function styleDansCadre(
   });
   const noms = dedans.filter((t) => !estBruit(t.texte) && !estSurface(t.texte) && !MOTIF_NUMERO_LETTRES.test(t.texte.trim()));
   const choisi = [...(noms.length ? noms : dedans)].sort((a, b) => b.texte.trim().length - a.texte.trim().length)[0];
-  return choisi ? { ...(choisi.police ? { police: choisi.police } : {}), hauteur: choisi.hauteur } : null;
+  if (!choisi) return null;
+  const chasse = chasseDe(choisi);
+  return {
+    ...(choisi.police ? { police: choisi.police, famille: famillePolice(choisi.police) } : {}),
+    hauteur: choisi.hauteur,
+    ...(chasse ? { chasse: Math.round(chasse * 1000) / 1000 } : {}),
+    texte: choisi.texte.trim(),
+  };
 }
 
-/** Même style que l'exemple : même police (si connue) et hauteur à 15 % près. */
-function memeStyle(l: { police?: string; h: number }, exemple: StyleEtiquette) {
-  return (exemple.police === undefined || l.police === undefined || l.police === exemple.police) && Math.abs(l.h - exemple.hauteur) <= 0.15 * exemple.hauteur;
+/**
+ * Même style que l'exemple : hauteur à 15 % près, et même police. Si la police exacte de l'exemple
+ * existe sur le plan (même carnet), elle seule compte ; sinon (autre fichier), même famille de
+ * police et chasse à 10 % près.
+ */
+function memeStyle(l: { police?: string; h: number; chasse?: number }, exemple: StyleEtiquette, policeExacte: boolean) {
+  if (Math.abs(l.h - exemple.hauteur) > 0.15 * exemple.hauteur) return false;
+  if (exemple.police === undefined || l.police === undefined) return true;
+  if (policeExacte) return l.police === exemple.police;
+  if (famillePolice(l.police) !== (exemple.famille ?? famillePolice(exemple.police))) return false;
+  return exemple.chasse === undefined || l.chasse === undefined || Math.abs(l.chasse - exemple.chasse) <= 0.1 * exemple.chasse;
 }
 
 /**
@@ -300,7 +332,7 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
 
 /** Détection guidée par une étiquette exemple (voir detecterLocaux). */
 function detecterSelonExemple(textes: TextePlace[], largeurPage: number, hauteurPage: number, exemple: StyleEtiquette): LocalDetecte[] {
-  const toutes: Ligne[] = textes
+  const toutes: Array<Ligne & { chasse?: number }> = textes
     .filter((t) => Math.abs(t.angle) < 5 && t.texte.trim() !== '' && t.hauteur > 0)
     .map((t) => ({
       texte: t.texte.trim().replace(/\s+/g, ' '),
@@ -308,15 +340,18 @@ function detecterSelonExemple(textes: TextePlace[], largeurPage: number, hauteur
       cy: t.y - t.hauteur * 0.35,
       h: t.hauteur,
       ...(t.police ? { police: t.police } : {}),
+      chasse: chasseDe(t),
     }));
   const exclues = zonesExclues(toutes, largeurPage, hauteurPage);
+  const policeExacte = exemple.police !== undefined && toutes.some((l) => l.police === exemple.police);
+  const style = (l: Ligne & { chasse?: number }) => memeStyle(l, exemple, policeExacte);
   // Lignes retenues : celles du style de l'exemple (le nom), et les numéros et surfaces voisins.
   const lignes = toutes.filter(
-    (l) => memeStyle(l, exemple) || estSurface(l.texte) || MOTIF_NUMERO_LETTRES.test(l.texte) || /^\d{1,3}$/.test(l.texte),
+    (l) => style(l) || estSurface(l.texte) || MOTIF_NUMERO_LETTRES.test(l.texte) || /^\d{1,3}$/.test(l.texte),
   );
   const resultat: LocalDetecte[] = [];
   for (const groupe of regrouper(lignes)) {
-    const noms = groupe.filter((l) => memeStyle(l, exemple) && !estSurface(l.texte) && (!estBruit(l.texte) || /^\d{1,3}$/.test(l.texte)));
+    const noms = groupe.filter((l) => style(l) && !estSurface(l.texte) && (!estBruit(l.texte) || /^\d{1,3}$/.test(l.texte)));
     if (!noms.some((l) => !estBruit(l.texte)) || noms.length > 4) continue;
     const surfaceLigne = groupe.find((l) => estSurface(l.texte));
     const surface = surfaceLigne ? lireSurface(surfaceLigne.texte) : null;

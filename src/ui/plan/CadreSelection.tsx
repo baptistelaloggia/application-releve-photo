@@ -14,6 +14,8 @@ interface Props {
  */
 export function CadreSelection({ convertir, surCadre, surAnnuler }: Props) {
   const zone = useRef<HTMLDivElement>(null);
+  // « Déplacer / zoomer » : le calque laisse passer les gestes vers le plan (24/11/2026).
+  const [deplacer, setDeplacer] = useState(false);
   const [trace, setTrace] = useState<{ x0: number; y0: number; x1: number; y1: number; cx0: number; cy0: number } | null>(null);
 
   const local = (e: PointerEvent) => {
@@ -24,9 +26,9 @@ export function CadreSelection({ convertir, surCadre, surAnnuler }: Props) {
   return (
     <div
       ref={zone}
-      className="cadre-selection"
+      className={`cadre-selection${deplacer ? ' inactif' : ''}`}
       onPointerDown={(e) => {
-        if ((e.target as HTMLElement).closest('button')) return;
+        if (deplacer || (e.target as HTMLElement).closest('button')) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         const p = local(e);
         setTrace({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, cx0: e.clientX, cy0: e.clientY });
@@ -47,8 +49,12 @@ export function CadreSelection({ convertir, surCadre, surAnnuler }: Props) {
       }}
     >
       <div className="consigne">
-        Encadrez le nom d'un local : glissez le doigt d'un coin à l'autre, autour du texte. Les étiquettes de même police et de même taille
-        seront retenues.
+        {deplacer
+          ? 'Déplacez ou zoomez le plan, puis revenez à l’encadré.'
+          : "Encadrez le nom d'un local : glissez le doigt d'un coin à l'autre, autour du texte. Les étiquettes de même police et de même taille seront retenues."}
+        <button className="petit" onClick={() => setDeplacer(!deplacer)}>
+          {deplacer ? '▭ Encadrer' : '✋ Déplacer / zoomer'}
+        </button>
         <button className="petit" onClick={surAnnuler}>
           Annuler
         </button>

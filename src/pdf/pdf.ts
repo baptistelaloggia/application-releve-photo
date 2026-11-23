@@ -65,7 +65,8 @@ export function ouvrirPagePlan(cle: string, fichier: Blob): Promise<PagePdf> {
     ouverts.set(cle, deja); // remis en dernier : le plus récemment utilisé
     return deja.page;
   }
-  const tache = fichier.arrayBuffer().then((b) => pdfjs.getDocument({ data: new Uint8Array(b) }));
+  // fontExtraProperties : nom réel des polices, pour reconnaître le style des étiquettes (24/11/2026).
+  const tache = fichier.arrayBuffer().then((b) => pdfjs.getDocument({ data: new Uint8Array(b), fontExtraProperties: true }));
   const page = tache.then(async (t) => (await t.promise).getPage(1));
   const entree: Ouvert = { tache, page };
   ouverts.set(cle, entree);
