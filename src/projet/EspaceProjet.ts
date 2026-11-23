@@ -623,7 +623,8 @@ export class EspaceProjet {
     if (!autres.some((l) => cle(l.nom) === cle(nom))) return;
     const base = nomDeBase(nom);
     let rang = 1;
-    while (autres.some((l) => cle(l.nom) === cle(`${base} ${String(rang).padStart(2, '0')}`))) rang++;
+    // Borné : un nom raccourci pourrait ne jamais devenir libre (boucle sans fin du 24/11/2026).
+    while (rang < 999 && autres.some((l) => cle(l.nom) === cle(`${base} ${String(rang).padStart(2, '0')}`))) rang++;
     throw new Error(`Le nom « ${nom.trim()} » est déjà pris sur ce plan. Proposition : « ${base} ${String(rang).padStart(2, '0')} ».`);
   }
 
@@ -773,6 +774,16 @@ export class EspaceProjet {
     // Seul le nom est gardé (17/11/2026) : ni numéro ni surface. Les noms en double sur le plan
     // sont numérotés (« LT 01 », « LT 02 »).
     const nommes = numeroterNomsEnDouble(aCreer, this.locauxDuPlan(planId).map((l) => l.nom));
+    // Noms longs qui donneraient le même dossier une fois raccourcis (30 caractères) : numérotés.
+    const dossiers = new Set(this.locauxDuPlan(planId).map((l) => nomLocalPourFichier(l.nom).toUpperCase()));
+    for (const d of nommes) {
+      let nom = d.nom;
+      for (let rang = 2; rang < 999 && dossiers.has(nomLocalPourFichier(nom).toUpperCase()); rang++) {
+        nom = `${nomDeBase(d.nom)} ${String(rang).padStart(2, '0')}`;
+      }
+      d.nom = nom;
+      dossiers.add(nomLocalPourFichier(nom).toUpperCase());
+    }
     for (const d of nommes) {
       try {
         const l = this.construireLocal(planId, { nom: d.nom, numero: null, surface: null, x: d.x, y: d.y }, auteur, 'auto');
@@ -1246,7 +1257,7 @@ export class EspaceProjet {
       for (const l of tries) {
         const base = nomDeBase(l.nom);
         let nom = `${base} ${String(rang).padStart(2, '0')}`;
-        while (pris.has(nomLocalPourFichier(nom).toUpperCase())) nom = `${base} ${String(++rang).padStart(2, '0')}`;
+        while (rang < 999 && pris.has(nomLocalPourFichier(nom).toUpperCase())) nom = `${base} ${String(++rang).padStart(2, '0')}`;
         rang++;
         pris.add(nomLocalPourFichier(nom).toUpperCase());
         await this.ecrireLocal({ ...l, nom, modifieLe: maintenant(), modifiePar: auteur });

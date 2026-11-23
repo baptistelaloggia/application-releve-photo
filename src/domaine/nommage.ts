@@ -79,7 +79,14 @@ export const DOSSIERS = {
  * Depuis le 18/11/2026, le numéro du local n'y figure plus (CONCEPTION §A.6).
  */
 export function nomLocalPourFichier(nom: string): string {
-  return nettoyerPourNom(nom.replace(/\./g, ' ')).slice(0, 30).replace(/-+$/, '') || 'Local';
+  const n = nettoyerPourNom(nom.replace(/\./g, ' '));
+  if (n.length <= 30) return n || 'Local';
+  // Nom trop long : on raccourcit le début mais on garde le numéro final (« …-Open-Space-02 »),
+  // sinon deux locaux numérotés auraient le même dossier (constaté le 24/11/2026).
+  const numero = /-(\d{1,3})$/.exec(n)?.[1];
+  const garde = numero ? 30 - numero.length - 1 : 30;
+  const debut = n.slice(0, garde).replace(/-+$/, '');
+  return (numero ? `${debut}-${numero}` : debut) || 'Local';
 }
 
 /** Dossier des photos hors local, sous le dossier du niveau. */

@@ -106,6 +106,9 @@ Principe : une fois les noms triés par ordre alphabétique, les photos d'un mê
 - **Sans numéro de local (décision du 18/11/2026, modifie la règle précédente `{Niveau}.{N°local}_{NomLocal}`)** :
   - **Noms :** le dossier d'un local est `{Niveau}.{NomLocal}`, et une photo `{Projet}_{Niveau}.{NomLocal}_{P001}_{date}_{rang}.jpg`.
   - **Nom du local :** il est nettoyé (accents, espaces et points remplacés) et coupé à 30 caractères.
+    - **Numéro final conservé (24/11/2026) :** quand le nom est trop long, le numéro final est gardé (« Point-d'eau-zone-tisanerie-01 »).
+    - **Bug corrigé :** avant, « … Open Space 01 » et « … 02 » donnaient le même dossier une fois coupés. La recherche d'un nom libre tournait alors sans fin, et la page se figeait à l'enregistrement de la détection.
+    - **Garde-fous :** les recherches de nom libre sont bornées. Deux noms longs qui ne diffèrent qu'au-delà de 30 caractères sont numérotés à l'enregistrement.
   - **Hors local :** dossier `{Niveau}.Hors-local`, photo `{Projet}_{Niveau}_{P001}_….jpg`.
   - **Unicité :** deux locaux d'un même plan ne peuvent plus porter le même nom ; l'appli refuse et propose « … 02 ». Le numéro de repère (`P001`, unique dans le projet) garantit l'unicité des noms de photos.
   - **Projets existants :** un bandeau de l'écran Projet propose « Mettre à jour les noms ». Il fait deux choses :
