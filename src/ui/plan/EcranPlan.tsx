@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRetour } from '../retour';
-import type { LocalDetecte } from '../../domaine/locaux';
+import type { LocalDetecte, StyleEtiquette } from '../../domaine/locaux';
 import type { Local, Photo } from '../../domaine/types';
 import { dateLocale } from '../../domaine/nommage';
 import { compresserPhoto } from '../../photo/compression';
@@ -10,7 +10,8 @@ import { VisionneusePhoto } from '../photo/VisionneusePhoto';
 import { ComparaisonPhotos } from '../photo/ComparaisonPhotos';
 import { FicheRepere, PanneauPanier, PanneauTerrain, PhotosDuLocal } from './PanneauxTerrain';
 import type { EspaceProjet, ResultatLocal, SaisieLocal } from '../../projet/EspaceProjet';
-import { proposerLocaux } from '../../pdf/pdf';
+import { proposerLocaux, styleEncadre } from '../../pdf/pdf';
+import { CadreSelection } from './CadreSelection';
 import { ecrireReglage, lireReglage } from '../../stockage/registre';
 import { BarreRecherche } from '../BarreRecherche';
 import { Message, texteErreur } from '../commun';
@@ -43,7 +44,7 @@ type Mode =
   | { type: 'classement'; photoIds: string[] }
   | { type: 'rattachement'; repereId: string }
   | { type: 'direction'; repereId: string }
-  | { type: 'detection'; candidats: Candidat[]; sansTexte: boolean };
+  | { type: 'detection'; candidats: Candidat[]; sansTexte: boolean; exemple?: StyleEtiquette; encadrer?: boolean };
 
 const PREFIXE_REPERE = 'repere:';
 
@@ -81,6 +82,15 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
    * local s'ouvre à la fermeture de la visée (19/11/2026), le plan restant visible derrière.
    */
   const [aRattacher, setARattacher] = useState<string | null>(null);
+  /** Dernière action annulable sur les locaux (détection enregistrée, suppression) : bouton « ↶ Annuler ». */
+  const [annulation, setAnnulation] = useState<{ texte: string; annuler: () => Promise<void> } | null>(null);
+  const annuler = () =>
+    annulation &&
+    executer(async () => {
+      await annulation.annuler();
+      setInfo(`Annulé : ${annulation.texte}`);
+      setAnnulation(null);
+    });
   /** Comparaison avant / après ouverte sur un repère (lot 6). */
   const [comparaison, setComparaison] = useState<string | null>(null);
   useRetour(!!aRattacher, () => setARattacher(null), 3);
@@ -471,19 +481,42 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
     return [...photos].reverse().find((p) => p.date < aujourdhui) ?? photos[photos.length - 1] ?? null;
   }
 
-  const detecter = () =>
+  const detecter = (exemple?: StyleEtiquette) =>
     executer(async () => {
       if (!fichier) return;
-      const { locaux: trouves, sansTexte } = await proposerLocaux(plan.empreinte, fichier);
+      const { locaux: trouves, sansTexte } = await proposerLocaux(plan.empreinte, fichier, exemple);
       setSelection(null);
       setMode({
         type: 'detection',
         sansTexte,
+        ...(exemple ? { exemple } : {}),
         candidats: trouves.map((t, i) => {
           const doublon = espace.dejaPresent(planId, t) !== undefined;
           return { ...t, cle: String(i), retenu: !doublon, doublon };
         }),
       });
+      if (exemple) setInfo(`${trouves.length} étiquette${trouves.length > 1 ? 's' : ''} du même style que l'exemple encadré.`);
+    });
+
+  /** Encadré tracé autour du nom d'un local : son style guide une nouvelle détection (23/11/2026). */
+  const detecterSelonCadre = (cadre: { x1: number; y1: number; x2: number; y2: number }) =>
+    executer(async () => {
+      if (!fichier) return;
+      const style = await styleEncadre(plan.empreinte, fichier, cadre);
+      if (!style) {
+        setInfo('Aucun texte dans le cadre : encadrez le nom d’un local, au plus près.');
+        return;
+      }
+      await detecter(style);
+    });
+
+  /** Supprime des locaux, avec possibilité d'annuler. */
+  const supprimerLocaux = (ids: string[], texte: string) =>
+    executer(async () => {
+      const instantane = await espace.supprimerLocaux(ids, auteur);
+      setSelection(null);
+      setAnnulation({ texte, annuler: () => espace.restaurerLocaux(instantane) });
+      setInfo(texte);
     });
 
   const choisirResultat = (r: ResultatLocal) => {
@@ -546,6 +579,11 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
       {info && !erreur && (
         <div className="message message-succes bandeau-info" role="status">
           {info}
+          {annulation && (
+            <button className="petit" onClick={() => void annuler()} disabled={occupe} title={`Annuler : ${annulation.texte}`}>
+              ↶ Annuler
+            </button>
+          )}
           <button className="petit" onClick={() => setInfo(null)}>
             OK
           </button>
@@ -571,6 +609,13 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
             />
           ) : (
             <div className="vue-etat">Lecture du plan…</div>
+          )}
+          {mode.type === 'detection' && mode.encadrer && (
+            <CadreSelection
+              convertir={(x, y) => vue.current?.relatifDepuisEcran(x, y) ?? null}
+              surCadre={(c) => void detecterSelonCadre(c)}
+              surAnnuler={() => (mode.candidats.length ? setMode({ ...mode, encadrer: false }) : setMode({ type: 'consultation' }))}
+            />
           )}
           {(mode.type === 'ajout' || mode.type === 'deplacement' || mode.type === 'deplacementRepere' || mode.type === 'classement' || mode.type === 'rattachement' || mode.type === 'direction') && (
             <div className="consigne">
@@ -603,6 +648,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               }
               surTout={(retenu) => setMode({ ...mode, candidats: mode.candidats.map((c) => (c.doublon ? c : { ...c, retenu })) })}
               surVoir={(c) => vue.current?.centrerSur(c.x, c.y, 4)}
+              exemple={!!mode.exemple}
+              surEncadrer={() => setMode({ ...mode, encadrer: true })}
               surAnnuler={() => setMode({ type: 'consultation' })}
               surEnregistrer={() =>
                 executer(async () => {
@@ -612,6 +659,9 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                     auteur,
                   );
                   surJournal(cr);
+                  const crees = espace.dernieresCreations;
+                  setAnnulation({ texte: cr[0], annuler: async () => void (await espace.supprimerLocaux(crees, auteur)) });
+                  setInfo(cr[0]);
                   setMode({ type: 'consultation' });
                 })
               }
@@ -676,11 +726,7 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
               surEnregistrer={(s) => executer(async () => void (await espace.modifierLocal(selectionne.id, s, auteur)))}
               surDeplacer={() => setMode({ type: 'deplacement', localId: selectionne.id })}
               surSupprimer={() => {
-                if (!confirm(`Supprimer le local « ${selectionne.nom} » ? Ses photos restent, sur des repères hors local.`)) return;
-                void executer(async () => {
-                  await espace.supprimerLocal(selectionne.id, auteur);
-                  setSelection(null);
-                });
+                void supprimerLocaux([selectionne.id], `Local supprimé : ${selectionne.nom}`);
               }}
             />
           ) : null}
@@ -746,7 +792,19 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
                 setSelection(l.id);
                 vue.current?.centrerSur(l.x, l.y);
               }}
-              surDetecter={detecter}
+              surDetecter={() => detecter()}
+              surDetecterExemple={() => {
+                setSelection(null);
+                setMode({ type: 'detection', candidats: [], sansTexte: false, encadrer: true });
+              }}
+              surSupprimer={(ids) => {
+                const tous = ids.length === locaux.length;
+                const quoi = ids.length > 1 ? `${ids.length} locaux` : '1 local';
+                if (!confirm(`Supprimer ${tous ? `les ${quoi} de ce plan` : quoi} ? Les photos restent, sur des repères hors local. (Annulable)`)) return;
+                void supprimerLocaux(ids, `${quoi} supprimé${ids.length > 1 ? 's' : ''}`);
+              }}
+              annulation={annulation?.texte ?? null}
+              surAnnuler={() => void annuler()}
               surAjouter={() => {
                 setSelection(null);
                 setMode({ type: 'ajout' });
@@ -869,41 +927,114 @@ function FenetreRattachement({
   );
 }
 
+/**
+ * Liste des locaux du plan. Depuis le 23/11/2026 : détection guidée par une étiquette encadrée,
+ * sélection de plusieurs locaux, « Tout supprimer », et « ↶ Annuler » la dernière action.
+ */
 function ListeLocaux({
   locaux,
   occupe,
   surChoix,
   surDetecter,
+  surDetecterExemple,
   surAjouter,
+  surSupprimer,
+  annulation,
+  surAnnuler,
 }: {
   locaux: Local[];
   occupe: boolean;
   surChoix: (l: Local) => void;
   surDetecter: () => void;
+  surDetecterExemple: () => void;
   surAjouter: () => void;
+  surSupprimer: (ids: string[]) => void;
+  /** Dernière action annulable (texte), ou null. */
+  annulation: string | null;
+  surAnnuler: () => void;
 }) {
+  // Mode sélection : null = désactivé.
+  const [choisis, setChoisis] = useState<Set<string> | null>(null);
+  useRetour(choisis !== null, () => setChoisis(null), 2);
+  const basculer = (id: string) =>
+    setChoisis((c) => {
+      const n = new Set(c);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   return (
     <>
       <div className="boutons">
         <button className="principal" onClick={surDetecter} disabled={occupe}>
           {occupe ? 'Lecture du plan…' : 'Détecter les locaux'}
         </button>
+        <button onClick={surDetecterExemple} disabled={occupe} title="Tracez un cadre autour du nom d'un local : seules les étiquettes de même police et taille seront proposées">
+          ▭ D'après un exemple
+        </button>
         <button onClick={surAjouter} disabled={occupe}>
           + Ajouter un local
         </button>
       </div>
+      {annulation && (
+        <div className="boutons">
+          <button className="petit" onClick={surAnnuler} disabled={occupe} title={`Annuler : ${annulation}`}>
+            ↶ Annuler : {annulation}
+          </button>
+        </div>
+      )}
       <h2>
         Locaux de ce plan <span className="discret">({locaux.length})</span>
       </h2>
+      {locaux.length > 0 && (
+        <div className="boutons">
+          {choisis === null ? (
+            <>
+              <button className="petit" onClick={() => setChoisis(new Set())} disabled={occupe}>
+                ☑ Sélectionner
+              </button>
+              <button className="petit discret" onClick={() => surSupprimer(locaux.map((l) => l.id))} disabled={occupe}>
+                Tout supprimer
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="petit"
+                onClick={() => setChoisis(choisis.size === locaux.length ? new Set() : new Set(locaux.map((l) => l.id)))}
+              >
+                {choisis.size === locaux.length ? 'Tout décocher' : `Tout cocher (${locaux.length})`}
+              </button>
+              <button
+                className="petit principal"
+                disabled={occupe || choisis.size === 0}
+                onClick={() => {
+                  surSupprimer([...choisis]);
+                  setChoisis(null);
+                }}
+              >
+                Supprimer la sélection ({choisis.size})
+              </button>
+              <button className="petit" onClick={() => setChoisis(null)}>
+                Terminer
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {locaux.length === 0 ? (
         <p className="discret">
-          Aucun local pour l'instant. « Détecter les locaux » lit les étiquettes du plan ; vous validez ensuite la liste.
+          Aucun local pour l'instant. « Détecter les locaux » lit les étiquettes du plan ; vous validez ensuite la liste. Si les
+          propositions sont fausses, « D'après un exemple » : encadrez le nom d'un local sur le plan.
         </p>
       ) : (
         <ul className="liste-locaux">
           {locaux.map((l) => (
-            <li key={l.id}>
-              <button onClick={() => surChoix(l)}>
+            <li key={l.id} className={choisis?.has(l.id) ? 'choisi' : undefined}>
+              {choisis !== null && (
+                <input type="checkbox" checked={choisis.has(l.id)} aria-label={`Choisir ${l.nom}`} onChange={() => basculer(l.id)} />
+              )}
+              <button onClick={() => (choisis !== null ? basculer(l.id) : surChoix(l))}>
                 <span>{l.nom}</span>
               </button>
             </li>
@@ -923,7 +1054,12 @@ function PanneauDetection({
   surVoir,
   surAnnuler,
   surEnregistrer,
+  exemple,
+  surEncadrer,
 }: {
+  /** Détection guidée par une étiquette encadrée. */
+  exemple: boolean;
+  surEncadrer: () => void;
   candidats: Candidat[];
   sansTexte: boolean;
   occupe: boolean;
@@ -956,6 +1092,11 @@ function PanneauDetection({
           Enregistrer {retenus} {retenus > 1 ? 'locaux' : 'local'}
         </button>
         <button onClick={surAnnuler}>Annuler</button>
+      </div>
+      <div className="boutons">
+        <button className="petit" onClick={surEncadrer} disabled={occupe} title="Tracez un cadre autour du nom d'un local : seules les étiquettes de même police et taille seront proposées">
+          ▭ {exemple ? 'Encadrer une autre étiquette' : 'Propositions fausses ? Encadrer une étiquette de local'}
+        </button>
       </div>
       {nouveaux.length > 0 && (
         <>

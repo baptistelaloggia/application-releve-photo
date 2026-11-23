@@ -16,8 +16,10 @@ export function pdfFictif(texte, etiquettes = []) {
   const textes = etiquettes
     .flatMap(([x, y, lignes]) =>
       lignes.map((l, i) => {
-        const t = l.replace('²', '2');
-        return `BT /F1 7 Tf ${x - t.length * 2} ${y - i * 7.5} Td (${t}) Tj ET`;
+        // Une ligne peut être en gras : { t: 'Open space 01', gras: true } (police F2, Helvetica-Bold).
+        const gras = typeof l === 'object';
+        const t = (gras ? l.t : l).replace('²', '2');
+        return `BT /${gras ? 'F2' : 'F1'} 7 Tf ${x - t.length * 2} ${y - i * 7.5} Td (${t}) Tj ET`;
       }),
     )
     .join(' ');
@@ -25,9 +27,10 @@ export function pdfFictif(texte, etiquettes = []) {
   const objets = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>',
     `<< /Length ${flux.length} >>\nstream\n${flux}\nendstream`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
   ];
   let sortie = '%PDF-1.4\n';
   const positions = [];

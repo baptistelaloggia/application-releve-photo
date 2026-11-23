@@ -95,3 +95,12 @@ describe('codes de niveau', () => {
     expect(devinerNiveau('plan masse.pdf')).toBeNull();
   });
 });
+
+describe('niveau d’une page : titres avec un mot intercalé (23/11/2026)', () => {
+  it('reconnaît « Plan projet R+6 »', async () => {
+    const { devinerNiveauPage } = await import('./niveaux');
+    expect(devinerNiveauPage('Réhabilitation d’un immeuble Plan projet R+6 R+6 projet Terrasse accessible R+6 Niveau')).toBe('R+6');
+    expect(devinerNiveauPage('PLAN ETAT EXISTANT SS1')).toBe('SS1');
+    expect(devinerNiveauPage('Plan de masse')).toBeNull();
+  });
+});

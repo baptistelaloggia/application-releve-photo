@@ -1,4 +1,5 @@
 import * as pdfjs from 'pdfjs-dist';
+import type { StyleEtiquette } from '../domaine/locaux';
 import urlTravailleur from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // pdf.js lit les PDF dans un « worker » (tâche de fond) pour ne pas figer l'écran.
@@ -77,11 +78,23 @@ export function ouvrirPagePlan(cle: string, fichier: Blob): Promise<PagePdf> {
   return page;
 }
 
-/** Propose les locaux d'un plan à partir de son texte (voir domaine/locaux.ts). */
-export async function proposerLocaux(cle: string, fichier: Blob) {
+/**
+ * Propose les locaux d'un plan à partir de son texte (voir domaine/locaux.ts). exemple : style
+ * d'une étiquette montrée par l'utilisateur (encadré) ; seules les étiquettes de ce style sont gardées.
+ */
+export async function proposerLocaux(cle: string, fichier: Blob, exemple?: StyleEtiquette) {
   const { detecterLocaux } = await import('../domaine/locaux');
   const { lireTextesPlaces } = await import('./textesPlaces');
   const page = await ouvrirPagePlan(cle, fichier);
   const { textes, largeur, hauteur } = await lireTextesPlaces(page);
-  return { locaux: detecterLocaux(textes, largeur, hauteur), sansTexte: textes.every((t) => !t.texte.trim()) };
+  return { locaux: detecterLocaux(textes, largeur, hauteur, exemple), sansTexte: textes.every((t) => !t.texte.trim()) };
+}
+
+/** Style du texte encadré par l'utilisateur sur le plan (coordonnées relatives) ; null s'il n'y a pas de texte. */
+export async function styleEncadre(cle: string, fichier: Blob, cadre: { x1: number; y1: number; x2: number; y2: number }) {
+  const { styleDansCadre } = await import('../domaine/locaux');
+  const { lireTextesPlaces } = await import('./textesPlaces');
+  const page = await ouvrirPagePlan(cle, fichier);
+  const { textes, largeur, hauteur } = await lireTextesPlaces(page);
+  return styleDansCadre(textes, largeur, hauteur, cadre);
 }

@@ -448,3 +448,9 @@ button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
   border-radius: 18px; padding: 10px 26px; pointer-events: none; }
 .corbeille span { font-size: 0.8rem; }
 .corbeille.active { background: #b3261e; border-style: solid; transform: translateX(-50%) scale(1.15); }
+
+/* Encadré tracé autour du nom d'un local (23/11/2026). */
+.cadre-selection { position: absolute; inset: 0; z-index: 6; cursor: crosshair; touch-action: none; }
+.cadre-selection .consigne { pointer-events: auto; }
+.cadre-trace { position: absolute; border: 2px dashed #e0281e; background: rgb(224 40 30 / 0.12); pointer-events: none; }
+.liste-locaux li.choisi { background: var(--info-fond); }

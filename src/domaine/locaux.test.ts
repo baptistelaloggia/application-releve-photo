@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detecterLocaux, type TextePlace } from './locaux';
+import { detecterLocaux, styleDansCadre, type TextePlace } from './locaux';
 import { nomDeBase, numeroterNomsEnDouble } from './locaux';
 
 /** Étiquette fictive centrée en (cx, y), lignes de hauteur h espacées de h. */
@@ -193,5 +193,28 @@ describe('détection : cartouche, légende et style des étiquettes (21/11/2026)
   it('ajoute au nom le nombre qui le termine (« Open Space 2 »)', () => {
     const t = avecPolice(650, 500, [['Open Space', 'nom'], ['2', 'nom'], ['BR.A-R02-02', 'autre'], ['41.5 m²', 'autre']]);
     expect(detecterLocaux([...plan, ...t], L, H).find((l) => l.numero === 'BR.A-R02-02')?.nom).toBe('Open Space 2');
+  });
+});
+
+describe('détection d’après une étiquette encadrée (23/11/2026)', () => {
+  const ligne = (texte: string, x: number, y: number, police: string, h = 6) => ({ texte, x: x - texte.length * h * 0.3, y, largeur: texte.length * h * 0.6, hauteur: h, angle: 0, police });
+  // Noms en gras (police « gras ») sans surface ; mobilier en maigre (« maigre ») avec surface.
+  const textes: TextePlace[] = [
+    ligne('Open space flex office 01', 600, 300, 'gras'),
+    ligne('CTA 01', 900, 300, 'gras'),
+    ligne('Terrasse accessible R+6', 1200, 900, 'gras'),
+    ...[0, 1, 2, 3].flatMap((i) => [ligne('Bureau', 400 + i * 120, 600, 'maigre'), ligne('12,6m²', 400 + i * 120, 606.3, 'maigre')]),
+  ];
+
+  it('lit le style du texte encadré', () => {
+    expect(styleDansCadre(textes, L, H, { x1: 520 / L, y1: 280 / H, x2: 680 / L, y2: 310 / H })).toEqual({ police: 'gras', hauteur: 6 });
+    expect(styleDansCadre(textes, L, H, { x1: 0, y1: 0, x2: 0.01, y2: 0.01 })).toBeNull();
+  });
+
+  it('ne garde que les étiquettes du style de l’exemple, même sans surface', () => {
+    const auto = detecterLocaux(textes, L, H).map((l) => l.nom);
+    expect(auto).toContain('Bureau');
+    const guidee = detecterLocaux(textes, L, H, { police: 'gras', hauteur: 6 }).map((l) => l.nom);
+    expect(guidee.sort()).toEqual(['CTA 01', 'Open space flex office 01', 'Terrasse accessible R+6']);
   });
 });

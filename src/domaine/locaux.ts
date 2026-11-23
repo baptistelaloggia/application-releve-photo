@@ -132,8 +132,49 @@ function regrouper(lignes: Ligne[]): Ligne[][] {
   return groupes;
 }
 
-/** Détecte les locaux d'une page. largeurPage et hauteurPage : taille de la page affichée, en points. */
-export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteurPage: number): LocalDetecte[] {
+/**
+ * Style d'une étiquette de local montrée par l'utilisateur (encadré tracé sur le plan, 23/11/2026) :
+ * police et hauteur du texte du nom.
+ */
+export interface StyleEtiquette {
+  police?: string;
+  hauteur: number;
+}
+
+/**
+ * Style du nom de local encadré par l'utilisateur : le texte le plus long dans le cadre (coordonnées
+ * relatives 0 à 1), hors surfaces, numéros et cotes. null si le cadre ne contient pas de nom.
+ */
+export function styleDansCadre(
+  textes: TextePlace[],
+  largeurPage: number,
+  hauteurPage: number,
+  cadre: { x1: number; y1: number; x2: number; y2: number },
+): StyleEtiquette | null {
+  const dedans = textes.filter((t) => {
+    if (Math.abs(t.angle) >= 5 || !t.texte.trim() || t.hauteur <= 0) return false;
+    const x = (t.x + t.largeur / 2) / largeurPage;
+    const y = (t.y - t.hauteur * 0.35) / hauteurPage;
+    return x >= cadre.x1 && x <= cadre.x2 && y >= cadre.y1 && y <= cadre.y2;
+  });
+  const noms = dedans.filter((t) => !estBruit(t.texte) && !estSurface(t.texte) && !MOTIF_NUMERO_LETTRES.test(t.texte.trim()));
+  const choisi = [...(noms.length ? noms : dedans)].sort((a, b) => b.texte.trim().length - a.texte.trim().length)[0];
+  return choisi ? { ...(choisi.police ? { police: choisi.police } : {}), hauteur: choisi.hauteur } : null;
+}
+
+/** Même style que l'exemple : même police (si connue) et hauteur à 15 % près. */
+function memeStyle(l: { police?: string; h: number }, exemple: StyleEtiquette) {
+  return (exemple.police === undefined || l.police === undefined || l.police === exemple.police) && Math.abs(l.h - exemple.hauteur) <= 0.15 * exemple.hauteur;
+}
+
+/**
+ * Détecte les locaux d'une page. largeurPage et hauteurPage : taille de la page affichée, en points.
+ * exemple : style d'une étiquette montrée par l'utilisateur. Seules les étiquettes dont le nom a ce
+ * style sont alors retenues, même sans numéro ni surface (« Open space flex office 01 »), et les
+ * autres textes (désignations de mobilier « Bureau 12,6 m² » d'un autre style…) sont écartés.
+ */
+export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteurPage: number, exemple?: StyleEtiquette): LocalDetecte[] {
+  if (exemple) return detecterSelonExemple(textes, largeurPage, hauteurPage, exemple);
   const lignes: Ligne[] = textes
     .filter((t) => Math.abs(t.angle) < 5 && t.texte.trim() !== '' && t.hauteur > 0)
     .map((t) => ({
@@ -255,6 +296,46 @@ export function detecterLocaux(textes: TextePlace[], largeurPage: number, hauteu
           (!majusculesExigees || c.majuscules),
     )
     .map(({ h: _h, hNom: _hNom, police: _police, majuscules: _majuscules, ...c }) => c);
+}
+
+/** Détection guidée par une étiquette exemple (voir detecterLocaux). */
+function detecterSelonExemple(textes: TextePlace[], largeurPage: number, hauteurPage: number, exemple: StyleEtiquette): LocalDetecte[] {
+  const toutes: Ligne[] = textes
+    .filter((t) => Math.abs(t.angle) < 5 && t.texte.trim() !== '' && t.hauteur > 0)
+    .map((t) => ({
+      texte: t.texte.trim().replace(/\s+/g, ' '),
+      cx: t.x + t.largeur / 2,
+      cy: t.y - t.hauteur * 0.35,
+      h: t.hauteur,
+      ...(t.police ? { police: t.police } : {}),
+    }));
+  const exclues = zonesExclues(toutes, largeurPage, hauteurPage);
+  // Lignes retenues : celles du style de l'exemple (le nom), et les numéros et surfaces voisins.
+  const lignes = toutes.filter(
+    (l) => memeStyle(l, exemple) || estSurface(l.texte) || MOTIF_NUMERO_LETTRES.test(l.texte) || /^\d{1,3}$/.test(l.texte),
+  );
+  const resultat: LocalDetecte[] = [];
+  for (const groupe of regrouper(lignes)) {
+    const noms = groupe.filter((l) => memeStyle(l, exemple) && !estSurface(l.texte) && (!estBruit(l.texte) || /^\d{1,3}$/.test(l.texte)));
+    if (!noms.some((l) => !estBruit(l.texte)) || noms.length > 4) continue;
+    const surfaceLigne = groupe.find((l) => estSurface(l.texte));
+    const surface = surfaceLigne ? lireSurface(surfaceLigne.texte) : null;
+    if (surface !== null && surface < SURFACE_MINIMALE) continue;
+    const numeroLigne = groupe.find((l) => !noms.includes(l) && MOTIF_NUMERO_LETTRES.test(l.texte));
+    const cx = noms.reduce((s, l) => s + l.cx, 0) / noms.length;
+    const cy = (groupe[0].cy + groupe[groupe.length - 1].cy) / 2;
+    const c = { x: arrondir(cx / largeurPage), y: arrondir(cy / hauteurPage) };
+    if (exclues.some((z) => c.x >= z.x1 && c.x <= z.x2 && c.y >= z.y1 && c.y <= z.y2)) continue;
+    resultat.push({
+      nom: noms.map((l) => l.texte).join(' '),
+      numero: numeroLigne?.texte ?? null,
+      surface,
+      ...c,
+      confiance: 'forte',
+      lignes: groupe.map((l) => l.texte),
+    });
+  }
+  return resultat;
 }
 
 /**
