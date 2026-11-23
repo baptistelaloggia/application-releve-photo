@@ -124,6 +124,42 @@ try {
   });
   assert.equal(nb, 3);
 
+  // 4. Tous les plans d'après un exemple (24/11/2026) : un second plan R+5, même présentation.
+  await page.getByRole('button', { name: '← Projet' }).click();
+  await page.locator('input[type=file][accept*=pdf]').setInputFiles({ name: 'autre.pdf', mimeType: 'application/pdf', buffer: pdfFictif('Plan projet R+5', etiquettes) });
+  await page.getByRole('button', { name: 'Importer 1 plan' }).click();
+  await page.getByText(/Plan importé/).waitFor();
+  await page.getByRole('button', { name: 'Détecter les locaux sur tous les plans…' }).click();
+  // L'exemple encadré sur le plan R+6 est mémorisé pour le projet : il est proposé.
+  await page.getByRole('button', { name: 'Réutiliser l’exemple « Open space flex office 01 »'.replace('’', "'") }).waitFor();
+  await page.getByRole('button', { name: "▭ D'après un exemple…" }).click();
+  await page.getByLabel('Plan exemple').selectOption({ label: 'R+5 · Étage 5' });
+  const fond = page.locator('.zone-exemple canvas').first();
+  await fond.waitFor();
+  await page.waitForTimeout(500);
+  const r = await fond.boundingBox();
+  const cx = r.x + (250 / 842) * r.width;
+  const cy = r.y + ((595 - 432.5) / 595) * r.height;
+  const p = r.width / 842; // pixels par point
+  await page.mouse.move(cx - 60 * p, cy - 8 * p);
+  await page.mouse.down();
+  await page.mouse.move(cx + 60 * p, cy + 6 * p, { steps: 5 });
+  await page.mouse.up();
+  await page.getByText(/Exemple : « Open space flex office 01 » · 3 étiquettes de ce style sur ce plan/).waitFor();
+  await capture('4-exemple-tous-les-plans');
+  await page.getByRole('button', { name: 'Appliquer à tous les plans (2)' }).click();
+  // R+6 a déjà ses 3 locaux (non recréés) ; R+5 reçoit les 3 siens, sans le mobilier.
+  await page.getByRole('button', { name: 'Enregistrer 3 locaux' }).click();
+  await page.getByText(/3 locaux enregistrés sur le plan T08_R\+5\.pdf/).waitFor();
+  const locauxR5 = await page.evaluate(async () => {
+    let d = await navigator.storage.getDirectory();
+    for (const m of ['projets', `${new Date().getFullYear()}-T08_Exemple-fictif`, '_data', 'locaux']) d = await d.getDirectoryHandle(m);
+    const noms = [];
+    for await (const [, h] of d.entries()) noms.push(JSON.parse(await (await h.getFile()).text()).nom);
+    return noms.sort();
+  });
+  assert.deepEqual(locauxR5, ['CTA 01', 'CTA 01', 'Open space flex office 01', 'Open space flex office 01', 'WC 01', 'WC 01']);
+
   assert.deepEqual(erreurs, []);
   console.log('OK : détection d’après un exemple, suppression et annulation');
 } finally {

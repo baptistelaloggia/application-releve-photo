@@ -170,6 +170,14 @@ Règles issues du lot 1 (04/11/2026) :
   - **L'encadré :** « ▭ D'après un exemple » (liste des locaux), ou « Propositions fausses ? Encadrer une étiquette de local » (pendant la détection). On trace un cadre au doigt autour du nom d'un local.
   - **Effet :** l'appli relève la police et la taille de ce texte. Elle ne propose alors que les étiquettes de même police et de même taille (à 15 % près), même sans numéro ni surface. Cartouche et légende restent exclus.
   - **Résultat sur le carnet d'essai concerné :** 31 locaux, tous les noms en gras, et plus aucune désignation de mobilier.
+  - **Sur tous les plans** (24/11/2026) : dans « Détecter les locaux sur tous les plans », le bouton « ▭ D'après un exemple… » fait trois choses :
+    - on choisit le plan exemple et on y encadre le nom d'un local ;
+    - un aperçu donne le nombre d'étiquettes de ce style sur ce plan ;
+    - « Appliquer à tous les plans » lance la détection guidée sur chaque plan. Le récapitulatif par niveau, puis l'enregistrement, sont inchangés.
+  - **Mémoire de l'exemple :** il est mémorisé pour le projet, sur l'appareil, y compris quand il est tracé sur un seul plan. « Réutiliser l'exemple « … » » le relance sans nouvel encadré.
+  - **Encadré :** la bascule « ✋ Déplacer / zoomer » ↔ « ▭ Encadrer » permet d'agrandir le plan avant de tracer.
+  - **Reconnaissance d'un plan à l'autre :** l'appli lit le vrai nom des polices du PDF (« ABCDEF+ArialNarrow,Bold ») au lieu de l'identifiant interne de pdf.js, propre à chaque fichier. Les plans d'un même carnet, découpés à l'import, gardent le nom exact (vérifié sur un carnet d'essai).
+  - **Repli :** pour un plan venu d'un autre fichier, où le préfixe diffère, la comparaison se fait sur la famille de police, la taille et la chasse. La chasse ne distingue pas toujours le gras du maigre (mesuré : 0,555 contre 0,563 pour une même famille). Sur un tel plan, il vaut mieux encadrer un exemple propre [À VÉRIFIER].
 - **Supprimer et annuler** (23/11/2026) :
   - **Supprimer plusieurs locaux :** dans la liste des locaux, « ☑ Sélectionner » (cases à cocher, « Supprimer la sélection ») et « Tout supprimer ».
   - **Annuler :** « ↶ Annuler » défait la dernière action sur les locaux (détection enregistrée, suppression). Les locaux reviennent avec le même identifiant, les repères retrouvent leur local, et les photos reprennent leur rangement.

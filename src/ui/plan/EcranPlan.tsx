@@ -12,6 +12,7 @@ import { FicheRepere, PanneauPanier, PanneauTerrain, PhotosDuLocal } from './Pan
 import type { EspaceProjet, ResultatLocal, SaisieLocal } from '../../projet/EspaceProjet';
 import { proposerLocaux, styleEncadre } from '../../pdf/pdf';
 import { CadreSelection } from './CadreSelection';
+import { cleExempleLocaux } from '../DetectionGlobale';
 import { ecrireReglage, lireReglage } from '../../stockage/registre';
 import { BarreRecherche } from '../BarreRecherche';
 import { Message, texteErreur } from '../commun';
@@ -507,6 +508,8 @@ export function EcranPlan({ espace, auteur, planId, localId, surChangerPlan, sur
         setInfo('Aucun texte dans le cadre : encadrez le nom d’un local, au plus près.');
         return;
       }
+      // Mémorisé pour le projet : réutilisable dans « Détecter les locaux sur tous les plans ».
+      await ecrireReglage(cleExempleLocaux(espace.projet.id), style);
       await detecter(style);
     });
 

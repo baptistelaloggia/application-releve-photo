@@ -452,5 +452,10 @@ button.enregistre { background: #b3261e; color: #fff; border-color: #b3261e; }
 /* Encadré tracé autour du nom d'un local (23/11/2026). */
 .cadre-selection { position: absolute; inset: 0; z-index: 6; cursor: crosshair; touch-action: none; }
 .cadre-selection .consigne { pointer-events: auto; }
+.cadre-selection.inactif { pointer-events: none; cursor: auto; }
 .cadre-trace { position: absolute; border: 2px dashed #e0281e; background: rgb(224 40 30 / 0.12); pointer-events: none; }
 .liste-locaux li.choisi { background: var(--info-fond); }
+
+/* Détection sur tous les plans d'après un exemple : plan exemple affiché pour l'encadré (24/11/2026). */
+.zone-exemple { position: relative; height: 65vh; min-height: 320px; border: 1px solid var(--bord); border-radius: 8px; overflow: hidden; }
+.zone-exemple .visionneuse { position: absolute; inset: 0; }

@@ -207,7 +207,11 @@ describe('détection d’après une étiquette encadrée (23/11/2026)', () => {
   ];
 
   it('lit le style du texte encadré', () => {
-    expect(styleDansCadre(textes, L, H, { x1: 520 / L, y1: 280 / H, x2: 680 / L, y2: 310 / H })).toEqual({ police: 'gras', hauteur: 6 });
+    expect(styleDansCadre(textes, L, H, { x1: 520 / L, y1: 280 / H, x2: 680 / L, y2: 310 / H })).toMatchObject({
+      police: 'gras',
+      hauteur: 6,
+      texte: 'Open space flex office 01',
+    });
     expect(styleDansCadre(textes, L, H, { x1: 0, y1: 0, x2: 0.01, y2: 0.01 })).toBeNull();
   });
 
@@ -216,5 +220,22 @@ describe('détection d’après une étiquette encadrée (23/11/2026)', () => {
     expect(auto).toContain('Bureau');
     const guidee = detecterLocaux(textes, L, H, { police: 'gras', hauteur: 6 }).map((l) => l.nom);
     expect(guidee.sort()).toEqual(['CTA 01', 'Open space flex office 01', 'Terrasse accessible R+6']);
+  });
+});
+
+describe('exemple appliqué à un autre plan (24/11/2026)', () => {
+  /** Ligne d'un autre fichier : préfixe de sous-ensemble différent, chasse propre au gras ou au maigre. */
+  const ligne = (texte: string, x: number, y: number, police: string, chasse: number, h = 6): TextePlace => {
+    const largeur = texte.length * h * chasse;
+    return { texte, x: x - largeur / 2, y, largeur, hauteur: h, angle: 0, police };
+  };
+  it('reconnaît le style par la famille de police et la chasse quand la police exacte est absente', () => {
+    const exemple = { police: 'AAAAAA+Poppins', famille: 'Poppins', hauteur: 6, chasse: 0.62 };
+    const autrePlan: TextePlace[] = [
+      ligne('Open space 05', 600, 300, 'BBBBBB+Poppins', 0.63), // gras, autre fichier
+      ligne('Bureau', 900, 300, 'CCCCCC+Poppins', 0.52), // maigre : chasse plus étroite
+      ligne('Local CTA', 1200, 300, 'DDDDDD+Arial', 0.62), // autre famille
+    ];
+    expect(detecterLocaux(autrePlan, L, H, exemple).map((l) => l.nom)).toEqual(['Open space 05']);
   });
 });

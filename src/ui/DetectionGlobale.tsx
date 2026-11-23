@@ -1,9 +1,16 @@
-import { useState } from 'react';
-import type { LocalDetecte } from '../domaine/locaux';
+import { useEffect, useRef, useState } from 'react';
+import type { LocalDetecte, StyleEtiquette } from '../domaine/locaux';
 import type { Niveau, Plan } from '../domaine/types';
 import type { EspaceProjet } from '../projet/EspaceProjet';
-import { proposerLocaux } from '../pdf/pdf';
+import { proposerLocaux, styleEncadre } from '../pdf/pdf';
+import { ecrireReglage, lireReglage } from '../stockage/registre';
 import { Message, texteErreur } from './commun';
+import { CadreSelection } from './plan/CadreSelection';
+import { VisionneusePlan, type CommandesVisionneuse } from './plan/VisionneusePlan';
+import { useRetour } from './retour';
+
+/** Clé de l'exemple d'étiquette d'un projet, mémorisé sur l'appareil (24/11/2026). */
+export const cleExempleLocaux = (projetId: string) => `exempleLocaux:${projetId}`;
 
 interface Ligne {
   plan: Plan;
@@ -24,9 +31,22 @@ interface Props {
   surFin: () => void;
 }
 
-/** Détection des locaux sur tous les plans du projet, avec un récapitulatif par niveau avant enregistrement. */
+/**
+ * Détection des locaux sur tous les plans du projet, avec un récapitulatif par niveau avant enregistrement.
+ * D'après un exemple (24/11/2026) : on choisit un plan, on encadre le nom d'un local ; seules les
+ * étiquettes de même police et de même taille sont proposées, sur tous les plans. L'exemple est
+ * mémorisé pour le projet (sur l'appareil) et peut être réutilisé.
+ */
 export function DetectionGlobale({ espace, auteur, surJournal, surFin }: Props) {
   const [lignes, setLignes] = useState<Ligne[] | null>(null);
+  const [exemple, setExemple] = useState<StyleEtiquette | null>(null);
+  /** Encadré en cours : plan exemple choisi. */
+  const [encadrer, setEncadrer] = useState<{ planId: string; fichier: Blob | null; apercu?: number } | null>(null);
+  const vue = useRef<CommandesVisionneuse>(null);
+  useRetour(!!encadrer, () => setEncadrer(null), 2);
+  useEffect(() => {
+    void lireReglage<StyleEtiquette>(cleExempleLocaux(espace.projet.id)).then((e) => e && setExemple(e));
+  }, [espace]);
   const [progression, setProgression] = useState<string | null>(null);
   const [inclureNomsSeuls, setInclureNomsSeuls] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -37,14 +57,40 @@ export function DetectionGlobale({ espace, auteur, surJournal, surFin }: Props) 
     return p ? [{ p, n }] : [];
   });
 
-  async function lancer() {
+  async function choisirPlanExemple(planId: string) {
+    setEncadrer({ planId, fichier: null });
+    const plan = espace.planParId(planId);
+    if (plan) {
+      const fichier = await espace.lirePlan(plan);
+      setEncadrer((e) => (e && e.planId === planId ? { ...e, fichier } : e));
+    }
+  }
+
+  /** Encadré tracé sur le plan exemple : style relevé, mémorisé, et aperçu sur ce plan. */
+  async function surCadre(cadre: { x1: number; y1: number; x2: number; y2: number }) {
+    const plan = encadrer && espace.planParId(encadrer.planId);
+    if (!plan || !encadrer.fichier) return;
+    setErreur(null);
+    const style = await styleEncadre(plan.empreinte, encadrer.fichier, cadre);
+    if (!style) {
+      setErreur('Aucun texte dans le cadre : encadrez le nom d’un local, au plus près.');
+      return;
+    }
+    setExemple(style);
+    await ecrireReglage(cleExempleLocaux(espace.projet.id), style);
+    const { locaux } = await proposerLocaux(plan.empreinte, encadrer.fichier, style);
+    setEncadrer({ ...encadrer, apercu: locaux.length });
+  }
+
+  async function lancer(avecExemple?: StyleEtiquette) {
     setErreur(null);
     setOccupe(true);
+    setEncadrer(null);
     const resultat: Ligne[] = [];
     try {
       for (const [i, { p, n }] of plans.entries()) {
         setProgression(`Lecture du plan ${n.code} (${i + 1}/${plans.length})…`);
-        const { locaux, sansTexte } = await proposerLocaux(p.empreinte, await espace.lirePlan(p));
+        const { locaux, sansTexte } = await proposerLocaux(p.empreinte, await espace.lirePlan(p), avecExemple);
         const nouveaux = locaux.filter((l) => !espace.dejaPresent(p.id, l));
         const sures = nouveaux.filter((l) => l.confiance === 'forte');
         const aVerifier = nouveaux.filter((l) => l.confiance === 'moyenne');
@@ -95,16 +141,74 @@ export function DetectionGlobale({ espace, auteur, surJournal, surFin }: Props) 
   return (
     <section className="carte">
       <h2>Détecter les locaux sur tous les plans</h2>
-      {!lignes ? (
+      {encadrer ? (
+        <>
+          <p className="discret">
+            Plan exemple :{' '}
+            <select aria-label="Plan exemple" value={encadrer.planId} onChange={(e) => void choisirPlanExemple(e.target.value)}>
+              {plans.map(({ p, n }) => (
+                <option key={p.id} value={p.id}>
+                  {n.code} · {espace.libelle(n)}
+                </option>
+              ))}
+            </select>{' '}
+            · encadrez le nom d'un local au doigt (« ✋ Déplacer / zoomer » pour agrandir d'abord le plan).
+          </p>
+          {encadrer.apercu !== undefined && exemple && (
+            <Message type="info">
+              Exemple : « {exemple.texte} » · {encadrer.apercu} étiquette{encadrer.apercu > 1 ? 's' : ''} de ce style sur ce plan.
+            </Message>
+          )}
+          <div className="boutons">
+            <button className="principal" disabled={occupe || !exemple || encadrer.apercu === undefined} onClick={() => exemple && void lancer(exemple)}>
+              Appliquer à tous les plans ({plans.length})
+            </button>
+            <button onClick={() => setEncadrer(null)} disabled={occupe}>
+              Retour
+            </button>
+          </div>
+          <div className="zone-exemple">
+            {encadrer.fichier ? (
+              <>
+                <VisionneusePlan
+                  key={encadrer.planId}
+                  ref={vue}
+                  cle={espace.planParId(encadrer.planId)!.empreinte}
+                  fichier={encadrer.fichier}
+                  marqueurs={[]}
+                  modePlacement
+                />
+                <CadreSelection
+                  convertir={(x, y) => vue.current?.relatifDepuisEcran(x, y) ?? null}
+                  surCadre={(c) => void surCadre(c)}
+                  surAnnuler={() => setEncadrer(null)}
+                />
+              </>
+            ) : (
+              <div className="vue-etat">Lecture du plan…</div>
+            )}
+          </div>
+        </>
+      ) : !lignes ? (
         <>
           <p className="discret">
             Lit les étiquettes de locaux des {plans.length} plans du projet. Rien n'est enregistré avant votre validation ;
-            les locaux déjà présents ne sont pas recréés.
+            les locaux déjà présents ne sont pas recréés. Si la détection automatique propose de faux locaux (mobilier,
+            annotations), détectez d'après un exemple : vous encadrez le nom d'un local sur un plan, et seules les étiquettes
+            de même police et de même taille sont retenues, sur tous les plans.
           </p>
           <div className="boutons">
-            <button className="principal" onClick={lancer} disabled={occupe || plans.length === 0}>
+            <button className="principal" onClick={() => void lancer()} disabled={occupe || plans.length === 0}>
               {progression ?? 'Lancer la détection'}
             </button>
+            <button onClick={() => plans[0] && void choisirPlanExemple(plans[0].p.id)} disabled={occupe || plans.length === 0}>
+              ▭ D'après un exemple…
+            </button>
+            {exemple && (
+              <button onClick={() => void lancer(exemple)} disabled={occupe || plans.length === 0} title="Exemple déjà encadré pour ce projet">
+                Réutiliser l'exemple « {exemple.texte ?? 'étiquette'} »
+              </button>
+            )}
             <button onClick={surFin} disabled={occupe}>
               Annuler
             </button>
